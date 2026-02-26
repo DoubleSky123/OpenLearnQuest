@@ -1,120 +1,108 @@
 /**
- * Validate the assembled code and complexity blocks
- * @param {Array} assemblyArea - Array of code block items with {index, isDistractor}
- * @param {Array} complexityArea - Array of complexity indices
- * @param {Object} currentLevel - Current level configuration
- * @returns {Object} Validation result with isValid flag and errors (if any)
+ * Validation logic — "fill-to-trigger" model
+ *
+ * Validation only runs when the student has placed exactly
+ * correctOrder.length blocks in the assembly area.
+ * Before that, nothing is checked and no errors are shown.
+ *
+ * When the assembly is full, two things are checked in order:
+ *   1. Distractor present  → show educational feedback for that error type
+ *   2. Wrong order         → show sequence error feedback
  */
+
+import { analyzeDistractorError } from './distractorAnalyzer.js';
+import { detectCodeError } from './errorDetectionEngine.js';
+
 export const validateAssembly = (assemblyArea, complexityArea, currentLevel) => {
-  const codeComplete = assemblyArea.length === currentLevel.correctOrder.length;
-  const complexityComplete = !currentLevel.hasComplexity || 
-                             complexityArea.length === currentLevel.complexity.length;
-  
-  // Check if there are too many blocks
-  if (assemblyArea.length > currentLevel.correctOrder.length) {
+  const required = currentLevel.correctOrder.length;
+
+  // ── Not full yet — stay silent ──────────────────────────────────────
+  if (assemblyArea.length < required) {
+    return { isValid: false, errors: null };
+  }
+
+  // ── Too many blocks ─────────────────────────────────────────────────
+  if (assemblyArea.length > required) {
     return {
       isValid: false,
       errors: {
         type: 'too_many_blocks',
-        message: `Too many code blocks! You need exactly ${currentLevel.correctOrder.length} blocks, but you have ${assemblyArea.length}.`
+        message: '🧩 Too Many Code Blocks',
+        explanation: `You need exactly ${required} blocks, but you have ${assemblyArea.length}.`,
+        hint: 'Drag the extra block back to the pool.',
       }
     };
-  }
-  
-  if (currentLevel.hasComplexity && complexityArea.length > currentLevel.complexity.length) {
-    return {
-      isValid: false,
-      errors: {
-        type: 'too_many_complexity',
-        message: `Too many complexity blocks! You need exactly ${currentLevel.complexity.length} blocks, but you have ${complexityArea.length}.`
-      }
-    };
-  }
-  
-  // Check if all blocks are placed
-  const allBlocksPlaced = codeComplete && complexityComplete;
-  
-  // Not yet complete, no validation needed
-  if (!allBlocksPlaced) {
-    return { isValid: false, errors: null };
   }
 
-  // Check for distractor blocks (incorrect code blocks)
+  // ── Assembly is exactly full — now validate ─────────────────────────
+
+  // 1. Check for distractors
   const hasDistractor = assemblyArea.some(item => item.isDistractor);
-  
   if (hasDistractor) {
+    const wrongBlocks = assemblyArea
+      .map((item, idx) => item.isDistractor ? { item, position: idx + 1 } : null)
+      .filter(Boolean)
+      .map(({ item, position }) => ({
+        position,
+        code: currentLevel.distractors[item.index]
+      }));
+
+    const fb = analyzeDistractorError(wrongBlocks, currentLevel);
     return {
       isValid: false,
       errors: {
         type: 'distractor',
-        message: 'You have included incorrect code blocks! Some blocks don\'t belong in this operation.'
+        message: '❌ Incorrect Code Block Detected',
+        explanation: fb.explanation,
+        reasoning:   fb.reasoning,
+        keyPoint:    fb.keyPoint,
+        hint:        fb.hint,
+        wrongBlocks,
       }
     };
   }
-  
-  // Check if code order is correct
-  const codeCorrect = assemblyArea.every((item, pos) => 
-    !item.isDistractor && item.index === currentLevel.correctOrder[pos]
+
+  // 2. Check code order
+  const codeCorrect = assemblyArea.every(
+    (item, pos) => !item.isDistractor && item.index === currentLevel.correctOrder[pos]
   );
-  
-  // Check if complexity matching is correct
-  let complexityCorrect = true;
-  let complexityErrors = [];
-  
-  if (currentLevel.hasComplexity) {
-    complexityArea.forEach((actualComplexity, pos) => {
-      const expectedComplexity = currentLevel.complexity[pos];
-      // ✅ 直接比较字符串（因为现在是 'O(1)' 而不是索引）
-      if (expectedComplexity !== actualComplexity) {
-        complexityCorrect = false;
-        complexityErrors.push({
-          line: pos + 1,
-          expected: expectedComplexity,
-          actual: actualComplexity
-        });
-      }
-    });
-  }
-  
-  const allCorrect = codeCorrect && complexityCorrect;
-  
-  // Everything is correct
-  if (allCorrect) {
-    return { isValid: true, errors: null };
-  }
-  
-  // Generate specific error messages
+
   if (!codeCorrect) {
-    // Find which lines are in wrong order
+    // Try specific pattern detection first
+    const patternError = detectCodeError(
+      assemblyArea,
+      currentLevel,
+      currentLevel.errorRules || []
+    );
+    if (patternError) {
+      return { isValid: false, errors: patternError };
+    }
+
+    // Generic sequence error
     const wrongLines = assemblyArea
-      .map((item, pos) => {
-        if (item.index !== currentLevel.correctOrder[pos]) {
-          return pos + 1;
-        }
-        return null;
-      })
-      .filter(x => x !== null);
-    
+      .map((item, pos) =>
+        item.index !== currentLevel.correctOrder[pos]
+          ? {
+              position: pos + 1,
+              yourCode: currentLevel.pseudocode[item.index],
+              shouldBe: currentLevel.pseudocode[currentLevel.correctOrder[pos]],
+            }
+          : null
+      )
+      .filter(Boolean);
+
     return {
       isValid: false,
       errors: {
         type: 'code_order',
-        message: `Code sequence is incorrect. Check line(s): ${wrongLines.join(', ')}`,
-        wrongLines
+        message: '📝 Code Sequence Incorrect',
+        explanation: 'The order of operations matters in linked list manipulation!',
+        wrongLines,
+        hint: 'Think about what needs to happen first: connecting pointers or moving them?',
       }
     };
   }
-  
-  if (!complexityCorrect) {
-    return {
-      isValid: false,
-      errors: {
-        type: 'complexity',
-        message: 'Time complexity analysis is incorrect.',
-        errors: complexityErrors
-      }
-    };
-  }
-  
-  return { isValid: false, errors: null };
+
+  // ── All correct ─────────────────────────────────────────────────────
+  return { isValid: true, errors: null };
 };
