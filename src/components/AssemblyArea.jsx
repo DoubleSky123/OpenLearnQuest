@@ -189,6 +189,15 @@ export default function AssemblyArea({
           {errorDetails.keyPoint && (
             <p className="text-yellow-300 text-xs mt-2"><span className="font-semibold">Key point: </span>{errorDetails.keyPoint}</p>
           )}
+          {errorDetails.wrongLines && Array.isArray(errorDetails.wrongLines) && (
+            <ul className="mt-2 space-y-1">
+              {errorDetails.wrongLines.map((line, idx) => (
+                <li key={idx} className="text-red-200 text-xs">
+                  Line {line.position}: <span className="font-mono">{line.yourCode}</span>
+                </li>
+              ))}
+            </ul>
+          )}
           {errorDetails.hint && (
             <p className="text-blue-300 text-xs mt-1"><span className="font-semibold">Hint: </span>{errorDetails.hint}</p>
           )}

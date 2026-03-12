@@ -1,148 +1,214 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { ChevronRight, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { LEVEL_TEMPLATES } from './config/levels';
-import { generateQuestion } from './services/questionGenerator';
-import { shuffleArray, getCurrentPattern, formatPatternValue } from './utils/helpers';
+import { generateQuestion, generateLevel1Question, generateLevel2Question, generateLevel3Question } from './services/questionGenerator';
+import { shuffleArray, getCurrentPattern } from './utils/helpers';
 import { executeLinkedListOperation } from './services/linkedListOperations';
 import { validateAssembly } from './services/validationLogic';
 import LevelSelector from './components/LevelSelector';
 import FeedbackMessage from './components/FeedbackMessage';
-import GoalPattern from './components/GoalPattern';
+import GoalPattern, { LinkedListVisualiser } from './components/GoalPattern';
 import HintBox from './components/HintBox';
 import CodePool from './components/CodePool';
 import AssemblyArea from './components/AssemblyArea';
+import ModuleSelector from './components/ModuleSelector';
+import ModeSelector from './components/ModeSelector';
+import TutorialGame from './components/TutorialGame';
+import TrainingGame from './components/TrainingGame';
+import SubQuestionSelector from './components/SubQuestionSelector';
+import DoublyLinkedListGame from './components/DoublyLinkedListGame';
+import SortLinkedListGame from './components/SortLinkedListGame';
+import GameTimer from './components/GameTimer';
+import ErrorCounter from './components/ErrorCounter';
+import LevelCompleteModal from './components/LevelCompleteModal';
 
-export default function LinkedListCodeAssemblyGame() {
-  // ── Difficulty level (1 / 2 / 3) ──────────────────────────────────────
-  const [currentLevelId, setCurrentLevelId]   = useState(1);
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-  // ── Generated question for this round ────────────────────────────────
-  const [currentQuestion, setCurrentQuestion] = useState(() => generateQuestion(1));
+const genQuestion = (levelId, subIdx) => {
+  if (levelId === 1) return generateLevel1Question(subIdx);
+  if (levelId === 2) return generateLevel2Question(subIdx);
+  if (levelId === 3) return generateLevel3Question(subIdx);
+  return generateLevel1Question(subIdx);
+};
 
-  // ── Completed difficulties ─────────────────────────────────────────────
+const SUB_COUNTS = { 1: 4, 2: 4, 3: 4 };
+
+// ─── Singly Linked List Game ──────────────────────────────────────────────────
+function SinglyLinkedListGame({ onBack }) {
+  const [currentLevelId, setCurrentLevelId] = useState(1);
+  const [currentQuestion, setCurrentQuestion] = useState(() => generateLevel1Question(0));
   const [completedLevels, setCompletedLevels] = useState([]);
 
-  // ── Drag state ────────────────────────────────────────────────────────
-  const [draggedIndex, setDraggedIndex]   = useState(null);
+  // Sub-question indices per level
+  const [subIdx1, setSubIdx1] = useState(0);
+  const [subIdx2, setSubIdx2] = useState(0);
+  const [subIdx3, setSubIdx3] = useState(0);
+
+  // Completed sub-question sets per level (independent)
+  const [completedSubs1, setCompletedSubs1] = useState(new Set());
+  const [completedSubs2, setCompletedSubs2] = useState(new Set());
+  const [completedSubs3, setCompletedSubs3] = useState(new Set());
+
+  // Derived helpers (render-time only — do NOT use inside useEffect/setTimeout)
+  const currentSubIdx = currentLevelId === 1 ? subIdx1 : currentLevelId === 2 ? subIdx2 : subIdx3;
+  const currentCompletedSubs = currentLevelId === 1 ? completedSubs1 : currentLevelId === 2 ? completedSubs2 : completedSubs3;
+
+  // Drag state
+  const [draggedIndex, setDraggedIndex] = useState(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
 
-  // ── Board state ───────────────────────────────────────────────────────
-  const [nodes, setNodes]               = useState([]);
+  // Board state
+  const [nodes, setNodes] = useState([]);
   const [assemblyArea, setAssemblyArea] = useState([]);
-  const [codePool, setCodePool]         = useState([]);
-  const [isCorrectOrder, setIsCorrectOrder]     = useState(false);
+  const [codePool, setCodePool] = useState([]);
+  const [isCorrectOrder, setIsCorrectOrder] = useState(false);
   const [operationExecuted, setOperationExecuted] = useState(false);
-  const [feedback, setFeedback]         = useState(null);
+  const [feedback, setFeedback] = useState(null);
   const [errorDetails, setErrorDetails] = useState(null);
 
-  // ─────────────────────────────────────────────────────────────────────
-  // Initialise board whenever the question changes
-  // ─────────────────────────────────────────────────────────────────────
-  const initBoard = useCallback((question) => {
-    const codeItems      = question.pseudocode.map((_, i) => ({ index: i, isDistractor: false }));
+  // Timer / error / modal
+  const timerRef = useRef(null);
+  const [errorCount, setErrorCount] = useState(0);
+  const [showModal, setShowModal] = useState(false);
+  const [finalTime, setFinalTime] = useState(0);
+  const lastErrorCountedRef = useRef(false);
+
+  // Refs to avoid stale closures inside async effects
+  const completedLevelsRef = useRef([]);
+  const nodesRef = useRef([]);
+  const currentQuestionRef = useRef(null);
+  const currentLevelIdRef = useRef(1);
+  const modalShownForThisQuestionRef = useRef(false);
+
+  // Setters map for completedSubs — stable refs, safe to use inside effects
+  const setCompletedSubsRef = useRef({
+    1: setCompletedSubs1,
+    2: setCompletedSubs2,
+    3: setCompletedSubs3,
+  });
+
+  // ── Board init ──────────────────────────────────────────────────────────────
+  const initBoard = useCallback((question, resetMistakes = true) => {
+    const codeItems       = question.pseudocode.map((_, i) => ({ index: i, isDistractor: false }));
     const distractorItems = (question.distractors ?? []).map((_, i) => ({ index: i, isDistractor: true }));
+    const freshNodes = JSON.parse(JSON.stringify(question.initialNodes));
     setCodePool(shuffleArray([...codeItems, ...distractorItems]));
     setAssemblyArea([]);
-    setNodes(JSON.parse(JSON.stringify(question.initialNodes)));
+    setNodes(freshNodes);
+    nodesRef.current = freshNodes;
+    currentQuestionRef.current = question;
     setIsCorrectOrder(false);
     setOperationExecuted(false);
     setFeedback(null);
     setErrorDetails(null);
+    if (resetMistakes) { setErrorCount(0); timerRef.current?.reset(); }
+    setShowModal(false);
+    lastErrorCountedRef.current = false;
+    modalShownForThisQuestionRef.current = false;
   }, []);
 
-  // When level changes → generate a new question
-  useEffect(() => {
-    const q = generateQuestion(currentLevelId);
-    setCurrentQuestion(q);
-    initBoard(q);
-  }, [currentLevelId]);          // eslint-disable-line react-hooks/exhaustive-deps
+  // ── Sync refs ───────────────────────────────────────────────────────────────
+  useEffect(() => { completedLevelsRef.current = completedLevels; }, [completedLevels]);
+  useEffect(() => { currentLevelIdRef.current = currentLevelId; }, [currentLevelId]);
 
-  // ─────────────────────────────────────────────────────────────────────
-  // Validation effect
-  // ─────────────────────────────────────────────────────────────────────
+  // ── Level change ────────────────────────────────────────────────────────────
+  useEffect(() => {
+    // Reset sub-index and completedSubs for the new level
+    if (currentLevelId === 1) { setSubIdx1(0); setCompletedSubs1(new Set()); }
+    if (currentLevelId === 2) { setSubIdx2(0); setCompletedSubs2(new Set()); }
+    if (currentLevelId === 3) { setSubIdx3(0); setCompletedSubs3(new Set()); }
+    const q = genQuestion(currentLevelId, 0);
+    setCurrentQuestion(q);
+    currentQuestionRef.current = q;
+    initBoard(q, true);
+  }, [currentLevelId]); // eslint-disable-line
+
+  // ── Validation ──────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!currentQuestion) return;
+    const required   = currentQuestion.correctOrder.length;
+    const isFull     = assemblyArea.length === required;
     const validation = validateAssembly(assemblyArea, [], currentQuestion);
+
+    if (!isFull) lastErrorCountedRef.current = false;
 
     if (validation.isValid && !operationExecuted) {
       setOperationExecuted(true);
       setErrorDetails(null);
       setFeedback(null);
-
       setTimeout(() => {
-        // For combined questions execute both operations in sequence
-        if (currentQuestion.isCombined) {
-          const res1 = executeLinkedListOperation(
-            currentQuestion.operation,
-            nodes,
-            currentQuestion.operationValue,
-            currentQuestion.operationPosition,
-          );
-          const res2 = executeLinkedListOperation(
-            currentQuestion.operation2,
-            res1.nodes,
-            currentQuestion.operationValue2,
-            currentQuestion.operationPosition2,
-          );
-          setNodes(res2.nodes);
-          setFeedback({ type: 'success', message: `✔ ${res1.message} → ${res2.message}` });
-        } else {
-          const res = executeLinkedListOperation(
-            currentQuestion.operation,
-            nodes,
-            currentQuestion.operationValue,
-            currentQuestion.operationPosition,
-          );
-          setNodes(res.nodes);
-          setFeedback({ type: 'success', message: res.message });
-        }
+        const opVal = currentQuestion.isMerge
+          ? { l1Values: currentQuestion.l1Values, l2Values: currentQuestion.l2Values }
+          : currentQuestion.operationValue;
+        const r = executeLinkedListOperation(
+          currentQuestion.operation, nodes, opVal, currentQuestion.operationPosition
+        );
+        setNodes(r.nodes);
+        setFeedback({ type: 'success', message: r.message });
       }, 500);
-
-    } else if (operationExecuted && assemblyArea.length !== currentQuestion.correctOrder.length) {
+    } else if (operationExecuted && assemblyArea.length !== required) {
       setErrorDetails({ type: 'already_executed', message: 'Code already executed! Reset to try again.' });
       setIsCorrectOrder(false);
     } else if (!operationExecuted && validation.errors) {
       setErrorDetails(validation.errors);
       setIsCorrectOrder(false);
+      if (isFull && !lastErrorCountedRef.current) {
+        setErrorCount(prev => prev + 1);
+        lastErrorCountedRef.current = true;
+      }
     } else if (!operationExecuted && !validation.errors) {
       setErrorDetails(null);
       setIsCorrectOrder(false);
     }
-  }, [assemblyArea, operationExecuted]);   // eslint-disable-line react-hooks/exhaustive-deps
+  }, [assemblyArea, operationExecuted]); // eslint-disable-line
 
-  // ─────────────────────────────────────────────────────────────────────
-  // Goal-check effect
-  // ─────────────────────────────────────────────────────────────────────
+  // ── Keep nodesRef current ───────────────────────────────────────────────────
   useEffect(() => {
-    if (!operationExecuted || !currentQuestion) return;
+    if (!operationExecuted) return;
+    nodesRef.current = nodes;
+  }, [nodes, operationExecuted]);
 
-    setTimeout(() => {
-      const current  = getCurrentPattern(nodes);
-      const goal     = currentQuestion.goalPattern;
-      const goalMet  = current.length === goal.length && current.every((v, i) => v === goal[i]);
-
+  // ── Goal check → stop timer → show modal ───────────────────────────────────
+  useEffect(() => {
+    if (!operationExecuted) return;
+    const timer = setTimeout(() => {
+      const q    = currentQuestionRef.current;
+      if (!q) return;
+      const cur  = getCurrentPattern(nodesRef.current);
+      const goal = q.goalPattern;
+      const goalMet = q.isCycle
+        ? true
+        : cur.length === goal.length && cur.every((v, i) => v === goal[i]);
       setIsCorrectOrder(goalMet);
-
-      if (goalMet && !completedLevels.includes(currentLevelId)) {
-        setCompletedLevels(prev => [...prev, currentLevelId]);
-        setTimeout(() => setFeedback({ type: 'complete', message: '🎉 Level Complete!' }), 800);
+      if (goalMet && !modalShownForThisQuestionRef.current) {
+        modalShownForThisQuestionRef.current = true;
+        // Mark sub-question complete — use stable ref to avoid stale closure
+        const lvl = currentLevelIdRef.current;
+        const subI = q.subQuestionIndex ?? 0;
+        setCompletedSubsRef.current[lvl]?.(prev => new Set([...prev, subI]));
+        // Mark level complete
+        if (!completedLevelsRef.current.includes(lvl)) {
+          setCompletedLevels(prev => {
+            const next = [...prev, lvl];
+            completedLevelsRef.current = next;
+            return next;
+          });
+        }
+        timerRef.current?.stop();
+        setTimeout(() => {
+          setFinalTime(timerRef.current?.getElapsed() ?? 0);
+          setShowModal(true);
+        }, 300);
       }
     }, 1000);
-  }, [nodes, operationExecuted]);    // eslint-disable-line react-hooks/exhaustive-deps
+    return () => clearTimeout(timer);
+  }, [nodes, operationExecuted]); // eslint-disable-line
 
-  // ─────────────────────────────────────────────────────────────────────
-  // Drag handlers
-  // ─────────────────────────────────────────────────────────────────────
+  // ── Drag handlers ───────────────────────────────────────────────────────────
   const handleDragStart = (e, index, source) => {
     setDraggedIndex({ index, source });
     e.dataTransfer.effectAllowed = 'move';
   };
-
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-  };
-
+  const handleDragOver  = (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; };
   const handleDragEnter = (e, index, areaType, position = 'before') => {
     e.preventDefault();
     setDragOverIndex({ index, areaType, position });
@@ -163,15 +229,10 @@ export default function LinkedListCodeAssemblyGame() {
   const handleDropInAssembly = (e, areaType, dropIndex = null, position = 'before') => {
     e.preventDefault();
     e.stopPropagation();
-    if (!draggedIndex || areaType !== 'code') {
-      setDragOverIndex(null);
-      return;
-    }
-
+    if (!draggedIndex || areaType !== 'code') { setDragOverIndex(null); return; }
     const captured = draggedIndex;
-    setDraggedIndex(null);  // clear immediately to prevent double-fire
+    setDraggedIndex(null);
     setDragOverIndex(null);
-
     if (captured.source === 'pool') {
       const item = codePool[captured.index];
       setCodePool(prev => prev.filter((_, i) => i !== captured.index));
@@ -195,67 +256,80 @@ export default function LinkedListCodeAssemblyGame() {
     }
   };
 
-  // ─────────────────────────────────────────────────────────────────────
-  // Reset / next
-  // ─────────────────────────────────────────────────────────────────────
-  const resetQuestion = () => initBoard(currentQuestion);
+  // ── Navigation ──────────────────────────────────────────────────────────────
+  const loadSub = (levelId, idx) => {
+    if (levelId === 1) setSubIdx1(idx);
+    if (levelId === 2) setSubIdx2(idx);
+    if (levelId === 3) setSubIdx3(idx);
+    const q = genQuestion(levelId, idx);
+    setCurrentQuestion(q);
+    currentQuestionRef.current = q;
+    initBoard(q, true);
+  };
+
+  const resetQuestion = () => initBoard(currentQuestion, false);
 
   const newQuestion = () => {
-    const q = generateQuestion(currentLevelId);
-    setCurrentQuestion(q);
-    initBoard(q);
+    const total  = SUB_COUNTS[currentLevelId] ?? 3;
+    const nextIdx = (currentSubIdx + 1) % total;
+    loadSub(currentLevelId, nextIdx);
   };
+
+  const jumpToSub = (idx) => loadSub(currentLevelId, idx);
 
   const handleNextLevel = () => {
-    const next = currentLevelId < 3 ? currentLevelId + 1 : 1;
-    setCurrentLevelId(next);
+    setShowModal(false);
+    setCurrentLevelId(prev => prev < 3 ? prev + 1 : 1);
   };
 
-  // ─────────────────────────────────────────────────────────────────────
-  // Derived
-  // ─────────────────────────────────────────────────────────────────────
-  const isLevelComplete  = completedLevels.includes(currentLevelId);
-  const currentPattern   = getCurrentPattern(nodes);
-  const q                = currentQuestion;
-
+  // ── Render ──────────────────────────────────────────────────────────────────
+  const currentPattern = getCurrentPattern(nodes);
+  const q = currentQuestion;
   if (!q) return null;
 
-  // LevelSelector expects objects with { id, label } shape
-  const levelsForSelector = LEVEL_TEMPLATES.map(lt => ({
-    id:    lt.id,
-    title: lt.label,
-  }));
+  const levelsForSelector = LEVEL_TEMPLATES.map(lt => ({ id: lt.id, title: lt.label }));
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 p-8">
       <div className="max-w-7xl mx-auto">
 
         {/* Header */}
-        <h1 className="text-4xl font-bold text-white mb-1">Linked List Code Assembly</h1>
-        <p className="text-slate-300 mb-6">Drag pseudocode blocks in the correct order to execute the operation!</p>
+        <div className="flex items-center gap-4 mb-1">
+          <button onClick={onBack} className="flex items-center gap-1 text-slate-400 hover:text-white transition-colors text-sm">
+            ← Back
+          </button>
+          <h1 className="text-4xl font-bold text-white">Linked List Code Assembly</h1>
+        </div>
+        <p className="text-slate-300 mb-6 ml-14">Drag pseudocode blocks in the correct order to the Assembly Area to execute the operation!</p>
 
-        {/* Level selector + new-question button */}
-        <div className="flex items-center gap-4 mb-8">
+        {/* Controls */}
+        <div className="flex items-center gap-3 mb-8 flex-wrap">
           <LevelSelector
             levels={levelsForSelector}
             currentLevelId={currentLevelId}
             completedLevels={completedLevels}
             onLevelChange={setCurrentLevelId}
-          />
-          <button
-            onClick={newQuestion}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded font-semibold text-sm"
-            title="Generate a new random question at this difficulty"
           >
-            <RefreshCw size={16} /> New Question
-          </button>
+            <SubQuestionSelector
+              levelId={currentLevelId}
+              currentSubIdx={currentSubIdx}
+              completedSubs={currentCompletedSubs}
+              onSubChange={jumpToSub}
+            />
+          </LevelSelector>
+
+
+          <div className="flex items-center gap-2 ml-auto">
+            <GameTimer ref={timerRef} isRunning={!showModal} />
+            <ErrorCounter count={errorCount} />
+          </div>
         </div>
 
         <FeedbackMessage feedback={feedback} />
 
         <div className="grid grid-cols-2 gap-8">
 
-          {/* ── Top Left: Goal & Hint ─────────────────────────────── */}
+          {/* Top Left: Title + Description + Current State */}
           <div className="bg-slate-800 rounded-lg p-6 border border-slate-700">
             <div className="flex items-center gap-3 mb-1">
               <h2 className="text-2xl font-bold text-white">{q.title}</h2>
@@ -268,76 +342,42 @@ export default function LinkedListCodeAssemblyGame() {
               </span>
             </div>
             <p className="text-slate-300 text-sm mb-4">{q.description}</p>
-            <GoalPattern goalPattern={q.goalPattern} useNumbers={q.useNumbers} />
-            <HintBox hint={q.hint} />
-          </div>
-
-          {/* ── Top Right: Linked List State ─────────────────────── */}
-          <div className="bg-slate-800 rounded-lg p-6 border border-slate-700">
-            <h2 className="text-xl font-bold text-white mb-4">🔗 Current Linked List State</h2>
-
-            <div className="bg-slate-700 rounded p-4 mb-4">
-              <p className="text-slate-300 text-sm mb-3">Current Pattern:</p>
-              <div className="flex gap-3 flex-wrap min-h-16">
-                {currentPattern.length === 0 ? (
-                  <p className="text-slate-400 text-sm my-auto">Empty</p>
-                ) : (
-                  currentPattern.map((value, idx) => {
-                    const isCorrect = value === q.goalPattern[idx];
-                    return (
-                      <div
-                        key={idx}
-                        className={`w-12 h-12 text-lg rounded-lg flex items-center justify-center border-2 font-bold transition-all ${
-                          isCorrect
-                            ? 'bg-green-600 border-green-400 scale-110 shadow-lg shadow-green-500'
-                            : 'bg-slate-600 border-slate-500 text-white'
-                        }`}
-                      >
-                        {formatPatternValue(value)}
-                      </div>
-                    );
-                  })
-                )}
+            {q.isMerge ? (
+              <div className="bg-slate-700 rounded p-4">
+                <p className="text-slate-300 text-sm mb-2">l1:</p>
+                <LinkedListVisualiser values={q.l1Values} nodeColor="bg-indigo-600 border-indigo-400" />
+                <p className="text-slate-300 text-sm mt-3 mb-2">l2:</p>
+                <LinkedListVisualiser values={q.l2Values} nodeColor="bg-purple-600 border-purple-400" />
               </div>
-            </div>
-
-            <div className="bg-slate-700 rounded p-4">
-              <p className="text-slate-300 text-sm mb-3">Memory Structure:</p>
-              <div className="flex items-center gap-2 flex-wrap font-mono text-sm min-h-16 overflow-x-auto">
-                {nodes.length === 0 ? (
-                  <span className="text-slate-400">NULL</span>
-                ) : (
-                  <>
-                    {nodes.map((node) => (
-                      <React.Fragment key={node.id}>
-                        <div className="bg-slate-600 border-2 border-slate-500 rounded px-3 py-2 text-white shrink-0">
-                          <div className="font-bold text-base">{formatPatternValue(node.value)}</div>
-                        </div>
-                        {node.next !== null && <span className="text-slate-400">→</span>}
-                      </React.Fragment>
-                    ))}
-                    <span className="text-slate-400">NULL</span>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {isLevelComplete && (
-              <div className="bg-slate-700 rounded p-4 mt-4 space-y-3">
-                <div className="bg-gradient-to-r from-green-600 to-emerald-600 rounded p-3 text-white text-center font-bold">
-                  ✓ Level Complete!
-                </div>
-                <button
-                  onClick={handleNextLevel}
-                  className="w-full bg-gradient-to-r from-yellow-600 to-yellow-500 hover:from-yellow-700 hover:to-yellow-600 text-white py-3 rounded font-bold flex items-center justify-center gap-2"
-                >
-                  {currentLevelId < 3 ? 'Next Level' : 'Play Again'} <ChevronRight size={20} />
-                </button>
+            ) : (
+              <div className="bg-slate-700 rounded p-4">
+                <LinkedListVisualiser
+                  values={currentPattern}
+                  emptyLabel="Empty list"
+                  highlight={isCorrectOrder}
+                  goalValues={isCorrectOrder ? currentPattern : []}
+                />
               </div>
             )}
           </div>
 
-          {/* ── Bottom Left: Code Pool ────────────────────────────── */}
+          {/* Top Right: Goal + Hint */}
+          <div className="bg-slate-800 rounded-lg p-6 border border-slate-700">
+            {q.isCycle ? (
+              <div className="bg-slate-700 rounded p-4 mb-4">
+                <p className="text-slate-300 text-sm mb-3">🎯 Goal:</p>
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">🔄</span>
+                  <span className="text-green-400 font-bold text-lg">CYCLE DETECTED → return True</span>
+                </div>
+                <p className="text-slate-400 text-xs mt-2">The last node points back to the node with value <span className="text-yellow-300 font-bold">{q.cycleNodeValue}</span></p>
+              </div>
+            ) : (
+              <GoalPattern goalPattern={q.goalPattern} useNumbers={q.useNumbers} />
+            )}
+            <HintBox hint={q.hint} />
+          </div>
+
           <CodePool
             codePool={codePool}
             complexityPool={[]}
@@ -345,8 +385,6 @@ export default function LinkedListCodeAssemblyGame() {
             onDragStart={handleDragStart}
             onDrop={handleDropInPool}
           />
-
-          {/* ── Bottom Right: Assembly Area ───────────────────────── */}
           <AssemblyArea
             assemblyArea={assemblyArea}
             complexityArea={[]}
@@ -362,6 +400,41 @@ export default function LinkedListCodeAssemblyGame() {
           />
         </div>
       </div>
+
+      <LevelCompleteModal
+        isOpen={showModal}
+        levelId={currentLevelId}
+        totalLevels={3}
+        timeSeconds={finalTime}
+        errorCount={errorCount}
+        onNext={handleNextLevel}
+        onNewQuestion={() => { setShowModal(false); newQuestion(); }}
+        accentColor="from-green-500 to-emerald-500"
+      />
     </div>
   );
+}
+
+// ─── Root App ─────────────────────────────────────────────────────────────────
+export default function App() {
+  const [screen, setScreen]   = useState('menu');
+  const [moduleId, setModuleId] = useState(null); // 'singly' | 'doubly'
+
+  const goMenu       = () => setScreen('menu');
+  const goModeSelect = (mod) => { setModuleId(mod); setScreen('mode-select'); };
+  const goRegular    = () => setScreen(moduleId === 'doubly' ? 'doubly' : 'singly');
+
+  if (screen === 'menu')        return <ModuleSelector onSelect={goModeSelect} />;
+  if (screen === 'mode-select') return <ModeSelector moduleId={moduleId} onSelect={(mode) => {
+    if (mode === 'tutorial') setScreen('tutorial');
+    if (mode === 'training') setScreen('training');
+    if (mode === 'regular')  goRegular();
+    if (mode === 'sort')     setScreen('sort');
+  }} onBack={goMenu} />;
+  if (screen === 'tutorial')    return <TutorialGame onBack={() => setScreen('mode-select')} onGoRegular={() => { setScreen('mode-select'); }} />;
+  if (screen === 'training')    return <TrainingGame onBack={() => setScreen('mode-select')} onGoRegular={() => { setScreen('mode-select'); }} />;
+  if (screen === 'singly')      return <SinglyLinkedListGame onBack={() => setScreen('mode-select')} />;
+  if (screen === 'doubly')      return <DoublyLinkedListGame onBack={() => setScreen('mode-select')} />;
+  if (screen === 'sort')        return <SortLinkedListGame onBack={() => setScreen('mode-select')} />;
+  return <ModuleSelector onSelect={goModeSelect} />;
 }

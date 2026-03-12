@@ -78,27 +78,12 @@ export const validateAssembly = (assemblyArea, complexityArea, currentLevel) => 
       return { isValid: false, errors: patternError };
     }
 
-    // Generic sequence error
-    const wrongLines = assemblyArea
-      .map((item, pos) =>
-        item.index !== currentLevel.correctOrder[pos]
-          ? {
-              position: pos + 1,
-              yourCode: currentLevel.pseudocode[item.index],
-              shouldBe: currentLevel.pseudocode[currentLevel.correctOrder[pos]],
-            }
-          : null
-      )
-      .filter(Boolean);
-
     return {
       isValid: false,
       errors: {
         type: 'code_order',
         message: '📝 Code Sequence Incorrect',
-        explanation: 'The order of operations matters in linked list manipulation!',
-        wrongLines,
-        hint: 'Think about what needs to happen first: connecting pointers or moving them?',
+        hint: 'Check the order of each step. Think about what must be set up before the next line can work correctly.',
       }
     };
   }
