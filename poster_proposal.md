@@ -142,7 +142,7 @@ The design process followed a three-source iterative loop:
 
 1. **Literature Review** — Identified engagement mechanics (Duolingo), scaffolding models (Brilliant), adaptive routing (CogBooks), companion design (Prodigy/Tamagotchi), and validated the code-block mechanic (BlockList, ACM SIGCSE 2025).
 
-2. **Instructor Feedback** — Regular review sessions with the supervising professor surfaced usability issues (font size, theme, onboarding depth) and shaped module scope decisions (e.g., keeping Sort as a standalone mode rather than integrating into Challenge Mode while requirements were evolving).
+2. **Instructor Feedback** — Regular review sessions with the supervising professor surfaced usability issues (User experience, onboarding depth) and shaped module scope decisions (e.g., keeping Sort as a standalone mode rather than integrating into Challenge Mode while requirements were evolving).
 
 3. **Comparative Platform Analysis** — Features from Duolingo (path navigation, XP, lives), Kahoot (timer, competitive framing), Brilliant (concept-first slides), and LeetCode (difficulty levels) were selectively adapted to the algorithm education context.
 
@@ -154,7 +154,7 @@ Each stage produced a testable prototype evaluated against the previous version 
 
 This project demonstrates that a research-driven iterative design process — grounded in literature review and regular instructor feedback — can produce an educationally principled, engaging gamified learning module. Key contributions:
 
-- A **six-category error taxonomy** that maps game-level mistakes to real CS misconceptions
+- A **seven-category error taxonomy** that maps game-level mistakes to real CS misconceptions
 - A **cross-module adaptive routing design** that preserves learner autonomy
 - A **three-tier scaffolding architecture** (Tutorial → Training → Challenge) bridging the novice-to-practitioner gap
 - A **modular platform foundation** extensible to Sorting, Tree, and Graph algorithm modules
