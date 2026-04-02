@@ -75,34 +75,40 @@ When a student accumulates repeated fundamental errors in a Doubly Linked List s
 
 ### 2.4 Design Evolution (Figure 1 caption text)
 
-Six iterative stages, each driven by a specific research or feedback trigger:
+Seven iterative stages, each driven by a specific research or feedback trigger:
 
 **Stage 1 — Initial Prototype**
 A single-page dark-theme app with drag-and-drop pseudocode blocks for basic singly linked list operations. No feedback, no scaffolding, no distractors. Validated the core mechanic but revealed it was too abrupt for novice learners.
 *Trigger: BlockList (ACM SIGCSE 2025) paper — validated code-block assembly as a learnable mechanic.*
 
 **Stage 2 — Three-Mode Architecture**
-Introduced Tutorial, Training, and Challenge modes with progressive scaffolding. Challenge mode initially covered basic linked list operations (insert/remove at head and end) across three difficulty levels, with procedurally generated question values and distractor blocks mapped to a six-category error taxonomy. *Goal: prevent novice learners from being thrown into challenge-level problems without any scaffolding.*
+Introduced Tutorial → Training → Challenge with progressive scaffolding, covering basic insert/remove operations across three difficulty levels with distractor blocks and error taxonomy feedback.
+*Goal: prevent novice learners from being thrown into challenge-level problems without scaffolding.*
 *Trigger: Brilliant.org scaffolding model + CogBooks adaptive design principles.*
 
 **Stage 3 — Challenge Mode Content Expansion**
-Challenge mode extended beyond basic operations to cover edge cases and classic algorithm problems essential for CS students: Reverse Linked List, Detect Cycle, Merge Two Lists, and Sort List. These were added as a Level 3 tier, reflecting the real-world problem sets students encounter on platforms like LeetCode. The Sort List problem is also designed as an entry point into a broader cross-platform ecosystem, where a teammate's dedicated sorting algorithm game module can be adaptively recommended. *Goal: ensure the platform covers the algorithm knowledge students actually need, bridging gamified learning with real interview and coursework expectations.*
+Extended Level 3 to include classic algorithm problems: Reverse Linked List, Detect Cycle, Merge Two Lists, and Sort List — mirroring real coursework and interview expectations. Sort List also serves as a potential bridge to a teammate's dedicated sorting game module.
+*Goal: ensure content coverage matches the algorithm knowledge students actually need.*
 *Trigger: LeetCode problem set analysis — identified the classic linked list problems every CS student is expected to know.*
 
 **Stage 4 — Tutorial Intro Redesign**
-Replaced the welcome popup with a 4-slide concept introduction (linked list structure, node anatomy, HEAD & NULL, key terms) followed by a mandatory 4-question quiz. Drag-and-drop replaced with fill-in-the-blank to reduce cognitive load in the learning phase. *Goal: ensure students build a conceptual understanding of linked lists before attempting any interactive exercises.*
+Replaced the welcome popup with a 4-slide concept introduction (linked list structure, node anatomy, HEAD & NULL, key terms) and a mandatory quiz. Mechanic changed from drag-and-drop to fill-in-the-blank to lower cognitive load.
+*Goal: build conceptual understanding before students attempt any interactive exercises.*
 *Trigger: Instructor feedback — students had no conceptual baseline on entry.*
 
 **Stage 5 — Gamification Layer**
-Added a pixel husky companion (Algo) with 5 evolution stages driven by a shared XP pool, a star rating system (0–3 stars per question), a lives counter, and a game timer. A progress path replaced flat mode card selection, making learning milestones visible and reinforcing students' sense of progression. *Goal: sustain long-term motivation beyond task completion through emotional investment and visible growth.*
+Added a pixel husky companion (Algo) with 5 XP-driven evolution stages, star ratings, lives, and a timer. A progress path replaced flat mode cards, making milestones visible.
+*Goal: sustain long-term motivation through emotional investment and a visible sense of growth.*
 *Trigger: Duolingo engagement mechanics + Tamagotchi companion investment research.*
 
 **Stage 6 — Doubly Linked List Module + Adaptive Routing**
-Added DLL as the second module with bidirectional node visualization and a new error type (Broken Prev). Implemented cross-module adaptive logic: when a student accumulates repeated fundamental pointer errors in a DLL session, a suggestion modal appears to return to SLL — designed as a player choice, not a forced redirect. *Goal: detect prerequisite gaps in real time and guide students back to foundational content without breaking their sense of agency.*
+Added DLL with bidirectional visualization and a new error type (Broken Prev). Repeated fundamental pointer errors in a DLL session trigger a suggestion modal to return to SLL — framed as a player choice.
+*Goal: detect prerequisite gaps in real time and guide students back to foundational content without breaking their sense of agency.*
 *Trigger: CogBooks adaptive routing research + "player choice" design principle.*
 
 **Stage 7 — UI Unification + Platform Path**
-Converted all screens to a unified light theme, doubled all font sizes, and replaced drag-and-drop with click-to-place in Tutorial. Module selection now displays a winding path with locked future modules (Sorting, Tree, Graph) visible to students, communicating the platform's broader learning roadmap and the potential for cross-game adaptive routing. *Goal: reduce interface friction and give students a clear picture of where they are and where they are going.*
+Unified all screens to a light theme, doubled font sizes, and switched to click-to-place in Tutorial. Module path now shows locked future modules (Sorting, Tree, Graph), communicating the broader learning roadmap.
+*Goal: reduce interface friction and give students a clear sense of where they are and where they are going.*
 *Trigger: Instructor usability feedback — dark theme and small fonts created friction.*
 
 ---
