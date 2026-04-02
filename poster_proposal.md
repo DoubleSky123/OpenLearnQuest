@@ -94,7 +94,7 @@ Added a pixel husky companion (Algo) with 5 evolution stages driven by a shared 
 *Trigger: Duolingo engagement mechanics + Tamagotchi companion investment research.*
 
 **Stage 5 — Doubly Linked List Module + Adaptive Routing**
-Added DLL as the second module with bidirectional node visualization and a new error type (Broken Prev). Implemented cross-module adaptive logic: ≥ 2 Type-A errors in a DLL session triggers a suggestion modal to return to SLL — designed as a player choice, not a forced redirect.
+Added DLL as the second module with bidirectional node visualization and a new error type (Broken Prev). Implemented cross-module adaptive logic: when a student accumulates repeated fundamental pointer errors in a DLL session, a suggestion modal appears to return to SLL — designed as a player choice, not a forced redirect.
 *Trigger: CogBooks adaptive routing research + "player choice" design principle.*
 
 **Stage 6 — UI Unification + Sort Mode**
