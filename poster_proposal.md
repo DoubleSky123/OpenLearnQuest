@@ -82,23 +82,27 @@ A single-page dark-theme app with drag-and-drop pseudocode blocks for basic sing
 *Trigger: BlockList (ACM SIGCSE 2025) paper — validated code-block assembly as a learnable mechanic.*
 
 **Stage 2 — Three-Mode Architecture**
-Introduced Tutorial, Training, and Challenge modes with progressive scaffolding. Challenge mode added three difficulty levels, procedurally generated question values, and distractor blocks mapped to a six-category error taxonomy.
+Introduced Tutorial, Training, and Challenge modes with progressive scaffolding. Challenge mode initially covered basic linked list operations (insert/remove at head and end) across three difficulty levels, with procedurally generated question values and distractor blocks mapped to a six-category error taxonomy. *Goal: prevent novice learners from being thrown into challenge-level problems without any scaffolding.*
 *Trigger: Brilliant.org scaffolding model + CogBooks adaptive design principles.*
 
-**Stage 3 — Tutorial Intro Redesign**
-Replaced the welcome popup with a 4-slide concept introduction (linked list structure, node anatomy, HEAD & NULL, key terms) followed by a mandatory 4-question quiz. Drag-and-drop replaced with fill-in-the-blank to reduce cognitive load in the learning phase.
+**Stage 3 — Challenge Mode Content Expansion**
+Challenge mode extended beyond basic operations to cover edge cases and classic algorithm problems essential for CS students: Reverse Linked List, Detect Cycle, Merge Two Lists, and Sort List. These were added as a Level 3 tier, reflecting the real-world problem sets students encounter on platforms like LeetCode. The Sort List problem is also designed as an entry point into a broader cross-platform ecosystem, where a teammate's dedicated sorting algorithm game module can be adaptively recommended. *Goal: ensure the platform covers the algorithm knowledge students actually need, bridging gamified learning with real interview and coursework expectations.*
+*Trigger: LeetCode problem set analysis — identified the classic linked list problems every CS student is expected to know.*
+
+**Stage 4 — Tutorial Intro Redesign**
+Replaced the welcome popup with a 4-slide concept introduction (linked list structure, node anatomy, HEAD & NULL, key terms) followed by a mandatory 4-question quiz. Drag-and-drop replaced with fill-in-the-blank to reduce cognitive load in the learning phase. *Goal: ensure students build a conceptual understanding of linked lists before attempting any interactive exercises.*
 *Trigger: Instructor feedback — students had no conceptual baseline on entry.*
 
-**Stage 4 — Gamification Layer**
-Added a pixel husky companion (Algo) with 5 evolution stages driven by a shared XP pool, a star rating system (0–3 stars per question), a lives counter, and a game timer. Duolingo-style winding path replaced flat mode card selection.
+**Stage 5 — Gamification Layer**
+Added a pixel husky companion (Algo) with 5 evolution stages driven by a shared XP pool, a star rating system (0–3 stars per question), a lives counter, and a game timer. A progress path replaced flat mode card selection, making learning milestones visible and reinforcing students' sense of progression. *Goal: sustain long-term motivation beyond task completion through emotional investment and visible growth.*
 *Trigger: Duolingo engagement mechanics + Tamagotchi companion investment research.*
 
-**Stage 5 — Doubly Linked List Module + Adaptive Routing**
-Added DLL as the second module with bidirectional node visualization and a new error type (Broken Prev). Implemented cross-module adaptive logic: when a student accumulates repeated fundamental pointer errors in a DLL session, a suggestion modal appears to return to SLL — designed as a player choice, not a forced redirect.
+**Stage 6 — Doubly Linked List Module + Adaptive Routing**
+Added DLL as the second module with bidirectional node visualization and a new error type (Broken Prev). Implemented cross-module adaptive logic: when a student accumulates repeated fundamental pointer errors in a DLL session, a suggestion modal appears to return to SLL — designed as a player choice, not a forced redirect. *Goal: detect prerequisite gaps in real time and guide students back to foundational content without breaking their sense of agency.*
 *Trigger: CogBooks adaptive routing research + "player choice" design principle.*
 
-**Stage 6 — UI Unification + Sort Mode**
-Converted all screens to a unified light theme, doubled all font sizes, replaced drag-and-drop with click-to-place in Tutorial. Added a standalone Sort Linked List mode with live pseudocode highlighting. Module path now displays locked future modules (Sorting, Tree, Graph) to communicate platform vision.
+**Stage 7 — UI Unification + Platform Path**
+Converted all screens to a unified light theme, doubled all font sizes, and replaced drag-and-drop with click-to-place in Tutorial. Module selection now displays a winding path with locked future modules (Sorting, Tree, Graph) visible to students, communicating the platform's broader learning roadmap and the potential for cross-game adaptive routing. *Goal: reduce interface friction and give students a clear picture of where they are and where they are going.*
 *Trigger: Instructor usability feedback — dark theme and small fonts created friction.*
 
 ---
