@@ -3,17 +3,8 @@
 
 **Project:** OpenLearnQuest — A Gamified Adaptive Learning Platform for Algorithm Education  
 **Subtitle:** Iterative Design of a Linked List Game Module with Cross-Topic Prerequisite Routing  
-**Author:** Kunyi Qiu — Northeastern University, Silicon Valley  
-**Date:** April 2026  
+**Author:** Kunyi Shi ·  Advisor: Lama Hamandi — Northeastern University, Silicon Valley  
 **Purpose:** Outline proposed poster content, structure, and figures for feedback before final production.
-
----
-
-## Table of Contents
-1. Poster Section Layout
-2. Poster Text Draft
-3. Suggested Figures / Visual Elements
-4. Design Evolution Figure Specification
 
 ---
 
