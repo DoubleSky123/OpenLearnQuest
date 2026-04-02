@@ -69,7 +69,7 @@ Six design iterations, each grounded in literature review findings or direct ins
 A Tutorial → Training → Challenge progression maps to established learning theory: concept introduction (slides + quiz), guided practice (fill-in-the-blank with hints), and independent challenge (procedurally generated questions with distractor blocks and error taxonomy feedback).
 
 **3 — Adaptive Cross-Module Prerequisite Routing**
-When a student accumulates ≥ 2 Type-A errors (pointer logic errors shared with the prerequisite module) in a Doubly Linked List session, the platform surfaces a non-disruptive suggestion to return to the Singly Linked List module — framed as a player choice, not a system redirect.
+When a student accumulates repeated fundamental errors in a Doubly Linked List session, the platform surfaces a non-disruptive suggestion to return to the Singly Linked List module — framed as a player choice, not a system redirect.
 
 ---
 
