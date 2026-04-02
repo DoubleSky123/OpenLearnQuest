@@ -63,7 +63,7 @@ Students learning complex algorithms often hit prerequisite gaps mid-session —
 ### 2.3 Key Highlights
 
 **1 — Research-Driven Iterative Design**
-Six design iterations, each grounded in literature review findings or direct instructor feedback, evolved the platform from a bare drag-and-drop prototype to a fully scaffolded, gamified learning experience. Every major design decision is traceable to a specific research insight.
+Seven design iterations, each grounded in literature review findings or direct instructor feedback, evolved the platform from a bare drag-and-drop prototype to a fully scaffolded, gamified learning experience. Every major design decision is traceable to a specific research insight.
 
 **2 — Three-Tier Scaffolding Architecture**
 A Tutorial → Training → Challenge progression maps to established learning theory: concept introduction (slides + quiz), guided practice (fill-in-the-blank with hints), and independent challenge (procedurally generated questions with distractor blocks and error taxonomy feedback).
