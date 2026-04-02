@@ -136,21 +136,7 @@ Type A errors (shared with SLL) accumulate toward the cross-module routing thres
 
 ---
 
-### 2.6 Methodology
-
-The design process followed a three-source iterative loop:
-
-1. **Literature Review** — Identified engagement mechanics (Duolingo), scaffolding models (Brilliant), adaptive routing (CogBooks), companion design (Prodigy/Tamagotchi), and validated the code-block mechanic (BlockList, ACM SIGCSE 2025).
-
-2. **Instructor Feedback** — Regular review sessions with the supervising professor surfaced usability issues (User experience, onboarding depth) and shaped module scope decisions (e.g., keeping Sort as a standalone mode rather than integrating into Challenge Mode while requirements were evolving).
-
-3. **Comparative Platform Analysis** — Features from Duolingo (path navigation, XP, lives), Kahoot (timer, competitive framing), Brilliant (concept-first slides), and LeetCode (difficulty levels) were selectively adapted to the algorithm education context.
-
-Each stage produced a testable prototype evaluated against the previous version before proceeding.
-
----
-
-### 2.7 Conclusions
+### 2.6 Conclusions
 
 This project demonstrates that a research-driven iterative design process — grounded in literature review and regular instructor feedback — can produce an educationally principled, engaging gamified learning module. Key contributions:
 
@@ -163,7 +149,7 @@ This project demonstrates that a research-driven iterative design process — gr
 
 ---
 
-### 2.8 Future Work
+### 2.7 Future Work
 
 - Integrate backend persistence to enable cross-session adaptive routing (current logic is session-local)
 - Conduct formal user study measuring learning outcomes vs. traditional instruction
@@ -172,7 +158,7 @@ This project demonstrates that a research-driven iterative design process — gr
 
 ---
 
-### 2.9 References
+### 2.8 References
 
 - Contrino et al. (2024). CogBooks adaptive learning system. *Educational Technology Research.*
 - Murali et al. (2025). BlockList: A game for learning linked list concepts. *ACM SIGCSE TS 2025.*
