@@ -82,7 +82,7 @@ A single-page dark-theme app with drag-and-drop pseudocode blocks for basic sing
 *Trigger: BlockList (ACM SIGCSE 2025) paper — validated code-block assembly as a learnable mechanic.*
 
 **Stage 2 — Three-Mode Architecture**
-Introduced Tutorial → Training → Challenge with progressive scaffolding, covering basic insert/remove operations across three difficulty levels with distractor blocks and error taxonomy feedback.
+Introduced Tutorial → Training → Challenge with progressive scaffolding, covering basic insert/remove operations across three difficulty levels with distractor blocks and error category feedback.
 *Goal: prevent novice learners from being thrown into challenge-level problems without scaffolding.*
 *Trigger: Brilliant.org scaffolding model + CogBooks adaptive design principles.*
 
@@ -121,7 +121,7 @@ The platform models a **knowledge dependency graph** where modules are nodes and
 Singly Linked List  →  Doubly Linked List  →  Trees (planned)  →  Graph (planned)
 ```
 
-**Error Taxonomy — Six Categories:**
+**Six Error Categories:**
 
 | Category | Description | Routing Effect |
 |---|---|---|
@@ -154,7 +154,7 @@ Each stage produced a testable prototype evaluated against the previous version 
 
 This project demonstrates that a research-driven iterative design process — grounded in literature review and regular instructor feedback — can produce an educationally principled, engaging gamified learning module. Key contributions:
 
-- A **seven-category error taxonomy** that maps game-level mistakes to real CS misconceptions
+- A **six-category error classification** that maps game-level mistakes to real CS misconceptions
 - A **cross-module adaptive routing design** that preserves learner autonomy
 - A **three-tier scaffolding architecture** (Tutorial → Training → Challenge) bridging the novice-to-practitioner gap
 - A **modular platform foundation** extensible to Sorting, Tree, and Graph algorithm modules
