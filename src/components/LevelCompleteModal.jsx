@@ -2,120 +2,91 @@ import React, { useEffect } from 'react';
 import { ChevronRight, Clock, AlertTriangle, Trophy, RotateCcw } from 'lucide-react';
 import { formatTime } from './GameTimer';
 
-/**
- * LevelCompleteModal
- *
- * Props:
- *   isOpen        {boolean}  — whether to show
- *   levelId       {number}   — current level number (1-3)
- *   totalLevels   {number}   — total level count (default 3)
- *   timeSeconds   {number}   — elapsed time in seconds
- *   errorCount    {number}   — number of mistakes made
- *   onNext        {function} — called when player clicks Next Level / Play Again
- *   onNewQuestion {function} — called when player clicks Try New Question
- *   accentColor   {string}   — tailwind gradient classes e.g. 'from-green-500 to-emerald-500'
- */
 export default function LevelCompleteModal({
   isOpen,
-  levelId       = 1,
-  totalLevels   = 3,
-  timeSeconds   = 0,
-  errorCount    = 0,
+  levelId     = 1,
+  totalLevels = 3,
+  timeSeconds = 0,
+  errorCount  = 0,
+  xpGained    = 0,
   onNext,
   onNewQuestion,
-  accentColor   = 'from-green-500 to-emerald-500',
 }) {
-  // Prevent body scroll while open
   useEffect(() => {
     if (isOpen) document.body.style.overflow = 'hidden';
     else        document.body.style.overflow = '';
-    return ()  => { document.body.style.overflow = ''; };
+    return () => { document.body.style.overflow = ''; };
   }, [isOpen]);
 
   if (!isOpen) return null;
 
   const isLast = levelId >= totalLevels;
-
-  // Star rating based on errors
-  const stars = errorCount === 0 ? 3 : errorCount <= 2 ? 2 : 1;
+  const stars  = errorCount === 0 ? 3 : errorCount <= 2 ? 2 : 1;
 
   return (
-    /* Backdrop */
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
-      {/* Card */}
-      <div className="relative w-full max-w-md bg-slate-800 border border-slate-600 rounded-2xl shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      <div className="relative w-full max-w-sm bg-white border border-gray-200 rounded-2xl shadow-xl overflow-hidden">
+        <div className="h-1 w-full bg-violet-500" />
 
-        {/* Coloured top bar */}
-        <div className={`h-2 w-full bg-gradient-to-r ${accentColor}`} />
-
-        <div className="p-8">
-          {/* Trophy + title */}
-          <div className="flex flex-col items-center mb-6">
-            <div className={`w-20 h-20 rounded-full bg-gradient-to-br ${accentColor} flex items-center justify-center mb-4 shadow-lg`}>
-              <Trophy size={40} className="text-white" />
+        <div className="p-7">
+          <div className="flex flex-col items-center mb-5">
+            <div className="w-16 h-16 rounded-full bg-violet-100 flex items-center justify-center mb-3">
+              <Trophy size={32} className="text-violet-600" />
             </div>
-            <h2 className="text-3xl font-extrabold text-white mb-1">Level Complete!</h2>
-            <p className="text-slate-400 text-sm">Level {levelId} of {totalLevels}</p>
+            <h2 className="text-2xl font-bold text-gray-900 mb-0.5">Quest complete!</h2>
+            <p className="text-gray-400 text-sm">Level {levelId} of {totalLevels}</p>
           </div>
 
           {/* Stars */}
-          <div className="flex justify-center gap-3 mb-6">
+          <div className="flex justify-center gap-3 mb-5">
             {[1, 2, 3].map(s => (
-              <span
-                key={s}
-                className={`text-4xl transition-all ${s <= stars ? 'opacity-100 scale-110' : 'opacity-20 grayscale'}`}
-              >
+              <span key={s} className={`text-3xl transition-all ${s <= stars ? 'opacity-100' : 'opacity-20 grayscale'}`}>
                 ⭐
               </span>
             ))}
           </div>
 
-          {/* Stats row */}
-          <div className="grid grid-cols-2 gap-3 mb-8">
-            {/* Time */}
-            <div className="bg-slate-700 rounded-xl p-4 flex flex-col items-center gap-1">
-              <Clock size={22} className="text-blue-400" />
-              <p className="text-2xl font-bold text-white font-mono">{formatTime(timeSeconds)}</p>
-              <p className="text-slate-400 text-xs">Time</p>
+          {/* Stats */}
+          <div className="grid grid-cols-3 gap-2 mb-5">
+            <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 flex flex-col items-center gap-1">
+              <Clock size={18} className="text-violet-500" />
+              <p className="text-lg font-bold text-gray-900 font-mono">{formatTime(timeSeconds)}</p>
+              <p className="text-gray-400 text-xs">Time</p>
             </div>
-
-            {/* Mistakes */}
-            <div className="bg-slate-700 rounded-xl p-4 flex flex-col items-center gap-1">
-              <AlertTriangle size={22} className={errorCount === 0 ? 'text-green-400' : 'text-yellow-400'} />
-              <p className={`text-2xl font-bold font-mono ${errorCount === 0 ? 'text-green-400' : 'text-yellow-300'}`}>
+            <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 flex flex-col items-center gap-1">
+              <AlertTriangle size={18} className={errorCount === 0 ? 'text-emerald-500' : 'text-amber-500'} />
+              <p className={`text-lg font-bold font-mono ${errorCount === 0 ? 'text-emerald-600' : 'text-amber-600'}`}>
                 {errorCount}
               </p>
-              <p className="text-slate-400 text-xs">{errorCount === 1 ? 'Mistake' : 'Mistakes'}</p>
+              <p className="text-gray-400 text-xs">Errors</p>
+            </div>
+            <div className="bg-violet-50 border border-violet-100 rounded-xl p-3 flex flex-col items-center gap-1">
+              <span className="text-violet-500 font-bold text-sm">XP</span>
+              <p className="text-lg font-bold text-violet-700">+{xpGained}</p>
+              <p className="text-gray-400 text-xs">Earned</p>
             </div>
           </div>
 
-          {/* Perfect run badge */}
           {errorCount === 0 && (
-            <div className="mb-6 text-center">
-              <span className="inline-block px-4 py-1.5 bg-gradient-to-r from-yellow-500 to-amber-500 rounded-full text-white text-sm font-bold shadow">
-                🏆 Perfect Run!
+            <div className="mb-5 text-center">
+              <span className="inline-block px-3 py-1 bg-amber-50 border border-amber-200 text-amber-700 rounded-full text-xs font-semibold">
+                Perfect run — no errors!
               </span>
             </div>
           )}
 
-          {/* Action buttons */}
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-2">
             <button
               onClick={onNext}
-              className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-white bg-gradient-to-r ${accentColor} hover:opacity-90 active:scale-95 transition-all shadow-lg`}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-semibold text-white bg-violet-600 hover:bg-violet-700 active:scale-95 transition-all text-sm"
             >
-              {isLast ? (
-                <><RotateCcw size={18} /> Play Again</>
-              ) : (
-                <>Next Level <ChevronRight size={18} /></>
-              )}
+              {isLast ? <><RotateCcw size={16} /> Play Again</> : <>Next Level <ChevronRight size={16} /></>}
             </button>
-
             <button
               onClick={onNewQuestion}
-              className="w-full py-2.5 rounded-xl font-semibold text-slate-300 bg-slate-700 hover:bg-slate-600 active:scale-95 transition-all text-sm"
+              className="w-full py-2.5 rounded-xl font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 active:scale-95 transition-all text-sm"
             >
-              Try Another Question (Same Level)
+              Try another question
             </button>
           </div>
         </div>

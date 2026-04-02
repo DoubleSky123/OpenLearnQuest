@@ -1,30 +1,39 @@
 import React from 'react';
 
 /**
- * Single code block component - draggable pseudocode line
- * @param {Object} item - Block item with {index, isDistractor}
- * @param {number} index - Position in the pool/assembly
- * @param {string} source - Source identifier for drag/drop
- * @param {Function} onDragStart - Drag start handler
- * @param {Object} currentLevel - Current level configuration
- * @param {boolean} hasError - Whether this block has an error
+ * Single code block — click to place/remove, no drag.
+ * source='pool'     → click adds to assembly
+ * source='assembly' → click returns to pool
  */
-export default function CodeBlock({ item, index, source, onDragStart, currentLevel, hasError = false }) {
-  const text = item.isDistractor 
+export default function CodeBlock({ item, index, source, onClick, currentLevel, isCorrect = false }) {
+  const text = item.isDistractor
     ? currentLevel.distractors[item.index]
     : currentLevel.pseudocode[item.index];
-  
+
+  const base = 'w-full text-left p-3 rounded-lg border font-mono text-xl transition-all cursor-pointer';
+
+  if (source === 'assembly') {
+    return (
+      <button
+        onClick={() => onClick(index)}
+        className={`${base} ${
+          isCorrect
+            ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
+            : 'bg-white border-gray-200 text-gray-800 hover:border-red-300 hover:bg-red-50'
+        }`}
+      >
+        {text}
+      </button>
+    );
+  }
+
+  // pool block
   return (
-    <div
-      draggable
-      onDragStart={(e) => onDragStart(e, index, source)}
-      className={`hover:bg-slate-500 text-white p-3 rounded cursor-move border-2 hover:border-blue-400 transition-all font-mono text-sm ${
-        hasError
-          ? 'bg-red-800 border-red-500'
-          : 'bg-slate-600 border-slate-500'
-      }`}
+    <button
+      onClick={() => onClick(index)}
+      className={`${base} bg-white border-gray-200 text-gray-800 hover:border-violet-400 hover:bg-violet-50`}
     >
       {text}
-    </div>
+    </button>
   );
 }

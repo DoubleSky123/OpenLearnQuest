@@ -1,12 +1,19 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Lightbulb, ChevronRight } from 'lucide-react';
+import { Lightbulb, ChevronRight } from 'lucide-react';
 import { LinkedListVisualiser } from './GoalPattern';
-import { shuffleArray } from '../utils/helpers';
-import TutorialWelcomeModal from './TutorialWelcomeModal';
+import GameTimer from './GameTimer';
+import PetCanvas, { getStage } from './PetCanvas';
 import TutorialCompleteModal from './TutorialCompleteModal';
+import HelpModal from './HelpModal';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TUTORIAL QUESTION DEFINITIONS  (fixed values, no randomness)
+// TUTORIAL QUESTION DEFINITIONS  — fill-in-the-blank format
+//
+// Each line has:
+//   template  — the pseudocode with '___' marking the blank
+//   answer    — the correct word to fill in
+//   options   — array of 3 choices (1 correct + 2 distractors)
+//   hint      — shown while this blank is active
 // ─────────────────────────────────────────────────────────────────────────────
 
 const TUTORIAL_QUESTIONS = [
@@ -20,17 +27,25 @@ const TUTORIAL_QUESTIONS = [
       { id: 3, value: 3, next: null },
     ],
     goalPattern: [0, 1, 2, 3],
-    pseudocode: [
-      'create newNode',
-      'newNode.next = head',
-      'head = newNode',
-    ],
-    correctOrder: [0, 1, 2],
-    // Per-step hints shown BEFORE the player places each block
-    stepHints: [
-      'Step 1 of 3 — Before you can insert anything, you need to create a new node to hold the value 0.',
-      'Step 2 of 3 — The new node must link to the current head so the existing list is not lost.',
-      'Step 3 of 3 — Now move the head pointer to the new node, making it the first node in the list.',
+    lines: [
+      {
+        template: 'create ___',
+        answer:   'newNode',
+        options:  ['newNode', 'temp', 'head'],
+        hint:     'You need a brand-new node to hold the value 0 — create one and give it a name.',
+      },
+      {
+        template: '___.next = head',
+        answer:   'newNode',
+        options:  ['newNode', 'head', 'temp'],
+        hint:     'Before moving head, link the new node to the current head so the rest of the list is not lost.',
+      },
+      {
+        template: 'head = ___',
+        answer:   'newNode',
+        options:  ['newNode', 'temp', 'head'],
+        hint:     'Now point head at the new node — it becomes the new first node in the list.',
+      },
     ],
   },
   {
@@ -43,16 +58,25 @@ const TUTORIAL_QUESTIONS = [
       { id: 3, value: 3, next: null },
     ],
     goalPattern: [2, 3],
-    pseudocode: [
-      'temp = head',
-      'head = head.next',
-      'free(temp)',
-    ],
-    correctOrder: [0, 1, 2],
-    stepHints: [
-      'Step 1 of 3 — Save the current head in a temporary variable before you move anything, so you can free it later.',
-      'Step 2 of 3 — Advance the head pointer to the second node, effectively skipping the first one.',
-      'Step 3 of 3 — Release the memory of the old head node using the temporary reference you saved.',
+    lines: [
+      {
+        template: '___ = head',
+        answer:   'temp',
+        options:  ['temp', 'newNode', 'head'],
+        hint:     'Save the current head in a temporary variable before moving anything — you will need it to free the memory.',
+      },
+      {
+        template: 'head = head.___',
+        answer:   'next',
+        options:  ['next', 'value', 'prev'],
+        hint:     'Advance head to the second node by following its next pointer.',
+      },
+      {
+        template: 'free(___)',
+        answer:   'temp',
+        options:  ['temp', 'newNode', 'head'],
+        hint:     'Release the old head node using the reference you saved earlier.',
+      },
     ],
   },
 ];
@@ -62,7 +86,6 @@ const TUTORIAL_QUESTIONS = [
 // ─────────────────────────────────────────────────────────────────────────────
 
 const getValues = (nodes) => {
-  // Traverse nodes in linked-list order and return values
   const allIds     = new Set(nodes.map(n => n.id));
   const pointedIds = new Set(nodes.map(n => n.next).filter(Boolean));
   let cur = [...allIds].find(id => !pointedIds.has(id)) ?? nodes[0]?.id ?? null;
@@ -77,28 +100,156 @@ const getValues = (nodes) => {
 };
 
 const applyInsertAtHead = (nodes, value) => {
-  const newId = Math.max(...nodes.map(n => n.id), 0) + 1;
+  const newId      = Math.max(...nodes.map(n => n.id), 0) + 1;
   const allIds     = new Set(nodes.map(n => n.id));
   const pointedIds = new Set(nodes.map(n => n.next).filter(Boolean));
-  const headId = [...allIds].find(id => !pointedIds.has(id)) ?? null;
+  const headId     = [...allIds].find(id => !pointedIds.has(id)) ?? null;
   return [{ id: newId, value, next: headId }, ...nodes];
 };
 
 const applyRemoveAtHead = (nodes) => {
   const allIds     = new Set(nodes.map(n => n.id));
   const pointedIds = new Set(nodes.map(n => n.next).filter(Boolean));
-  const headId = [...allIds].find(id => !pointedIds.has(id)) ?? null;
+  const headId     = [...allIds].find(id => !pointedIds.has(id)) ?? null;
   return nodes.filter(n => n.id !== headId);
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ERROR FEEDBACK MODAL  (wrong block placed)
+// CONSTANTS
 // ─────────────────────────────────────────────────────────────────────────────
 
-function ErrorFeedbackModal({ isOpen, wrongBlock, expectedBlock, stepHint, onDismiss }) {
+const XP_PER_LEVEL = 500;
+const LEVEL_NAMES  = ['Novice','Explorer','Learner','Practitioner','Skilled','Advanced','Expert','Master'];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TOP BAR
+// ─────────────────────────────────────────────────────────────────────────────
+
+function TopBar({ onBack, timerRef, xp }) {
+  const level     = Math.floor(xp / XP_PER_LEVEL) + 1;
+  const levelName = LEVEL_NAMES[Math.min(level - 1, LEVEL_NAMES.length - 1)];
+  const xpInLevel = xp % XP_PER_LEVEL;
+  const xpPct     = Math.round((xpInLevel / XP_PER_LEVEL) * 100);
+  const [showHelp, setShowHelp] = useState(false);
+  return (
+    <div className="bg-white border-b border-gray-200 px-6 py-3 sticky top-0 z-10">
+      <div className="max-w-7xl mx-auto flex items-center">
+
+        {/* Left */}
+        <div className="flex-1 flex items-center gap-2">
+          <button onClick={onBack} className="border border-gray-300 rounded-lg px-4 py-1.5 text-gray-600 font-semibold text-lg hover:bg-gray-50 transition-colors">
+            ← Back
+          </button>
+          <button onClick={() => setShowHelp(true)} className="w-8 h-8 rounded-full border border-gray-300 text-gray-500 font-bold text-base hover:bg-gray-50 transition-colors flex items-center justify-center" title="Game Guide">
+            ?
+          </button>
+        </div>
+
+        {/* Center */}
+        <div className="flex-1 flex justify-center">
+          <span className="text-emerald-600 text-2xl font-bold">Tutorial · Guided</span>
+        </div>
+
+        {/* Right */}
+        <div className="flex-1 flex justify-end items-center gap-4">
+          <span className="text-gray-700 text-lg font-semibold whitespace-nowrap">
+            Level {level} · {levelName}
+          </span>
+          <div className="w-36 shrink-0">
+            <div className="flex justify-between text-sm text-gray-400 mb-1">
+              <span>XP</span><span>{xpInLevel}/{XP_PER_LEVEL}</span>
+            </div>
+            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+              <div className="h-full bg-violet-500 rounded-full transition-all duration-500" style={{ width: `${xpPct}%` }} />
+            </div>
+          </div>
+          <GameTimer ref={timerRef} isRunning={true} />
+        </div>
+
+      </div>
+      <HelpModal isOpen={showHelp} onClose={() => setShowHelp(false)} />
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// QUEST NAV
+// ─────────────────────────────────────────────────────────────────────────────
+
+function QuestNav({ questions, currentIndex, completedSet }) {
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-4">
+      <div className="border-b border-gray-100 px-4 py-2.5">
+        <p className="text-lg font-semibold text-gray-500 uppercase tracking-wide">Exercises</p>
+      </div>
+      <div className="p-2 flex flex-col gap-1">
+        {questions.map((q, i) => {
+          const isDone   = completedSet.has(i);
+          const isActive = i === currentIndex;
+          return (
+            <div key={q.id} className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg border ${
+              isActive ? 'bg-emerald-50 border-emerald-200' :
+              isDone   ? 'bg-emerald-50 border-emerald-100' :
+                         'bg-transparent border-transparent'
+            }`}>
+              <div className={`w-5 h-5 rounded flex items-center justify-center shrink-0 ${
+                isDone   ? 'bg-emerald-100 border border-emerald-300' :
+                isActive ? 'bg-emerald-100 border border-emerald-300' :
+                           'bg-gray-100 border border-gray-200'
+              }`}>
+                <div className={`w-2 h-2 rounded-sm ${
+                  isDone ? 'bg-emerald-500' : isActive ? 'bg-emerald-500' : 'bg-gray-300'
+                }`} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className={`text-lg font-medium truncate ${
+                  isActive ? 'text-emerald-800' : isDone ? 'text-emerald-700' : 'text-gray-400'
+                }`}>{q.title}</p>
+                <p className="text-lg text-gray-400 mt-0.5">
+                  {isDone ? 'Completed' : isActive ? 'In progress' : 'Not started'}
+                </p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PET CARD
+// ─────────────────────────────────────────────────────────────────────────────
+
+function PetCard({ mood = 'idle', xp = 0 }) {
+  const stage     = getStage(xp);
+  const xpInLevel = xp % XP_PER_LEVEL;
+  const xpPct     = Math.round((xpInLevel / XP_PER_LEVEL) * 100);
+  const level     = Math.floor(xp / XP_PER_LEVEL) + 1;
+  return (
+    <div className="bg-white rounded-xl border-2 border-dashed border-emerald-200 overflow-hidden">
+      <div className="bg-[#c8dfa8] mx-3 mt-3 rounded-lg flex items-center justify-center py-16">
+        <PetCanvas stage={stage} mood={mood} />
+      </div>
+      <div className="px-4 py-4 flex flex-col items-center gap-2">
+        <p className="text-sm font-semibold text-gray-700">Algo</p>
+        <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+          <div className="h-full bg-violet-400 rounded-full transition-all duration-500" style={{ width: `${xpPct}%` }} />
+        </div>
+        <p className="text-xs text-gray-400">Level {level} · {xpInLevel}/{XP_PER_LEVEL} XP</p>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ERROR MODAL
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ErrorModal({ isOpen, wrongWord, hint, onDismiss }) {
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div className="relative w-full max-w-sm bg-slate-800 border border-red-500/60 rounded-2xl shadow-2xl overflow-hidden">
         <div className="h-1.5 w-full bg-gradient-to-r from-red-500 to-rose-500" />
         <div className="p-6">
@@ -106,17 +257,14 @@ function ErrorFeedbackModal({ isOpen, wrongBlock, expectedBlock, stepHint, onDis
             <span className="text-2xl">❌</span>
             <h3 className="text-lg font-bold text-white">Not quite!</h3>
           </div>
-
-          <div className="bg-slate-700 rounded-lg p-3 mb-3 text-sm">
-            <p className="text-slate-400 text-xs mb-1">You placed:</p>
-            <p className="font-mono text-red-300 font-semibold">"{wrongBlock}"</p>
+          <div className="bg-slate-700 rounded-lg p-3 mb-3">
+            <p className="text-slate-400 text-xs mb-1">You chose:</p>
+            <p className="font-mono text-red-300 font-semibold text-sm">"{wrongWord}"</p>
           </div>
-
-          <div className="bg-slate-700 rounded-lg p-3 mb-5 text-sm">
-            <p className="text-slate-400 text-xs mb-1">Hint for this step:</p>
-            <p className="text-emerald-300 text-sm">{stepHint}</p>
+          <div className="bg-slate-700 rounded-lg p-3 mb-5">
+            <p className="text-slate-400 text-xs mb-1">Hint:</p>
+            <p className="text-emerald-300 text-sm">{hint}</p>
           </div>
-
           <button
             onClick={onDismiss}
             className="w-full py-2.5 rounded-xl font-bold text-white bg-gradient-to-r from-red-500 to-rose-500 hover:opacity-90 active:scale-95 transition-all"
@@ -130,49 +278,85 @@ function ErrorFeedbackModal({ isOpen, wrongBlock, expectedBlock, stepHint, onDis
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// CODE LINE  — renders a template with a blank or filled word inline
+// ─────────────────────────────────────────────────────────────────────────────
+
+function CodeLine({ line, filledWord, isActive, isComplete }) {
+  const parts = line.template.split('___');
+
+  const containerClass = [
+    'flex-1 flex items-center px-3 py-2 rounded-lg border font-mono text-xl transition-all',
+    isComplete ? 'bg-emerald-50 border-emerald-200' :
+    isActive   ? 'bg-violet-50 border-violet-300 ring-1 ring-violet-200' :
+    filledWord  ? 'bg-emerald-50 border-emerald-200' :
+                 'bg-gray-50 border-gray-200 opacity-50',
+  ].join(' ');
+
+  return (
+    <div className={containerClass}>
+      <span className={isComplete || filledWord ? 'text-gray-700' : isActive ? 'text-gray-700' : 'text-gray-400'}>
+        {parts[0]}
+      </span>
+
+      {filledWord ? (
+        <span className="mx-0.5 px-1.5 py-0 rounded bg-emerald-200 text-emerald-900 font-bold">
+          {filledWord}
+        </span>
+      ) : (
+        <span className={[
+          'mx-0.5 px-2 py-0.5 rounded border-b-2 font-bold tracking-widest text-xs',
+          isActive
+            ? 'border-violet-400 text-violet-400 animate-pulse bg-violet-50'
+            : 'border-gray-300 text-gray-300 bg-transparent',
+        ].join(' ')}>
+          {isActive ? '___' : '___'}
+        </span>
+      )}
+
+      <span className={isComplete || filledWord ? 'text-gray-700' : isActive ? 'text-gray-700' : 'text-gray-400'}>
+        {parts[1]}
+      </span>
+
+      {filledWord && (
+        <span className="ml-auto text-emerald-500 text-xs">✓</span>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // MAIN TUTORIAL GAME
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default function TutorialGame({ onBack, onGoRegular }) {
-  const [showWelcome, setShowWelcome]   = useState(true);
+export default function TutorialGame({ onBack, onGoRegular, startAt = 0, xp = 0 }) {
   const [showComplete, setShowComplete] = useState(false);
+  const [qIndex, setQIndex]             = useState(startAt);
+  const [completedSet, setCompletedSet] = useState(new Set());
 
-  // Which of the two tutorial questions we're on (0 or 1)
-  const [qIndex, setQIndex] = useState(0);
-
-  // Current question derived from qIndex
   const q = TUTORIAL_QUESTIONS[qIndex];
 
-  // How many blocks has the player correctly placed so far
-  const [placedCount, setPlacedCount] = useState(0);
+  // fill-in-the-blank state
+  const [filledAnswers, setFilledAnswers] = useState(() => q.lines.map(() => null));
+  const [nodes, setNodes]                 = useState(() => JSON.parse(JSON.stringify(q.initialNodes)));
+  const [executed, setExecuted]           = useState(false);
+  const [success, setSuccess]             = useState(false);
 
-  // The shuffled pool items (each is an index into q.pseudocode)
-  const [codePool, setCodePool] = useState([]);
+  // error modal
+  const [errorModal, setErrorModal] = useState({ open: false, wrongWord: '', hint: '' });
 
-  // Assembled blocks (correctly placed, in order)
-  const [assemblyArea, setAssemblyArea] = useState([]);
-
-  // Node state (updates after all blocks placed)
-  const [nodes, setNodes] = useState([]);
-  const [executed, setExecuted] = useState(false);
-  const [success, setSuccess] = useState(false);
-
-  // Error modal
-  const [errorModal, setErrorModal] = useState({ open: false, wrongBlock: '', stepHint: '' });
-
-  // Drag state
-  const [draggedIdx, setDraggedIdx] = useState(null);
-
-  // Ref to track if we already animated to next question
+  const timerRef     = useRef(null);
   const advancingRef = useRef(false);
 
-  // ── Init question ──────────────────────────────────────────────────────────
+  // active blank = first unfilled index
+  const activeBlankIdx = filledAnswers.findIndex(a => a === null);
+  // all blanks filled
+  const allFilled = activeBlankIdx === -1;
+
+  // ── Init ───────────────────────────────────────────────────────────────────
   const initQuestion = useCallback((index) => {
     const question = TUTORIAL_QUESTIONS[index];
     setNodes(JSON.parse(JSON.stringify(question.initialNodes)));
-    setCodePool(shuffleArray(question.pseudocode.map((_, i) => i)));
-    setAssemblyArea([]);
-    setPlacedCount(0);
+    setFilledAnswers(question.lines.map(() => null));
     setExecuted(false);
     setSuccess(false);
     advancingRef.current = false;
@@ -180,127 +364,66 @@ export default function TutorialGame({ onBack, onGoRegular }) {
 
   useEffect(() => { initQuestion(qIndex); }, [qIndex, initQuestion]);
 
-  // ── Current step hint ──────────────────────────────────────────────────────
-  // Show the hint for the NEXT block the player needs to place
-  const currentStepHint = placedCount < q.stepHints.length
-    ? q.stepHints[placedCount]
-    : null;
-
-  // ── Handle a block being dropped from pool ─────────────────────────────────
-  const handleBlockClick = (poolIdx) => {
-    if (executed) return;
-    const blockIndex = codePool[poolIdx]; // index into q.pseudocode
-    const expected   = q.correctOrder[placedCount];
-
-    if (blockIndex === expected) {
-      // ✅ Correct
-      setAssemblyArea(prev => [...prev, blockIndex]);
-      setCodePool(prev => prev.filter((_, i) => i !== poolIdx));
-      setPlacedCount(prev => prev + 1);
-    } else {
-      // ❌ Wrong — show error modal, block stays in pool
-      setErrorModal({
-        open: true,
-        wrongBlock: q.pseudocode[blockIndex],
-        stepHint: q.stepHints[placedCount],
-      });
-    }
-  };
-
-  // ── Drag handlers (pool → assembly, same logic as click) ──────────────────
-  const handleDragStart = (e, poolIdx) => {
-    setDraggedIdx(poolIdx);
-    e.dataTransfer.effectAllowed = 'move';
-  };
-
-  const handleDropOnAssembly = (e) => {
-    e.preventDefault();
-    if (draggedIdx === null) return;
-    handleBlockClick(draggedIdx);
-    setDraggedIdx(null);
-  };
-
-  const handleDragOver = (e) => e.preventDefault();
-
-  // ── Check completion after each correct placement ──────────────────────────
+  // ── Completion effect ──────────────────────────────────────────────────────
   useEffect(() => {
-    if (placedCount < q.correctOrder.length || executed || advancingRef.current) return;
+    if (!allFilled || executed || advancingRef.current) return;
     advancingRef.current = true;
     setExecuted(true);
 
-    // Apply the operation to nodes
     setTimeout(() => {
-      let newNodes;
-      if (q.id === 'tut-insert-head') {
-        newNodes = applyInsertAtHead(nodes, 0);
-      } else {
-        newNodes = applyRemoveAtHead(nodes);
-      }
+      const newNodes = q.id === 'tut-insert-head'
+        ? applyInsertAtHead(nodes, 0)
+        : applyRemoveAtHead(nodes);
       setNodes(newNodes);
       setSuccess(true);
+      setCompletedSet(prev => new Set([...prev, qIndex]));
 
-      // After showing success state, advance after a pause
       setTimeout(() => {
         if (qIndex < TUTORIAL_QUESTIONS.length - 1) {
           setQIndex(prev => prev + 1);
         } else {
+          timerRef.current?.stop();
           setShowComplete(true);
         }
       }, 1800);
     }, 600);
-  }, [placedCount]); // eslint-disable-line
+  }, [allFilled]); // eslint-disable-line
 
-  // ── Current list values for visualiser ────────────────────────────────────
+  // ── Option click handler ───────────────────────────────────────────────────
+  const handleOptionClick = (word) => {
+    if (executed || activeBlankIdx < 0) return;
+    const line = q.lines[activeBlankIdx];
+
+    if (word === line.answer) {
+      // Correct — fill and advance
+      setFilledAnswers(prev => {
+        const next = [...prev];
+        next[activeBlankIdx] = word;
+        return next;
+      });
+    } else {
+      // Wrong — show error modal
+      setErrorModal({ open: true, wrongWord: word, hint: line.hint });
+    }
+  };
+
   const currentValues = getValues(nodes);
+  const activeHint    = activeBlankIdx >= 0 ? q.lines[activeBlankIdx].hint : null;
 
   // ─────────────────────────────────────────────────────────────────────────
   // RENDER
   // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 p-8">
-      <div className="max-w-5xl mx-auto">
+    <div className="min-h-screen bg-gray-50">
+      <TopBar onBack={onBack} timerRef={timerRef} xp={xp} />
 
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-1">
-          <button onClick={onBack} className="text-slate-400 hover:text-white transition-colors text-sm">
-            ← Back
-          </button>
-          <h1 className="text-3xl font-bold text-white">Tutorial Mode</h1>
-          {/* Progress pills */}
-          <div className="flex gap-2 ml-auto">
-            {TUTORIAL_QUESTIONS.map((tq, i) => (
-              <span
-                key={tq.id}
-                className={`text-xs px-3 py-1 rounded-full font-semibold transition-all ${
-                  i < qIndex
-                    ? 'bg-emerald-700 text-emerald-100'
-                    : i === qIndex
-                    ? 'bg-emerald-500 text-white shadow shadow-emerald-700'
-                    : 'bg-slate-700 text-slate-400'
-                }`}
-              >
-                {i < qIndex ? '✓ ' : ''}{tq.title}
-              </span>
-            ))}
-          </div>
-        </div>
-        <p className="text-slate-400 text-sm mb-8 ml-14">
-          Follow the hints and place each code block in the correct order.
-        </p>
+      <div className="max-w-7xl mx-auto p-5">
 
-        {/* Step hint bar */}
-        {currentStepHint && !executed && (
-          <div className="flex items-start gap-3 bg-emerald-900/50 border border-emerald-600/50 rounded-xl px-5 py-4 mb-6 shadow">
-            <Lightbulb size={18} className="text-emerald-400 shrink-0 mt-0.5" />
-            <p className="text-emerald-200 text-sm font-medium">{currentStepHint}</p>
-          </div>
-        )}
-
-        {/* Success bar */}
+        {/* Success banner */}
         {success && (
-          <div className="flex items-center gap-3 bg-emerald-800/60 border border-emerald-500/50 rounded-xl px-5 py-4 mb-6 shadow">
-            <span className="text-xl">🎉</span>
-            <p className="text-emerald-200 text-sm font-bold">
+          <div className="mb-4 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 flex items-center gap-3">
+            <span className="text-lg">🎉</span>
+            <p className="text-emerald-700 font-semibold text-xl">
               {qIndex < TUTORIAL_QUESTIONS.length - 1
                 ? 'Great job! Loading next exercise…'
                 : 'Excellent! Tutorial complete!'}
@@ -308,126 +431,134 @@ export default function TutorialGame({ onBack, onGoRegular }) {
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-8">
+        {/* 3-column layout */}
+        <div className="grid grid-cols-[1fr_1fr_240px] gap-4 items-start">
 
-          {/* LEFT: Question info + current list */}
-          <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
-            <div className="flex items-center gap-3 mb-1">
-              <h2 className="text-xl font-bold text-white">{q.title}</h2>
-              <span className="text-xs px-2 py-0.5 rounded font-semibold bg-emerald-700 text-emerald-100">
-                Tutorial
-              </span>
-            </div>
-            <p className="text-slate-300 text-sm mb-4">{q.description}</p>
+          {/* ── Col 1: Nav + Quest info ── */}
+          <div className="flex flex-col gap-4">
 
-            {/* Current linked list */}
-            <div className="bg-slate-700 rounded-lg p-4 mb-4">
-              <p className="text-slate-400 text-xs mb-2 uppercase tracking-wide">Current List</p>
-              <LinkedListVisualiser
-                values={currentValues}
-                emptyLabel="Empty list"
-                highlight={success}
-                goalValues={success ? currentValues : []}
-              />
-            </div>
+            <QuestNav
+              questions={TUTORIAL_QUESTIONS}
+              currentIndex={qIndex}
+              completedSet={completedSet}
+            />
 
-            {/* Goal */}
-            <div className="bg-slate-700 rounded-lg p-4">
-              <p className="text-slate-400 text-xs mb-2 uppercase tracking-wide">Goal</p>
-              <LinkedListVisualiser
-                values={q.goalPattern}
-                nodeColor="bg-yellow-600 border-yellow-400"
-              />
-            </div>
-          </div>
+            {/* Quest info card */}
+            <div className="bg-white rounded-xl border border-gray-200 p-4">
+              <div className="flex items-center gap-2 mb-1.5">
+                <h2 className="text-xl font-semibold text-gray-900">{q.title}</h2>
+                <span className="text-lg px-3 py-1 rounded-full font-medium border bg-emerald-50 text-emerald-700 border-emerald-200">
+                  Guided
+                </span>
+              </div>
+              <p className="text-gray-500 text-lg mb-3">{q.description}</p>
 
-          {/* RIGHT: Code pool + assembly area */}
-          <div className="flex flex-col gap-6">
+              {/* Current state */}
+              <div className="bg-gray-50 rounded-lg border border-gray-100 p-2.5 mb-2">
+                <p className="text-gray-400 text-lg font-medium mb-1.5">Current state</p>
+                <LinkedListVisualiser
+                  values={currentValues}
+                  emptyLabel="Empty list"
+                  highlight={success}
+                  goalValues={success ? currentValues : []}
+                />
+              </div>
 
-            {/* Code Pool */}
-            <div className="bg-slate-800 rounded-xl p-5 border border-slate-700">
-              <p className="text-slate-300 font-semibold text-sm mb-3 uppercase tracking-wide">
-                Code Pool
-              </p>
-              {codePool.length === 0 ? (
-                <p className="text-slate-500 text-sm italic">All blocks placed!</p>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  {codePool.map((blockIndex, poolIdx) => (
-                    <div
-                      key={`${blockIndex}-${poolIdx}`}
-                      draggable
-                      onDragStart={(e) => handleDragStart(e, poolIdx)}
-                      onClick={() => handleBlockClick(poolIdx)}
-                      className="flex items-center gap-2 px-4 py-2.5 bg-slate-700 border border-slate-500 rounded-lg cursor-grab active:cursor-grabbing hover:bg-slate-600 hover:border-slate-400 transition-all group select-none"
-                    >
-                      <span className="text-slate-500 group-hover:text-slate-300 transition-colors text-sm">⠿</span>
-                      <span className="font-mono text-sm text-white">{q.pseudocode[blockIndex]}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+              {/* Goal state */}
+              <div className="bg-gray-50 rounded-lg border border-gray-100 p-2.5 mb-2">
+                <p className="text-gray-400 text-lg font-medium mb-1.5">Goal state</p>
+                <LinkedListVisualiser
+                  values={q.goalPattern}
+                  nodeColor="bg-amber-50 border-amber-300 text-amber-800"
+                />
+              </div>
 
-            {/* Assembly Area */}
-            <div
-              className="bg-slate-800 rounded-xl p-5 border-2 border-dashed border-slate-600 min-h-36 transition-colors"
-              onDrop={handleDropOnAssembly}
-              onDragOver={handleDragOver}
-            >
-              <p className="text-slate-300 font-semibold text-sm mb-3 uppercase tracking-wide">
-                Assembly Area
-              </p>
-              {assemblyArea.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-24 text-slate-500 text-sm gap-2">
-                  <span className="text-2xl">📥</span>
-                  Drag or click a block to place it here
-                </div>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  {assemblyArea.map((blockIndex, pos) => (
-                    <div
-                      key={`placed-${pos}`}
-                      className="flex items-center gap-2 px-4 py-2.5 bg-emerald-800/60 border border-emerald-600 rounded-lg select-none"
-                    >
-                      <span className="text-emerald-400 text-xs font-bold w-5">{pos + 1}.</span>
-                      <span className="font-mono text-sm text-white">{q.pseudocode[blockIndex]}</span>
-                      <span className="ml-auto text-emerald-400 text-sm">✓</span>
-                    </div>
-                  ))}
-                  {/* Placeholder for next slot */}
-                  {!executed && (
-                    <div className="flex items-center gap-2 px-4 py-2.5 border border-dashed border-emerald-700/50 rounded-lg text-emerald-700 text-sm italic">
-                      <span className="text-xs font-bold w-5">{assemblyArea.length + 1}.</span>
-                      drop next block here…
-                    </div>
-                  )}
+              {/* Hint for current blank */}
+              {activeHint && !executed && (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-2.5 flex items-start gap-2">
+                  <Lightbulb size={14} className="text-emerald-600 shrink-0 mt-0.5" />
+                  <p className="text-emerald-700 text-lg leading-relaxed">{activeHint}</p>
                 </div>
               )}
             </div>
           </div>
+
+          {/* ── Col 2: Code frame + word options ── */}
+          <div className="flex flex-col gap-4">
+
+            {/* Code frame */}
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              {/* Mac-style title bar */}
+              <div className="flex items-center gap-2 px-4 py-2.5 bg-gray-50 border-b border-gray-200">
+                <span className="w-2.5 h-2.5 rounded-full bg-red-400/70" />
+                <span className="w-2.5 h-2.5 rounded-full bg-yellow-400/70" />
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400/70" />
+                <span className="ml-2 text-gray-400 text-lg font-mono">pseudocode — fill in the blanks</span>
+              </div>
+
+              <div className="p-4 flex flex-col gap-2">
+                {q.lines.map((line, idx) => (
+                  <div key={idx} className="flex items-center gap-3">
+                    <span className="text-gray-300 font-mono text-lg w-6 shrink-0 text-right">
+                      {idx + 1}
+                    </span>
+                    <CodeLine
+                      line={line}
+                      filledWord={filledAnswers[idx]}
+                      isActive={!executed && idx === activeBlankIdx}
+                      isComplete={success}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Word options for current blank */}
+            {!executed && activeBlankIdx >= 0 && (
+              <div className="bg-white rounded-xl border border-gray-200 p-4">
+                <p className="text-gray-400 text-lg font-semibold mb-3 uppercase tracking-wide">
+                  Fill in blank {activeBlankIdx + 1} — choose the correct word:
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {q.lines[activeBlankIdx].options.map(opt => (
+                    <button
+                      key={opt}
+                      onClick={() => handleOptionClick(opt)}
+                      className="px-5 py-3 bg-gray-50 border border-gray-200 rounded-xl font-mono text-xl text-gray-700 hover:bg-violet-50 hover:border-violet-300 hover:text-violet-800 active:scale-95 transition-all font-semibold"
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* All done message */}
+            {executed && !success && (
+              <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 text-center">
+                <p className="text-violet-700 text-xl font-medium">Executing operation…</p>
+              </div>
+            )}
+          </div>
+
+          {/* ── Col 3: Pet ── */}
+          <PetCard mood={success ? 'happy' : errorModal.open ? 'sad' : 'idle'} xp={xp} />
+
         </div>
       </div>
 
-      {/* Modals */}
-      {showWelcome && (
-        <TutorialWelcomeModal
-          onStart={() => setShowWelcome(false)}
-          onClose={() => setShowWelcome(false)}
-        />
-      )}
-
-      <ErrorFeedbackModal
+      {/* ── Modals ── */}
+      <ErrorModal
         isOpen={errorModal.open}
-        wrongBlock={errorModal.wrongBlock}
-        stepHint={errorModal.stepHint}
-        onDismiss={() => setErrorModal({ open: false, wrongBlock: '', stepHint: '' })}
+        wrongWord={errorModal.wrongWord}
+        hint={errorModal.hint}
+        onDismiss={() => setErrorModal({ open: false, wrongWord: '', hint: '' })}
       />
 
       <TutorialCompleteModal
         isOpen={showComplete}
         onRegular={onGoRegular}
-        onReplay={() => { setShowComplete(false); setQIndex(0); }}
+        onReplay={() => { setShowComplete(false); setQIndex(0); setCompletedSet(new Set()); }}
         onBack={onBack}
       />
     </div>

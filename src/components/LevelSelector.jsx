@@ -1,45 +1,33 @@
 import React from 'react';
-import { Lock, Unlock, Star } from 'lucide-react';
+import { Star, Lock } from 'lucide-react';
 
-/**
- * Level selector component - displays all levels with completion status.
- * Accepts optional `children` rendered below the level buttons (e.g. SubQuestionSelector).
- */
 export default function LevelSelector({ levels, currentLevelId, completedLevels, onLevelChange, children }) {
   return (
-    <div className="mb-8 p-4 bg-slate-800 rounded-lg border border-slate-700">
-      <p className="text-slate-300 text-sm mb-3">Levels:</p>
+    <div className="mb-6 bg-white rounded-xl border border-gray-200 p-4">
+      <p className="text-gray-500 text-sm font-medium mb-3">Level</p>
       <div className="flex gap-2 flex-wrap">
         {levels.map((level) => {
-          const isLocked = false;
+          const isActive    = currentLevelId === level.id;
+          const isCompleted = completedLevels.includes(level.id);
           return (
             <button
               key={level.id}
-              onClick={() => { if (!isLocked) onLevelChange(level.id); }}
-              disabled={isLocked}
-              className={`px-4 py-2 rounded font-bold text-sm transition-all ${
-                currentLevelId === level.id
-                  ? 'bg-blue-600 text-white border-2 border-blue-400'
-                  : isLocked
-                  ? 'bg-slate-700 text-slate-500 cursor-not-allowed opacity-50'
-                  : completedLevels.includes(level.id)
-                  ? 'bg-green-700 text-white hover:bg-green-600'
-                  : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+              onClick={() => onLevelChange(level.id)}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all border ${
+                isActive
+                  ? 'bg-violet-600 text-white border-violet-600 shadow-sm'
+                  : isCompleted
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                  : 'bg-white text-gray-600 border-gray-200 hover:border-violet-300 hover:text-violet-600'
               }`}
             >
-              {isLocked
-                ? <Lock   size={14} className="inline mr-1" />
-                : completedLevels.includes(level.id)
-                ? <Star   size={14} className="inline mr-1" />
-                : <Unlock size={14} className="inline mr-1" />}
-              L{level.id}
+              {isCompleted && !isActive && <Star size={13} className="shrink-0" />}
+              Level {level.id}
             </button>
           );
         })}
       </div>
-
-      {/* Optional sub-content (e.g. SubQuestionSelector) */}
-      {children && <div className="mt-1">{children}</div>}
+      {children && <div className="mt-3 pt-3 border-t border-gray-100">{children}</div>}
     </div>
   );
 }

@@ -1,21 +1,11 @@
 import React from 'react';
 import { formatPatternValue } from '../utils/helpers';
 
-/**
- * Reusable linked-list visualiser — circular nodes connected by arrows.
- * Each node shows its value inside the circle and its index (0-based) below.
- *
- * @param {Array}   values      - Ordered array of node values to display
- * @param {string}  emptyLabel  - Text shown when list is empty
- * @param {string}  nodeColor   - Tailwind bg + border classes for the node circle
- * @param {boolean} highlight   - When true each matching node glows (used in Current Pattern)
- * @param {Array}   goalValues  - Used for per-node highlight comparison
- */
-function LinkedListVisualiser({ values = [], emptyLabel = 'Empty', nodeColor = 'bg-slate-600 border-slate-400', highlight = false, goalValues = [] }) {
+function LinkedListVisualiser({ values = [], emptyLabel = 'Empty', nodeColor = 'bg-gray-200 border-gray-300', highlight = false, goalValues = [] }) {
   if (values.length === 0) {
     return (
-      <div className="flex items-center gap-2 text-slate-400 text-sm italic min-h-12">
-        <span className="w-10 h-10 rounded-full border-2 border-dashed border-slate-500 flex items-center justify-center text-xs">∅</span>
+      <div className="flex items-center gap-2 text-gray-400 text-sm italic min-h-12">
+        <span className="w-10 h-10 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center text-xs">∅</span>
         <span>{emptyLabel}</span>
       </div>
     );
@@ -27,44 +17,38 @@ function LinkedListVisualiser({ values = [], emptyLabel = 'Empty', nodeColor = '
         const isMatch = highlight && goalValues.length > 0 && val === goalValues[idx];
         const circleClass = highlight
           ? isMatch
-            ? 'bg-green-600 border-green-400 shadow-lg shadow-green-700 scale-110'
-            : 'bg-slate-600 border-slate-400'
+            ? 'bg-emerald-100 border-emerald-400 text-emerald-800 scale-110 shadow-sm'
+            : 'bg-gray-100 border-gray-300 text-gray-700'
           : nodeColor;
         return (
           <React.Fragment key={idx}>
-            {/* Node: circle + index label below */}
             <div className="flex flex-col items-center gap-0.5 shrink-0">
-              <div className={`w-11 h-11 rounded-full border-2 flex items-center justify-center font-bold text-white text-sm transition-all ${circleClass}`}>
+              <div className={`w-11 h-11 rounded-full border-2 flex items-center justify-center font-semibold text-sm transition-all ${circleClass}`}>
                 {formatPatternValue(val)}
               </div>
-              <span className="text-slate-400 text-xs">{idx}</span>
+              <span className="text-gray-400 text-xs">{idx}</span>
             </div>
-            {/* Arrow between nodes (vertically centered with circle, not label) */}
             {idx < values.length - 1 && (
-              <span className="text-slate-400 text-lg select-none mb-4">→</span>
+              <span className="text-gray-400 text-base select-none mb-4">→</span>
             )}
           </React.Fragment>
         );
       })}
-      {/* NULL terminator */}
-      <span className="text-slate-500 text-sm ml-1 select-none mb-4">→ NULL</span>
+      <span className="text-gray-400 text-sm ml-1 select-none mb-4">→ NULL</span>
     </div>
   );
 }
 
-/**
- * Goal Pattern panel — shows the target linked list state.
- */
-export default function GoalPattern({ goalPattern}) {
+export default function GoalPattern({ goalPattern }) {
   return (
     <div className="mb-4">
-      <h2 className="text-2xl font-bold text-white mb-3">Goal Linked List</h2>
-      <div className="bg-slate-700 rounded p-4">
-      <LinkedListVisualiser
-        values={goalPattern}
-        emptyLabel="Empty list (no nodes)"
-        nodeColor="bg-yellow-600 border-yellow-400"
-      />
+      <h2 className="text-base font-semibold text-gray-900 mb-3">Goal state</h2>
+      <div className="bg-gray-50 rounded-lg border border-gray-100 p-4">
+        <LinkedListVisualiser
+          values={goalPattern}
+          emptyLabel="Empty list (no nodes)"
+          nodeColor="bg-amber-50 border-amber-300 text-amber-800"
+        />
       </div>
     </div>
   );

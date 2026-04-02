@@ -1,78 +1,84 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { ChevronRight, RotateCcw } from 'lucide-react';
 
-/**
- * TutorialCompleteModal
- * Shown when the player finishes both tutorial exercises.
- *
- * Props:
- *   isOpen        {boolean}
- *   onRegular     {function} — go to Regular Mode
- *   onReplay      {function} — replay Tutorial
- *   onBack        {function} — back to Mode Select
- */
 export default function TutorialCompleteModal({ isOpen, onRegular, onReplay, onBack }) {
+  const [showStars, setShowStars] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      const t = setTimeout(() => setShowStars(true), 200);
+      return () => clearTimeout(t);
+    } else {
+      setShowStars(false);
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
-      <div className="relative w-full max-w-md bg-slate-800 border border-slate-600 rounded-2xl shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className="relative w-full max-w-sm bg-white rounded-3xl shadow-2xl overflow-hidden">
 
-        {/* Top accent */}
-        <div className="h-1.5 w-full bg-gradient-to-r from-emerald-500 to-teal-500" />
+        {/* Top colour band */}
+        <div className="h-2 w-full bg-gradient-to-r from-emerald-400 to-teal-500" />
 
-        <div className="p-8 flex flex-col items-center text-center">
+        <div className="px-8 py-10 flex flex-col items-center text-center">
 
-          {/* Trophy */}
-          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center mb-5 shadow-lg">
-            <span className="text-4xl">🎓</span>
+          {/* Big trophy */}
+          <div className="w-28 h-28 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center mb-6 shadow-xl">
+            <span className="text-6xl">🎓</span>
           </div>
 
-          <h2 className="text-3xl font-extrabold text-white mb-2">Tutorial Complete!</h2>
-          <p className="text-slate-400 text-sm mb-6">
-            Great work! You have mastered the basics of linked list operations.
-          </p>
+          {/* Title */}
+          <h2 className="text-4xl font-black text-gray-900 mb-1">Tutorial Complete!</h2>
+          <p className="text-gray-400 text-xl mb-8">You nailed the basics 🎉</p>
 
-          {/* What you learned */}
-          <div className="w-full bg-slate-700 rounded-xl p-4 mb-7 text-left">
-            <p className="text-emerald-400 font-semibold text-sm mb-3">What you practised:</p>
-            <ul className="space-y-2">
-              {[
-                { icon: '✅', text: 'Insert at Head — prepend a new node to the list' },
-                { icon: '✅', text: 'Remove at Head — delete the first node safely' },
-              ].map(({ icon, text }) => (
-                <li key={text} className="flex items-center gap-2 text-slate-300 text-sm">
-                  <span>{icon}</span>
-                  <span>{text}</span>
-                </li>
-              ))}
-            </ul>
+          {/* Stars */}
+          <div className="flex items-center justify-center gap-3 mb-10">
+            {[0, 1, 2].map(i => (
+              <span
+                key={i}
+                className="text-5xl transition-all duration-500"
+                style={{
+                  opacity:    showStars ? 1 : 0,
+                  transform:  showStars ? 'scale(1) rotate(0deg)' : 'scale(0.3) rotate(-30deg)',
+                  transitionDelay: `${i * 150}ms`,
+                }}
+              >
+                ⭐
+              </span>
+            ))}
           </div>
 
-          {/* Suggestion */}
-          <div className="w-full bg-blue-900/40 border border-blue-700/50 rounded-lg px-4 py-3 mb-7 text-sm text-blue-200 text-left">
-            <span className="font-semibold">Ready for more?</span> Head into
-            <span className="font-semibold"> Regular Mode</span> to tackle all operations
-            with randomised values, distractor blocks, and a timer!
+          {/* Completed badges */}
+          <div className="flex gap-3 mb-10">
+            {['Insert Head', 'Remove Head'].map(label => (
+              <div
+                key={label}
+                className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 text-base font-semibold px-4 py-2 rounded-full"
+              >
+                ✅ {label}
+              </div>
+            ))}
           </div>
 
           {/* Buttons */}
           <div className="flex flex-col gap-3 w-full">
             <button
               onClick={onRegular}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-white bg-gradient-to-r from-blue-500 to-indigo-600 hover:opacity-90 active:scale-95 transition-all shadow-lg"
+              className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-black text-white text-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:opacity-90 active:scale-95 transition-all shadow-lg"
             >
-              Go to Regular Mode <ChevronRight size={18} />
+              Training Mode <ChevronRight size={22} />
             </button>
             <button
               onClick={onReplay}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-semibold text-slate-300 bg-slate-700 hover:bg-slate-600 active:scale-95 transition-all text-sm"
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl font-semibold text-gray-500 bg-gray-100 hover:bg-gray-200 active:scale-95 transition-all text-lg border border-gray-200"
             >
-              <RotateCcw size={15} /> Replay Tutorial
+              <RotateCcw size={17} /> Replay
             </button>
             <button
               onClick={onBack}
-              className="w-full py-2 rounded-xl font-medium text-slate-500 hover:text-slate-300 transition-colors text-sm"
+              className="w-full py-2 rounded-2xl font-medium text-gray-400 hover:text-gray-600 transition-colors text-base"
             >
               Back to Mode Select
             </button>
