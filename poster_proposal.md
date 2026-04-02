@@ -45,7 +45,7 @@ The poster follows a one-page academic format optimized for 60-second scanning. 
 Most platforms address either engagement *or* algorithm depth — but not both. Learning tools lack algorithmic rigor; practice platforms are inaccessible to novices; educational games skip data structure reasoning entirely. A literature review of leading platforms revealed:
 
 - **Duolingo / Brilliant.org** — strong engagement and scaffolding mechanics, no algorithm content
-- **LeetCode / Kattis** — rigorous algorithm practice, not designed for novice learners and adaptively
+- **LeetCode / Kattis** — rigorous algorithm practice, but without gamification or adaptive routing
 - **CodeCombat / Prodigy** — gamified coding, but teaches syntax rather than data structure reasoning
 
 No existing platform combines gamified interaction with adaptive prerequisite routing for algorithm concept learning.
