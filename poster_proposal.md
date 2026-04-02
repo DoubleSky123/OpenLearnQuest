@@ -97,7 +97,7 @@ Replaced the welcome popup with a 4-slide concept introduction (linked list stru
 *Trigger: Instructor feedback — students had no conceptual baseline on entry.*
 
 **Stage 5 — Gamification Layer**
-Added a pixel husky companion (Algo) with 5 XP-driven evolution stages, star ratings, lives, and a timer. A progress path replaced flat mode cards, making milestones visible.
+Added a pixel husky companion (Algo) with 5 level-driven evolution stages, star ratings, lives, and a timer. A progress path replaced flat mode cards, making milestones visible.
 *Goal: sustain long-term motivation through emotional investment and a visible sense of growth.*
 *Trigger: Duolingo engagement mechanics + Tamagotchi companion investment research.*
 
