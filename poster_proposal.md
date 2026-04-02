@@ -24,7 +24,7 @@ The poster follows a one-page academic format optimized for 60-second scanning. 
 
 **Bottom Tier (3 columns)**
 - Left: Methodology — how iterative design + literature review drove decisions
-- Center: Adaptive Learning Architecture — knowledge dependency graph + error taxonomy
+- Center: Adaptive Learning Architecture — knowledge dependency graph + error categories
 - Right: Conclusions + References + Future Work
 
 **Footer strip:** Key design insights (horizontal bullets)
@@ -32,7 +32,7 @@ The poster follows a one-page academic format optimized for 60-second scanning. 
 ### Design Rationale
 - The design evolution figure is the poster's centerpiece — it tells the research story visually
 - Screenshots on the right give reviewers an immediate sense of the final product
-- Technical depth (error taxonomy, adaptive routing) is reserved for the bottom tier
+- Technical depth (error categories, adaptive routing) is reserved for the bottom tier
 - Target reading time: ~60 sec overview, ~3 min full read
 - Reading path: Title → Highlights → Evolution Timeline → Architecture → Conclusions
 
@@ -66,7 +66,7 @@ Students learning complex algorithms often hit prerequisite gaps mid-session —
 Seven design iterations, each grounded in literature review findings or direct instructor feedback, evolved the platform from a bare drag-and-drop prototype to a fully scaffolded, gamified learning experience. Every major design decision is traceable to a specific research insight.
 
 **2 — Three-Tier Scaffolding Architecture**
-A Tutorial → Training → Challenge progression maps to established learning theory: concept introduction (slides + quiz), guided practice (fill-in-the-blank with hints), and independent challenge (procedurally generated questions with distractor blocks and error taxonomy feedback).
+A Tutorial → Training → Challenge progression maps to established learning theory: concept introduction (slides + quiz), guided practice (fill-in-the-blank with hints), and independent challenge (procedurally generated questions with distractor blocks and error category feedback).
 
 **3 — Adaptive Cross-Module Prerequisite Routing**
 When a student accumulates repeated fundamental errors in a Doubly Linked List session, the platform surfaces a non-disruptive suggestion to return to the Singly Linked List module — framed as a player choice, not a system redirect.
