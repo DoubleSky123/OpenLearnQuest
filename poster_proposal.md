@@ -29,11 +29,11 @@ The poster follows a one-page academic format optimized for 60-second scanning. 
 - Right: Current State screenshots — module path, game UI, pet companion, completion modal
 
 **Middle Tier (full width)**
-- Full-width row: Figure 1 — Design Evolution Timeline (6-stage UI progression, primary visual)
+- Full-width row: Figure 1 — Design Evolution Timeline (7-stage UI progression, primary visual)
 
 **Bottom Tier (3 columns)**
 - Left: Methodology — how iterative design + literature review drove decisions
-- Center: Adaptive Learning Architecture — knowledge dependency graph + error taxonomy
+- Center: Adaptive Learning Architecture — knowledge dependency graph + error categories
 - Right: Conclusions + References + Future Work
 
 **Footer strip:** Key design insights (horizontal bullets)
@@ -41,7 +41,7 @@ The poster follows a one-page academic format optimized for 60-second scanning. 
 ### Design Rationale
 - The design evolution figure is the poster's centerpiece — it tells the research story visually
 - Screenshots on the right give reviewers an immediate sense of the final product
-- Technical depth (error taxonomy, adaptive routing) is reserved for the bottom tier
+- Technical depth (error categories, adaptive routing) is reserved for the bottom tier
 - Target reading time: ~60 sec overview, ~3 min full read
 - Reading path: Title → Highlights → Evolution Timeline → Architecture → Conclusions
 
@@ -54,7 +54,7 @@ The poster follows a one-page academic format optimized for 60-second scanning. 
 Most platforms address either engagement *or* algorithm depth — but not both. Learning tools lack algorithmic rigor; practice platforms are inaccessible to novices; educational games skip data structure reasoning entirely. A literature review of leading platforms revealed:
 
 - **Duolingo / Brilliant.org** — strong engagement and scaffolding mechanics, no algorithm content
-- **LeetCode / Kattis** — rigorous algorithm practice, not designed for novice learners and adaptively
+- **LeetCode / Kattis** — rigorous algorithm practice, but without gamification or adaptive routing
 - **CodeCombat / Prodigy** — gamified coding, but teaches syntax rather than data structure reasoning
 
 No existing platform combines gamified interaction with adaptive prerequisite routing for algorithm concept learning.
@@ -72,42 +72,52 @@ Students learning complex algorithms often hit prerequisite gaps mid-session —
 ### 2.3 Key Highlights
 
 **1 — Research-Driven Iterative Design**
-Six design iterations, each grounded in literature review findings or direct instructor feedback, evolved the platform from a bare drag-and-drop prototype to a fully scaffolded, gamified learning experience. Every major design decision is traceable to a specific research insight.
+Seven design iterations, each grounded in literature review findings or direct instructor feedback, evolved the platform from a bare drag-and-drop prototype to a fully scaffolded, gamified learning experience. Every major design decision is traceable to a specific research insight.
 
 **2 — Three-Tier Scaffolding Architecture**
-A Tutorial → Training → Challenge progression maps to established learning theory: concept introduction (slides + quiz), guided practice (fill-in-the-blank with hints), and independent challenge (procedurally generated questions with distractor blocks and error taxonomy feedback).
+A Tutorial → Training → Challenge progression maps to established learning theory: concept introduction (slides + quiz), guided practice (fill-in-the-blank with hints), and independent challenge (procedurally generated questions with distractor blocks and error category feedback).
 
 **3 — Adaptive Cross-Module Prerequisite Routing**
-When a student accumulates ≥ 2 Type-A errors (pointer logic errors shared with the prerequisite module) in a Doubly Linked List session, the platform surfaces a non-disruptive suggestion to return to the Singly Linked List module — framed as a player choice, not a system redirect.
+When a student accumulates repeated fundamental pointer errors (e.g., lost reference, null pointer misuse) in a Doubly Linked List session, the platform surfaces a non-disruptive suggestion to return to the Singly Linked List module — framed as a player choice, not a system redirect.
 
 ---
 
 ### 2.4 Design Evolution (Figure 1 caption text)
 
-Six iterative stages, each driven by a specific research or feedback trigger:
+Seven iterative stages, each driven by a specific research or feedback trigger:
 
 **Stage 1 — Initial Prototype**
 A single-page dark-theme app with drag-and-drop pseudocode blocks for basic singly linked list operations. No feedback, no scaffolding, no distractors. Validated the core mechanic but revealed it was too abrupt for novice learners.
 *Trigger: BlockList (ACM SIGCSE 2025) paper — validated code-block assembly as a learnable mechanic.*
 
 **Stage 2 — Three-Mode Architecture**
-Introduced Tutorial, Training, and Challenge modes with progressive scaffolding. Challenge mode added three difficulty levels, procedurally generated question values, and distractor blocks mapped to a six-category error taxonomy.
+Introduced Tutorial → Training → Challenge with progressive scaffolding, covering basic insert/remove operations across three difficulty levels with distractor blocks and error category feedback.
+*Goal: prevent novice learners from being thrown into challenge-level problems without scaffolding.*
 *Trigger: Brilliant.org scaffolding model + CogBooks adaptive design principles.*
 
-**Stage 3 — Tutorial Intro Redesign**
-Replaced the welcome popup with a 4-slide concept introduction (linked list structure, node anatomy, HEAD & NULL, key terms) followed by a mandatory 4-question quiz. Drag-and-drop replaced with fill-in-the-blank to reduce cognitive load in the learning phase.
+**Stage 3 — Challenge Mode Content Expansion**
+Extended Level 3 to include classic algorithm problems: Reverse Linked List, Detect Cycle, Merge Two Lists, and Sort List — mirroring real coursework and interview expectations. Sort List also serves as a potential bridge to a teammate's dedicated sorting game module.
+*Goal: ensure content coverage matches the algorithm knowledge students actually need.*
+*Trigger: LeetCode problem set analysis — identified the classic linked list problems every CS student is expected to know.*
+
+**Stage 4 — Tutorial Intro Redesign**
+Replaced the welcome popup with a 4-slide concept introduction (linked list structure, node anatomy, HEAD & NULL, key terms) and a mandatory quiz. Mechanic changed from drag-and-drop to fill-in-the-blank to lower cognitive load.
+*Goal: build conceptual understanding before students attempt any interactive exercises.*
 *Trigger: Instructor feedback — students had no conceptual baseline on entry.*
 
-**Stage 4 — Gamification Layer**
-Added a pixel husky companion (Algo) with 5 evolution stages driven by a shared XP pool, a star rating system (0–3 stars per question), a lives counter, and a game timer. Duolingo-style winding path replaced flat mode card selection.
+**Stage 5 — Gamification Layer**
+Added a pixel husky companion (Algo) with 5 XP-driven evolution stages, star ratings, lives, and a timer. A progress path replaced flat mode cards, making milestones visible.
+*Goal: sustain long-term motivation through emotional investment and a visible sense of growth.*
 *Trigger: Duolingo engagement mechanics + Tamagotchi companion investment research.*
 
-**Stage 5 — Doubly Linked List Module + Adaptive Routing**
-Added DLL as the second module with bidirectional node visualization and a new error type (Broken Prev). Implemented cross-module adaptive logic: ≥ 2 Type-A errors in a DLL session triggers a suggestion modal to return to SLL — designed as a player choice, not a forced redirect.
+**Stage 6 — Doubly Linked List Module + Adaptive Routing**
+Added DLL with bidirectional visualization and a new error type (Broken Prev). Repeated fundamental pointer errors in a DLL session trigger a suggestion modal to return to SLL — framed as a player choice.
+*Goal: detect prerequisite gaps in real time and guide students back to foundational content without breaking their sense of agency.*
 *Trigger: CogBooks adaptive routing research + "player choice" design principle.*
 
-**Stage 6 — UI Unification + Sort Mode**
-Converted all screens to a unified light theme, doubled all font sizes, replaced drag-and-drop with click-to-place in Tutorial. Added a standalone Sort Linked List mode with live pseudocode highlighting. Module path now displays locked future modules (Sorting, Tree, Graph) to communicate platform vision.
+**Stage 7 — UI Unification + Platform Path**
+Unified all screens to a light theme, doubled font sizes, and switched to click-to-place in Tutorial. Module path now shows locked future modules (Sorting, Tree, Graph), communicating the broader learning roadmap.
+*Goal: reduce interface friction and give students a clear sense of where they are and where they are going.*
 *Trigger: Instructor usability feedback — dark theme and small fonts created friction.*
 
 ---
@@ -120,18 +130,20 @@ The platform models a **knowledge dependency graph** where modules are nodes and
 Singly Linked List  →  Doubly Linked List  →  Trees (planned)  →  Graph (planned)
 ```
 
-**Error Taxonomy — Six Categories:**
+The linked list module itself also contains an internal progression from foundational operations to classic algorithm problems, with the Sort List problem serving as a potential bridge to a teammate's dedicated sorting algorithm game module.
+
+**Six Error Categories:**
 
 | Category | Description | Routing Effect |
 |---|---|---|
-| Lost Reference | Incorrect next/prev pointer assignment | Type A — triggers SLL suggestion |
-| Off-by-One | Traversal loop boundary errors | Type A — triggers SLL suggestion |
-| NULL Pointer | Incorrect NULL assignment or check | Type A — triggers SLL suggestion |
-| Self-Loop | Node pointing to itself | Type A — triggers SLL suggestion |
-| Memory Leak | Missing or misplaced free() | Type A — triggers SLL suggestion |
-| Broken Prev | DLL prev pointer not maintained | Type B — targeted hint only |
+| Lost Reference | Incorrect next/prev pointer assignment | Triggers SLL suggestion |
+| Off-by-One | Traversal loop boundary errors | Triggers SLL suggestion |
+| NULL Pointer | Incorrect NULL assignment or check | Triggers SLL suggestion |
+| Self-Loop | Node pointing to itself | Triggers SLL suggestion |
+| Memory Leak | Missing or misplaced free() | Triggers SLL suggestion |
+| Broken Prev | DLL prev pointer not maintained | Targeted hint only (DLL-specific) |
 
-Type A errors (shared with SLL) accumulate toward the cross-module routing threshold. Type B errors (DLL-specific) trigger targeted in-game hints without affecting routing.
+The first five error types reflect fundamental pointer misconceptions shared with SLL and accumulate toward the cross-module routing threshold. Broken Prev is DLL-specific and triggers a targeted in-game hint without affecting routing.
 
 ---
 
@@ -141,9 +153,9 @@ The design process followed a three-source iterative loop:
 
 1. **Literature Review** — Identified engagement mechanics (Duolingo), scaffolding models (Brilliant), adaptive routing (CogBooks), companion design (Prodigy/Tamagotchi), and validated the code-block mechanic (BlockList, ACM SIGCSE 2025).
 
-2. **Instructor Feedback** — Regular review sessions with the supervising professor surfaced usability issues (font size, theme, onboarding depth) and shaped module scope decisions (e.g., keeping Sort as a standalone mode rather than integrating into Challenge Mode while requirements were evolving).
+2. **Instructor Feedback** — Regular review sessions with the supervising professor surfaced usability issues (font size, theme, onboarding depth) and shaped content scope decisions (e.g., expanding Challenge Mode from basic operations to classic algorithm problems).
 
-3. **Comparative Platform Analysis** — Features from Duolingo (path navigation, XP, lives), Kahoot (timer, competitive framing), Brilliant (concept-first slides), and LeetCode (difficulty levels) were selectively adapted to the algorithm education context.
+3. **Comparative Platform Analysis** — Features from Duolingo (path navigation, XP, lives), Kahoot (timer, competitive framing), Brilliant (concept-first slides), and LeetCode (difficulty levels, classic problem sets) were selectively adapted to the algorithm education context.
 
 Each stage produced a testable prototype evaluated against the previous version before proceeding.
 
@@ -153,9 +165,10 @@ Each stage produced a testable prototype evaluated against the previous version 
 
 This project demonstrates that a research-driven iterative design process — grounded in literature review and regular instructor feedback — can produce an educationally principled, engaging gamified learning module. Key contributions:
 
-- A **six-category error taxonomy** that maps game-level mistakes to real CS misconceptions
+- A **six-category error classification** that maps game-level mistakes to real CS misconceptions
 - A **cross-module adaptive routing design** that preserves learner autonomy
 - A **three-tier scaffolding architecture** (Tutorial → Training → Challenge) bridging the novice-to-practitioner gap
+- A **Challenge Mode content progression** from basic operations to classic algorithm problems (Reverse, Cycle, Merge, Sort)
 - A **modular platform foundation** extensible to Sorting, Tree, and Graph algorithm modules
 
 **Platform Vision:** A knowledge dependency graph of algorithm games where students can always find — and choose — the prerequisite they need, in the form of a game they want to play.
@@ -167,7 +180,7 @@ This project demonstrates that a research-driven iterative design process — gr
 - Integrate backend persistence to enable cross-session adaptive routing (current logic is session-local)
 - Conduct formal user study measuring learning outcomes vs. traditional instruction
 - Expand module library: Sorting algorithms, Binary Search Tree, Graph traversal
-- Connect with classmate's game platform integration layer for multi-module deployment
+- Formalize cross-platform adaptive routing with teammate's sorting algorithm game module
 
 ---
 
@@ -185,20 +198,22 @@ This project demonstrates that a research-driven iterative design process — gr
 
 ### Figure 1: Design Evolution Timeline — FULL WIDTH (primary visual)
 **Role:** Tell the entire research story in one horizontal strip. Most important element on the poster.  
-**What it shows:** Six UI mockups arranged left to right, each with a version label, a one-line title, and a colored tag indicating the driving trigger (blue = literature, red = instructor feedback, green = design principle).  
+**What it shows:** Seven UI mockups arranged left to right, each with a version label, a one-line title, and a colored tag indicating the driving trigger (blue = literature, red = instructor feedback, green = design principle).  
 **Components:**
-- 6 simplified UI screenshots or diagrams (v1 through v6), connected by arrows
+- 7 simplified UI screenshots or diagrams (v1 through v7), connected by arrows
 - Color-coded driver badges below each stage
-- Version label above each stage  
+- Version label above each stage
 
-**Caption:** Six design iterations driven by literature review and instructor feedback, evolving from a bare drag-and-drop prototype to a fully scaffolded, gamified adaptive learning platform.
+**Note:** If 7 panels feel too dense for the poster width, Stages 2 and 3 (Three-Mode Architecture + Challenge Expansion) can be merged into a single panel labeled "v2 · Modes & Content," with both triggers noted.
+
+**Caption:** Seven design iterations driven by literature review and instructor feedback, evolving from a bare drag-and-drop prototype to a fully scaffolded, gamified adaptive learning platform.
 
 ---
 
 ### Figure 2: Knowledge Dependency Graph
 **Role:** Show the adaptive routing architecture visually.  
-**What it shows:** Module nodes (SLL, DLL, Trees, Graph) connected by directed edges. SLL and DLL highlighted as active; others shown as locked. A dashed back-arrow from DLL to SLL labeled "Adaptive suggestion (≥ 2 Type-A errors)".  
-**Caption:** Knowledge dependency graph. Students progress forward through modules; repeated Type-A errors in DLL surface a non-disruptive suggestion to revisit SLL.
+**What it shows:** Module nodes (SLL, DLL, Trees, Graph) connected by directed edges. SLL and DLL highlighted as active; others shown as locked. A dashed back-arrow from DLL to SLL labeled "Adaptive suggestion (repeated pointer errors)". A dashed outward arrow from Sort List labeled "Cross-platform routing (planned)".  
+**Caption:** Knowledge dependency graph. Students progress forward through modules; repeated fundamental pointer errors in DLL surface a non-disruptive suggestion to revisit SLL.
 
 ---
 
@@ -217,11 +232,11 @@ This project demonstrates that a research-driven iterative design process — gr
 
 Detailed spec for drawing Figure 1 (Design Evolution Timeline).
 
-**Layout:** Single horizontal row of 6 panels, connected by right-pointing arrows. Full poster width.
+**Layout:** Single horizontal row of 7 panels, connected by right-pointing arrows. Full poster width.
 
 **Each panel contains:**
 - Top label: version number + short name (e.g., "v1 · Prototype")
-- Center: simplified UI mockup (approx. 120×85px each) — can be actual screenshots or simplified diagrams
+- Center: simplified UI mockup — can be actual screenshots or simplified diagrams
 - Bottom: colored driver badge (blue/red/green)
 
 **Color coding:**
@@ -235,9 +250,12 @@ Detailed spec for drawing Figure 1 (Design Evolution Timeline).
 |---|---|---|---|
 | 1 | v1 · Prototype | Dark theme, drag-and-drop, single screen | Blue |
 | 2 | v2 · Modes Added | Mode selector, 3 cards (Tutorial/Training/Challenge) | Blue |
-| 3 | v3 · Tutorial Redesign | Intro slides + quiz UI | Red |
-| 4 | v4 · Gamification | Pet companion + XP bar + TopBar | Blue |
-| 5 | v5 · DLL + Adaptive | DLL visualizer + suggestion modal | Green |
-| 6 | v6 · Current State | Light theme + winding path + unified UI | Red |
+| 3 | v3 · Content Expansion | Challenge Level 3 — Reverse, Cycle, Merge, Sort | Blue |
+| 4 | v4 · Tutorial Redesign | Intro slides + quiz UI | Red |
+| 5 | v5 · Gamification | Pet companion + XP bar + TopBar | Blue |
+| 6 | v6 · DLL + Adaptive | DLL visualizer + suggestion modal | Green |
+| 7 | v7 · UI Unification | Light theme + winding path + locked modules | Red |
 
 **Arrow style:** Simple right-pointing arrows between panels, labeled with the trigger in small text above the arrow (e.g., "Instructor feedback ↓").
+
+**Merging option:** If poster width is tight, panels 2 and 3 can be merged into one "v2 · Modes & Content" panel showing both the mode cards and the Level 3 problem list side by side.
