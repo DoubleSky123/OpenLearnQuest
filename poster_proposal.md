@@ -42,6 +42,11 @@
 - No current platform detects gaps and reroutes without breaking learning flow
 - **Proposition:** A gamified, adaptive platform combining scaffolded instruction, engagement mechanics, and cross-topic prerequisite routing can provide a more effective and engaging environment for students learning algorithm concepts.
 
+**Broadening Participation in Computing:**
+- NodeForge lowers the barrier to algorithm learning by replacing intimidating code editors with an interactive game accessible to students of all backgrounds
+- The adaptive prerequisite routing system ensures learners with weaker foundations are guided back to foundational content — not left behind
+- By making data structure education engaging and self-paced, the platform supports broader participation in computing for students who may otherwise disengage from CS coursework
+
 ---
 
 ### Key Highlights
