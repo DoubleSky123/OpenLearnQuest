@@ -17,26 +17,7 @@
  */
 
 import { shuffleArray } from '../utils/helpers.js';
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 1. HELPERS
-// ─────────────────────────────────────────────────────────────────────────────
-
-const uniqueInts = (n, min, max) => {
-  const pool = [];
-  for (let i = min; i <= max; i++) pool.push(i);
-  return shuffleArray(pool).slice(0, n);
-};
-
-const buildNodes = (values) =>
-  values.map((v, i) => ({
-    id:    i + 1,
-    value: v,
-    next:  i + 1 < values.length ? i + 2 : null,
-    prev:  i > 0 ? i : null,
-  }));
-
-const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+import { uniqueInts, pick, buildDLLNodes as buildNodes } from './questionGeneratorCommon.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 2. CORRECT PSEUDOCODE TEMPLATES
@@ -95,13 +76,19 @@ const TEMPLATES = {
 
   insertAtTail: () => ({
     pseudocode: [
+      'node = head',
       'while (node.next != NULL): node = node.next',
       'create newNode',
       'newNode.prev = node',
       'newNode.next = NULL',
       'node.next = newNode',
     ],
-    correctOrder: [0, 1, 2, 3, 4],
+    correctOrder: [0, 1, 2, 3, 4, 5],
+    validOrders: [
+      [0, 1, 2, 3, 4, 5],  // node=head, while, create, ...
+      [0, 2, 1, 3, 4, 5],  // node=head, create, while, ...
+      [2, 0, 1, 3, 4, 5],  // create, node=head, while, ...
+    ],
     hint: 'Traverse to the tail, then set BOTH newNode.prev (backward link) and node.next (forward link).',
   }),
 
@@ -118,17 +105,20 @@ const TEMPLATES = {
 
   removeAtTail: () => ({
     pseudocode: [
+      'node = head',
       'while (node.next != NULL): node = node.next',
       'temp = node',
       'node.prev.next = NULL',
       'free(temp)',
     ],
-    correctOrder: [0, 1, 2, 3],
+    correctOrder: [0, 1, 2, 3, 4],
     hint: 'Traverse to the tail, save it in temp, disconnect via its predecessor\'s next pointer, then free.',
   }),
 
   insertAtPosition: ({ position }) => ({
     pseudocode: [
+      'node = head',
+      'i = 0',
       `while (i < ${position - 1}): node = node.next`,
       'create newNode',
       'newNode.next = node.next',
@@ -136,19 +126,33 @@ const TEMPLATES = {
       'node.next.prev = newNode',
       'node.next = newNode',
     ],
-    correctOrder: [0, 1, 2, 3, 4, 5],
+    correctOrder: [0, 1, 2, 3, 4, 5, 6, 7],
+    validOrders: [
+      [0, 1, 2, 3, 4, 5, 6, 7],  // node=head, i=0, while, create, ...
+      [1, 0, 2, 3, 4, 5, 6, 7],  // i=0, node=head, while, create, ...
+      [0, 1, 3, 2, 4, 5, 6, 7],  // node=head, i=0, create, while, ...
+      [1, 0, 3, 2, 4, 5, 6, 7],  // i=0, node=head, create, while, ...
+      [3, 0, 1, 2, 4, 5, 6, 7],  // create, node=head, i=0, while, ...
+      [3, 1, 0, 2, 4, 5, 6, 7],  // create, i=0, node=head, while, ...
+    ],
     hint: `Stop at position ${position - 1}. Wire newNode's next and prev first, then fix the successor's prev, then link node.next.`,
   }),
 
   removeAtPosition: ({ position }) => ({
     pseudocode: [
+      'node = head',
+      'i = 0',
       `while (i < ${position - 1}): node = node.next`,
       'temp = node.next',
       'node.next = temp.next',
       'temp.next.prev = node',
       'free(temp)',
     ],
-    correctOrder: [0, 1, 2, 3, 4],
+    correctOrder: [0, 1, 2, 3, 4, 5, 6],
+    validOrders: [
+      [0, 1, 2, 3, 4, 5, 6],  // node=head, i=0, while, ...
+      [1, 0, 2, 3, 4, 5, 6],  // i=0, node=head, while, ...
+    ],
     hint: `Stop at position ${position - 1}. Save the target, bypass it in BOTH directions (next and prev), then free.`,
   }),
 };
@@ -544,6 +548,7 @@ const buildSingleOpQuestion = (op, listValues, params, errorTypeKeys) => {
   return {
     pseudocode:           tpl.pseudocode,
     correctOrder:         tpl.correctOrder,
+    ...(tpl.validOrders && { validOrders: tpl.validOrders }),
     distractors,
     distractorFeedbackMap,
     hint:                 tpl.hint,

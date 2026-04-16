@@ -239,7 +239,25 @@ function TopBar({ onBack, moduleName, xp }) {
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────
-export default function ModeSelector({ moduleId, onSelect, onBack, xp = 0 }) {
+// ── Progression locking (currently disabled for testing — uncomment to enable) ──
+//
+// Pass `completedModes` from App.jsx (e.g. a Set of strings like 'intro','tutorial','training').
+// Then derive `isLocked` per node and skip onClick / grey out the button.
+//
+// export default function ModeSelector({ moduleId, onSelect, onBack, xp = 0, onDailyChallenge, completedModes = new Set() }) {
+//   const introUnlocked    = true;                         // always open
+//   const tutorialUnlocked = true;                         // always open
+//   const trainingUnlocked = completedModes.has('intro');  // requires Guide done
+//   const challengeUnlocked= completedModes.has('training');// requires Training done
+//
+//   // In the node render, derive isLocked:
+//   //   if (node.mode === 'training' && !trainingUnlocked) isLocked = true;
+//   //   if (node.mode === 'regular'  && !challengeUnlocked) isLocked = true;
+//   // Then: disabled={isChest || isLocked}  and  cursor: isLocked ? 'not-allowed' : ...
+//   // Overlay a 🔒 icon on locked nodes.
+// }
+
+export default function ModeSelector({ moduleId, onSelect, onBack, xp = 0, onDailyChallenge }) {
   const moduleName = moduleId === 'singly' ? 'Singly Linked List' : 'Doubly Linked List';
   const pathD      = buildPath(NODE_POS);
 
@@ -500,6 +518,66 @@ export default function ModeSelector({ moduleId, onSelect, onBack, xp = 0 }) {
 
         </div>
       </div>
+
+      {/* Daily Debug Challenge — only shown for Singly LL */}
+      {onDailyChallenge && (
+        <div style={{ padding: '0 60px 60px', display: 'flex', justifyContent: 'center' }}>
+          <button
+            onClick={onDailyChallenge}
+            style={{
+              width:          '100%',
+              maxWidth:       W,
+              display:        'flex',
+              alignItems:     'center',
+              justifyContent: 'space-between',
+              gap:            24,
+              background:     'rgba(251,191,36,0.12)',
+              border:         '1.5px solid rgba(251,191,36,0.4)',
+              borderRadius:   20,
+              padding:        '20px 28px',
+              cursor:         'pointer',
+              transition:     'background 0.15s, border-color 0.15s',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.background    = 'rgba(251,191,36,0.22)';
+              e.currentTarget.style.borderColor   = 'rgba(251,191,36,0.7)';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background    = 'rgba(251,191,36,0.12)';
+              e.currentTarget.style.borderColor   = 'rgba(251,191,36,0.4)';
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
+              <div style={{
+                width:          52,
+                height:         52,
+                borderRadius:   14,
+                background:     'rgba(251,191,36,0.25)',
+                display:        'flex',
+                alignItems:     'center',
+                justifyContent: 'center',
+                fontSize:       26,
+                flexShrink:     0,
+              }}>
+                🐛
+              </div>
+              <div style={{ textAlign: 'left' }}>
+                <p style={{ fontSize: 12, fontWeight: 700, color: '#D97706', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 3 }}>
+                  Daily Challenge
+                </p>
+                <p style={{ fontSize: 18, fontWeight: 800, color: '#1E1B4B', margin: 0 }}>
+                  Daily Debug Challenge
+                </p>
+                <p style={{ fontSize: 14, color: '#6B7280', marginTop: 3 }}>
+                  Find the bug in today's linked list snippet — new question every day.
+                </p>
+              </div>
+            </div>
+            <span style={{ fontSize: 22, color: '#D97706', flexShrink: 0 }}>→</span>
+          </button>
+        </div>
+      )}
+
     </div>
   );
 }

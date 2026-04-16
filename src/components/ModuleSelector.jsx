@@ -62,7 +62,7 @@ const COLOR_MAP = {
 };
 
 // ── Component ──────────────────────────────────────────────────────────────────
-export default function ModuleSelector({ onSelect, completedModules = [], xp = 0 }) {
+export default function ModuleSelector({ onSelect, completedModules = [], xp = 0, onDailyChallenge }) {
   const level     = Math.floor(xp / XP_PER_LEVEL) + 1;
   const levelName = LEVEL_NAMES[Math.min(level - 1, LEVEL_NAMES.length - 1)];
   const xpInLevel = xp % XP_PER_LEVEL;
@@ -141,7 +141,7 @@ export default function ModuleSelector({ onSelect, completedModules = [], xp = 0
       </div>
 
       {/* Footer */}
-      <p className="mt-8 text-gray-400 text-xl">
+      <p className="mt-4 text-gray-400 text-xl">
         Assemble pseudocode blocks · Master pointer operations · Level up
       </p>
     </div>

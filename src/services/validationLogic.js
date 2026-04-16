@@ -8,6 +8,11 @@
  * When the assembly is full, two things are checked in order:
  *   1. Distractor present  → show educational feedback for that error type
  *   2. Wrong order         → show sequence error feedback
+ *
+ * INTENTIONAL DESIGN: This silence-until-full behaviour differs from Training mode,
+ * which rejects each block immediately. The difference is deliberate — Challenge mode
+ * offers no hand-holding; the student must commit to a full answer before receiving
+ * any feedback. Do not "fix" this to match Training mode without a product decision.
  */
 
 import { analyzeDistractorError } from './distractorAnalyzer.js';
@@ -63,8 +68,9 @@ export const validateAssembly = (assemblyArea, complexityArea, currentLevel) => 
   }
 
   // 2. Check code order
-  const codeCorrect = assemblyArea.every(
-    (item, pos) => !item.isDistractor && item.index === currentLevel.correctOrder[pos]
+  const validOrders = currentLevel.validOrders || [currentLevel.correctOrder];
+  const codeCorrect = validOrders.some(order =>
+    assemblyArea.every((item, pos) => !item.isDistractor && item.index === order[pos])
   );
 
   if (!codeCorrect) {

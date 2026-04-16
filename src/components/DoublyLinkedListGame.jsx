@@ -1,20 +1,17 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { generateDLLQuestion, DLL_LEVEL_TEMPLATES } from '../services/doublyQuestionGenerator';
+import { generateDLLQuestion } from '../services/doublyQuestionGenerator';
 import { shuffleArray, getCurrentPattern } from '../utils/helpers';
 import { executeDLLOperation } from '../services/doublyLinkedListOperations';
 import { validateAssembly } from '../services/validationLogic';
-import PetCanvas, { getStage } from './PetCanvas';
 import CodePool from './CodePool';
 import AssemblyArea from './AssemblyArea';
-import GameTimer from './GameTimer';
 import LevelCompleteModal from './LevelCompleteModal';
 import SuggestSinglyModal from './SuggestSinglyModal';
-import HelpModal from './HelpModal';
+import GameTopBar from './shared/GameTopBar';
+import GamePetCard from './shared/GamePetCard';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const MAX_LIVES    = 5;
-const XP_PER_LEVEL = 500;
-const LEVEL_NAMES  = ['Novice','Explorer','Learner','Practitioner','Skilled','Advanced','Expert','Master'];
+const MAX_LIVES        = 5;
 const LEVEL_DIFFICULTY = ['Beginner', 'Intermediate', 'Advanced'];
 
 const TYPE_A_ERRORS = new Set(['lost_reference','off_by_one','null_pointer','memory_leak']);
@@ -77,63 +74,6 @@ function DLLVisualiser({ nodes, emptyLabel = 'Empty list', highlight = false }) 
   );
 }
 
-// ─── Top Bar ──────────────────────────────────────────────────────────────────
-function TopBar({ onBack, xp, lives, timerRef, showModal }) {
-  const level     = Math.floor(xp / XP_PER_LEVEL) + 1;
-  const levelName = LEVEL_NAMES[Math.min(level - 1, LEVEL_NAMES.length - 1)];
-  const xpInLevel = xp % XP_PER_LEVEL;
-  const xpPct     = Math.round((xpInLevel / XP_PER_LEVEL) * 100);
-  const [showHelp, setShowHelp] = React.useState(false);
-
-  return (
-    <div className="bg-white border-b border-gray-200 px-6 py-3 sticky top-0 z-10">
-      <div className="max-w-7xl mx-auto flex items-center">
-
-        {/* Left */}
-        <div className="flex-1 flex items-center gap-2">
-          <button onClick={onBack} className="border border-gray-300 rounded-lg px-4 py-1.5 text-gray-600 font-semibold text-lg hover:bg-gray-50 transition-colors">
-            ← Back
-          </button>
-          <button onClick={() => setShowHelp(true)} className="w-8 h-8 rounded-full border border-gray-300 text-gray-500 font-bold text-base hover:bg-gray-50 transition-colors flex items-center justify-center" title="Game Guide">
-            ?
-          </button>
-        </div>
-
-        {/* Center */}
-        <div className="flex-1 flex justify-center">
-          <span className="text-pink-600 text-2xl font-bold">Challenge · Solo</span>
-        </div>
-
-        {/* Right */}
-        <div className="flex-1 flex justify-end items-center gap-4">
-          <span className="text-gray-700 text-lg font-semibold whitespace-nowrap">
-            Level {level} · {levelName}
-          </span>
-          <div className="w-36 shrink-0">
-            <div className="flex justify-between text-sm text-gray-400 mb-1">
-              <span>XP</span><span>{xpInLevel}/{XP_PER_LEVEL}</span>
-            </div>
-            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-              <div className="h-full bg-pink-500 rounded-full transition-all duration-500" style={{ width: `${xpPct}%` }} />
-            </div>
-          </div>
-          <div className="flex items-center gap-1">
-            {Array.from({ length: MAX_LIVES }).map((_, i) => (
-              <svg key={i} width="18" height="16" viewBox="0 0 18 16">
-                <path d="M9 14S1 9 1 4.5A4 4 0 019 2a4 4 0 018 2.5C17 9 9 14 9 14z"
-                  fill={i < lives ? '#E24B4A' : '#D1D5DB'} />
-              </svg>
-            ))}
-          </div>
-          <GameTimer ref={timerRef} isRunning={!showModal} />
-        </div>
-
-      </div>
-      <HelpModal isOpen={showHelp} onClose={() => setShowHelp(false)} />
-    </div>
-  );
-}
-
 // ─── Nav Card ─────────────────────────────────────────────────────────────────
 function NavCard({ currentLevelId, completedLevels, onLevelChange, completedQuests }) {
   const labels = QUEST_LABELS[currentLevelId] ?? [];
@@ -181,28 +121,6 @@ function NavCard({ currentLevelId, completedLevels, onLevelChange, completedQues
             </div>
           );
         })}
-      </div>
-    </div>
-  );
-}
-
-// ─── Pet Card ─────────────────────────────────────────────────────────────────
-function PetCard({ xp, petMood = 'idle' }) {
-  const xpInLevel = xp % XP_PER_LEVEL;
-  const xpPct     = Math.round((xpInLevel / XP_PER_LEVEL) * 100);
-  const petLevel  = Math.floor(xp / XP_PER_LEVEL) + 1;
-  const stage     = getStage(xp);
-  return (
-    <div className="bg-white rounded-xl border-2 border-dashed border-pink-200 overflow-hidden">
-      <div className="bg-[#c8dfa8] mx-3 mt-3 rounded-lg flex items-center justify-center py-16">
-        <PetCanvas stage={stage} mood={petMood} />
-      </div>
-      <div className="px-4 py-4 flex flex-col items-center gap-2">
-        <p className="text-sm font-semibold text-gray-700">Algo</p>
-        <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
-          <div className="h-full bg-pink-400 rounded-full transition-all duration-500" style={{ width: `${xpPct}%` }} />
-        </div>
-        <p className="text-xs text-gray-500">Level {petLevel} · {xpInLevel} / {XP_PER_LEVEL} XP</p>
       </div>
     </div>
   );
@@ -425,7 +343,10 @@ export default function DoublyLinkedListGame({ onBack, initialXp = 0, onXpChange
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <TopBar onBack={onBack} xp={xp} lives={lives} timerRef={timerRef} showModal={showModal} />
+      <GameTopBar
+        onBack={onBack} xp={xp} lives={lives} timerRef={timerRef} showModal={showModal}
+        title="Challenge · Solo" titleColor="text-pink-600" barColor="bg-pink-500"
+      />
 
       <div className="max-w-7xl mx-auto p-5">
 
@@ -524,7 +445,7 @@ export default function DoublyLinkedListGame({ onBack, initialXp = 0, onXpChange
           </div>
 
           {/* Col 3 — Pet */}
-          <PetCard xp={xp} petMood={isCorrectOrder ? 'happy' : errorDetails ? 'sad' : 'idle'} />
+          <GamePetCard xp={xp} mood={isCorrectOrder ? 'happy' : errorDetails ? 'sad' : 'idle'} theme="pink" />
 
         </div>
       </div>

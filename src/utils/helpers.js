@@ -1,3 +1,7 @@
+/** Shared XP constants — used by all game screens and the shared TopBar/PetCard. */
+export const XP_PER_LEVEL = 500;
+export const LEVEL_NAMES  = ['Novice','Explorer','Learner','Practitioner','Skilled','Advanced','Expert','Master'];
+
 /**
  * Shuffle an array randomly using Fisher-Yates algorithm
  * @param {Array} array - The array to shuffle

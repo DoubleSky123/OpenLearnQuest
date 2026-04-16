@@ -15,25 +15,7 @@
  */
 
 import { shuffleArray } from '../utils/helpers.js';
-
-// ─────────────────────────────────────────────────────────────────────────────
-// HELPERS
-// ─────────────────────────────────────────────────────────────────────────────
-
-const uniqueInts = (n, min, max) => {
-  const pool = [];
-  for (let i = min; i <= max; i++) pool.push(i);
-  return shuffleArray(pool).slice(0, n);
-};
-
-const buildNodes = (values) =>
-  values.map((v, i) => ({
-    id:    i + 1,
-    value: v,
-    next:  i + 1 < values.length ? i + 2 : null,
-  }));
-
-const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+import { uniqueInts, pick, buildSLLNodes as buildNodes } from './questionGeneratorCommon.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PSEUDOCODE TEMPLATES
@@ -55,12 +37,18 @@ const TEMPLATES = {
 
   insertAtTail: () => ({
     pseudocode: [
+      'node = head',
       'while (node.next != NULL): node = node.next',
       'create newNode',
       'node.next = newNode',
       'newNode.next = NULL',
     ],
-    correctOrder: [0, 1, 2, 3],
+    correctOrder: [0, 1, 2, 3, 4],
+    validOrders: [
+      [0, 1, 2, 3, 4],   // node=head, while, create, connect, NULL
+      [0, 2, 1, 3, 4],   // node=head, create, while, connect, NULL
+      [2, 0, 1, 3, 4],   // create, node=head, while, connect, NULL
+    ],
     hint: 'Insert the new node at the end of the existing list.',
   }),
 
@@ -76,12 +64,13 @@ const TEMPLATES = {
 
   removeAtTail: () => ({
     pseudocode: [
+      'node = head',
       'while (node.next.next != NULL): node = node.next',
       'temp = node.next',
       'node.next = NULL',
       'free(temp)',
     ],
-    correctOrder: [0, 1, 2, 3],
+    correctOrder: [0, 1, 2, 3, 4],
     hint: 'Remove the last node by traversing to the second-to-last node.',
   }),
 
@@ -110,23 +99,37 @@ const TEMPLATES = {
 
   insertAtPosition: ({ position }) => ({
     pseudocode: [
+      'node = head',
+      'i = 0',
       `while (i < ${position - 1}): node = node.next`,
       'create newNode',
       'newNode.next = node.next',
       'node.next = newNode',
     ],
-    correctOrder: [0, 1, 2, 3],
+    correctOrder: [0, 1, 2, 3, 4, 5],
+    validOrders: [
+      [0, 1, 2, 3, 4, 5],   // node=head, i=0, while, create, link1, link2
+      [1, 0, 2, 3, 4, 5],   // i=0, node=head, while, create, link1, link2
+      [0, 1, 3, 2, 4, 5],   // node=head, i=0, create, while, link1, link2
+      [1, 0, 3, 2, 4, 5],   // i=0, node=head, create, while, link1, link2
+    ],
     hint: `Insert the new node at position ${position}.`,
   }),
 
   removeAtPosition: ({ position }) => ({
     pseudocode: [
+      'node = head',
+      'i = 0',
       `while (i < ${position - 1}): node = node.next`,
       'temp = node.next',
       'node.next = temp.next',
       'free(temp)',
     ],
-    correctOrder: [0, 1, 2, 3],
+    correctOrder: [0, 1, 2, 3, 4, 5],
+    validOrders: [
+      [0, 1, 2, 3, 4, 5],   // node=head, i=0, while, ...
+      [1, 0, 2, 3, 4, 5],   // i=0, node=head, while, ...
+    ],
     hint: `Remove the node at position ${position}.`,
   }),
 
@@ -419,6 +422,7 @@ const buildLevel1Question = (op) => {
   return {
     pseudocode: tpl.pseudocode,
     correctOrder: tpl.correctOrder,
+    ...(tpl.validOrders && { validOrders: tpl.validOrders }),
     distractors,
     distractorFeedbackMap,
     hint: tpl.hint,
@@ -533,6 +537,7 @@ export const generateLevel2Question = (subIndex = 0) => {
       ...baseShared,
       pseudocode: template.pseudocode,
       correctOrder: template.correctOrder,
+      ...(template.validOrders && { validOrders: template.validOrders }),
       hint: template.hint,
       operation: op,
       operationValue: insertValue,
@@ -556,6 +561,7 @@ export const generateLevel2Question = (subIndex = 0) => {
     ...baseShared,
     pseudocode: template.pseudocode,
     correctOrder: template.correctOrder,
+    ...(template.validOrders && { validOrders: template.validOrders }),
     hint: template.hint,
     operation: op,
     operationValue: null,

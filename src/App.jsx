@@ -1,11 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { LEVEL_TEMPLATES } from './config/levels';
 import { generateLevel1Question, generateLevel2Question, generateLevel3Question } from './services/questionGenerator';
-import { shuffleArray, getCurrentPattern } from './utils/helpers';
+import { shuffleArray, getCurrentPattern, XP_PER_LEVEL, LEVEL_NAMES } from './utils/helpers';
 import { executeLinkedListOperation } from './services/linkedListOperations';
 import { validateAssembly } from './services/validationLogic';
 import GoalPattern, { LinkedListVisualiser } from './components/GoalPattern';
-import PetCanvas, { getStage } from './components/PetCanvas';
 import CodePool from './components/CodePool';
 import AssemblyArea from './components/AssemblyArea';
 import ModuleSelector from './components/ModuleSelector';
@@ -16,13 +14,13 @@ import DoublyLinkedListGame from './components/DoublyLinkedListGame';
 import DLLIntroPage from './components/DLLIntroPage';
 import DLLTutorialGame from './components/DLLTutorialGame';
 import DLLTrainingGame from './components/DLLTrainingGame';
-import SortLinkedListGame from './components/SortLinkedListGame';
 import TutorialIntroPage from './components/TutorialIntroPage';
-import GameTimer from './components/GameTimer';
+import DailyChallenge from './components/DailyChallenge';
 import LevelCompleteModal from './components/LevelCompleteModal';
-import HelpModal from './components/HelpModal';
+import GameTopBar from './components/shared/GameTopBar';
+import GamePetCard from './components/shared/GamePetCard';
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const genQuestion = (levelId, subIdx) => {
   if (levelId === 1) return generateLevel1Question(subIdx);
@@ -31,14 +29,8 @@ const genQuestion = (levelId, subIdx) => {
   return generateLevel1Question(subIdx);
 };
 
-const SUB_COUNTS   = { 1: 4, 2: 4, 3: 4 };
-const MAX_LIVES    = 5;
-const XP_PER_LEVEL = 500;
-
-const LEVEL_NAMES = [
-  'Novice', 'Explorer', 'Learner', 'Practitioner',
-  'Skilled', 'Advanced', 'Expert', 'Master',
-];
+const SUB_COUNTS = { 1: 4, 2: 4, 3: 4 };
+const MAX_LIVES  = 5;
 
 const SUB_LABELS = {
   1: ['Insert at Head', 'Insert at End', 'Remove at Head', 'Remove Last Node'],
@@ -48,65 +40,18 @@ const SUB_LABELS = {
 
 const LEVEL_DIFFICULTY = ['Beginner', 'Intermediate', 'Advanced'];
 
-// ─── Top Bar ──────────────────────────────────────────────────────────────────
-
-function TopBar({ onBack, xp, lives, timerRef, showModal }) {
-  const level     = Math.floor(xp / XP_PER_LEVEL) + 1;
-  const levelName = LEVEL_NAMES[Math.min(level - 1, LEVEL_NAMES.length - 1)];
-  const xpInLevel = xp % XP_PER_LEVEL;
-  const xpPct     = Math.round((xpInLevel / XP_PER_LEVEL) * 100);
-  const [showHelp, setShowHelp] = React.useState(false);
-
-  return (
-    <div className="bg-white border-b border-gray-200 px-6 py-3 sticky top-0 z-10">
-      <div className="max-w-7xl mx-auto flex items-center">
-
-        {/* Left */}
-        <div className="flex-1 flex items-center gap-2">
-          <button onClick={onBack} className="border border-gray-300 rounded-lg px-4 py-1.5 text-gray-600 font-semibold text-lg hover:bg-gray-50 transition-colors">
-            ← Back
-          </button>
-          <button onClick={() => setShowHelp(true)} className="w-8 h-8 rounded-full border border-gray-300 text-gray-500 font-bold text-base hover:bg-gray-50 transition-colors flex items-center justify-center" title="Game Guide">
-            ?
-          </button>
-        </div>
-
-        {/* Center */}
-        <div className="flex-1 flex justify-center">
-          <span className="text-violet-600 text-2xl font-bold">
-            Challenge · Solo
-          </span>
-        </div>
-
-        {/* Right */}
-        <div className="flex-1 flex justify-end items-center gap-4">
-          <span className="text-gray-700 text-lg font-semibold whitespace-nowrap">
-            Level {level} · {levelName}
-          </span>
-          <div className="w-36 shrink-0">
-            <div className="flex justify-between text-sm text-gray-400 mb-1">
-              <span>XP</span><span>{xpInLevel}/{XP_PER_LEVEL}</span>
-            </div>
-            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-              <div className="h-full bg-violet-500 rounded-full transition-all duration-500" style={{ width: `${xpPct}%` }} />
-            </div>
-          </div>
-          <div className="flex items-center gap-1">
-            {Array.from({ length: MAX_LIVES }).map((_, i) => (
-              <svg key={i} width="18" height="16" viewBox="0 0 18 16">
-                <path d="M9 14S1 9 1 4.5A4 4 0 019 2a4 4 0 018 2.5C17 9 9 14 9 14z"
-                  fill={i < lives ? '#E24B4A' : '#D1D5DB'} />
-              </svg>
-            ))}
-          </div>
-          <GameTimer ref={timerRef} isRunning={!showModal} />
-        </div>
-
-      </div>
-      <HelpModal isOpen={showHelp} onClose={() => setShowHelp(false)} />
-    </div>
-  );
-}
+const CHALLENGE_WRONG_MSGS = [
+  'Wrong order — think through the steps!',
+  'Not quite right, try again!',
+  'Almost! Check the pointer logic.',
+  'Rethink the sequence 🤔',
+];
+const CHALLENGE_SUCCESS_MSGS = [
+  'Amazing work! 🎉',
+  'You nailed it! 🌟',
+  'Perfect! Keep it up!',
+  'Excellent! 🔥',
+];
 
 // ─── Nav Card (Col 1) ─────────────────────────────────────────────────────────
 
@@ -181,32 +126,6 @@ function NavCard({ currentLevelId, completedLevels, onLevelChange, currentSubIdx
   );
 }
 
-// ─── Pet Card ─────────────────────────────────────────────────────────────────
-
-// (PetCanvas imported from ./components/PetCanvas)
-
-function PetCard({ xp, petMood = 'idle' }) {
-  const xpInLevel = xp % XP_PER_LEVEL;
-  const xpPct     = Math.round((xpInLevel / XP_PER_LEVEL) * 100);
-  const petLevel  = Math.floor(xp / XP_PER_LEVEL) + 1;
-  const stage     = getStage(xp);
-
-  return (
-    <div className="bg-white rounded-xl border-2 border-dashed border-violet-200 overflow-hidden">
-      <div className="bg-[#c8dfa8] mx-3 mt-3 rounded-lg flex items-center justify-center py-16">
-        <PetCanvas stage={stage} mood={petMood} />
-      </div>
-      <div className="px-4 py-4 flex flex-col items-center gap-2">
-        <p className="text-sm font-semibold text-gray-700">Algo</p>
-        <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
-          <div className="h-full bg-violet-400 rounded-full transition-all duration-500" style={{ width: `${xpPct}%` }} />
-        </div>
-        <p className="text-xs text-gray-500">Level {petLevel} · {xpInLevel} / {XP_PER_LEVEL} XP</p>
-      </div>
-    </div>
-  );
-}
-
 // ─── Singly Linked List Game ──────────────────────────────────────────────────
 
 function SinglyLinkedListGame({ onBack, initialXp = 0, onXpChange, initialLevel = 1 }) {
@@ -236,7 +155,6 @@ function SinglyLinkedListGame({ onBack, initialXp = 0, onXpChange, initialLevel 
   const [lives, setLives]         = useState(MAX_LIVES);
   const [xp, setXp]               = useState(initialXp);
   const [errorCount, setErrorCount] = useState(0);
-  const [assists, setAssists]     = useState(0);
   const [xpGained, setXpGained]   = useState(0);
 
   const timerRef = useRef(null);
@@ -257,6 +175,14 @@ function SinglyLinkedListGame({ onBack, initialXp = 0, onXpChange, initialLevel 
     3: setCompletedSubs3,
   });
 
+  const [petMessage, setPetMessage] = useState('');
+  const petMsgTimer = useRef(null);
+  const showPetMsg = useCallback((msg) => {
+    if (petMsgTimer.current) clearTimeout(petMsgTimer.current);
+    setPetMessage(msg);
+    petMsgTimer.current = setTimeout(() => setPetMessage(''), 3000);
+  }, []);
+
   // ── Board init ──────────────────────────────────────────────────────────────
   const initBoard = useCallback((question, resetMistakes = true) => {
     const codeItems       = question.pseudocode.map((_, i) => ({ index: i, isDistractor: false }));
@@ -274,7 +200,6 @@ function SinglyLinkedListGame({ onBack, initialXp = 0, onXpChange, initialLevel 
     if (resetMistakes) {
       setErrorCount(0);
       errorCountRef.current = 0;
-      setAssists(0);
       timerRef.current?.reset();
     }
     setShowModal(false);
@@ -329,6 +254,7 @@ function SinglyLinkedListGame({ onBack, initialXp = 0, onXpChange, initialLevel 
         setErrorCount(prev => { const next = prev + 1; errorCountRef.current = next; return next; });
         setLives(prev => Math.max(0, prev - 1));
         lastErrorCountedRef.current = true;
+        showPetMsg(CHALLENGE_WRONG_MSGS[Math.floor(Math.random() * CHALLENGE_WRONG_MSGS.length)]);
       }
     } else if (!operationExecuted && !validation.errors) {
       setErrorDetails(null);
@@ -357,6 +283,7 @@ function SinglyLinkedListGame({ onBack, initialXp = 0, onXpChange, initialLevel 
 
       if (goalMet && !modalShownForThisRef.current) {
         modalShownForThisRef.current = true;
+        showPetMsg(CHALLENGE_SUCCESS_MSGS[Math.floor(Math.random() * CHALLENGE_SUCCESS_MSGS.length)]);
         const lvl  = currentLevelIdRef.current;
         const subI = q.subQuestionIndex ?? 0;
         const baseXP = lvl === 1 ? 80 : lvl === 2 ? 120 : 160;
@@ -422,7 +349,10 @@ function SinglyLinkedListGame({ onBack, initialXp = 0, onXpChange, initialLevel 
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <TopBar onBack={onBack} xp={xp} lives={lives} timerRef={timerRef} showModal={showModal} />
+      <GameTopBar
+        onBack={onBack} xp={xp} lives={lives} timerRef={timerRef} showModal={showModal}
+        title="Challenge · Solo" titleColor="text-violet-600" barColor="bg-violet-500"
+      />
 
       <div className="max-w-7xl mx-auto p-5">
 
@@ -523,7 +453,7 @@ function SinglyLinkedListGame({ onBack, initialXp = 0, onXpChange, initialLevel 
           </div>
 
           {/* Col 4 — Pet */}
-          <PetCard xp={xp} petMood={isCorrectOrder ? 'happy' : errorDetails ? 'sad' : 'idle'} />
+          <GamePetCard xp={xp} mood={isCorrectOrder ? 'happy' : errorDetails ? 'sad' : 'idle'} theme="violet" hideable message={petMessage} />
 
         </div>
       </div>
@@ -542,6 +472,65 @@ function SinglyLinkedListGame({ onBack, initialXp = 0, onXpChange, initialLevel 
   );
 }
 
+// ─── Challenge Intro Screen ───────────────────────────────────────────────────
+
+function ChallengeIntroScreen({ onStart, onBack }) {
+  const rules = [
+    { icon: '🚫', title: 'No hints',    desc: "You're on your own — trust your training"   },
+    { icon: '❤️', title: '5 lives',     desc: 'Each wrong assembly costs a life'            },
+    { icon: '⏱️', title: 'Timer on',    desc: 'Speed is tracked — faster earns more XP'     },
+    { icon: '⭐', title: 'XP rewards',  desc: 'Complete levels cleanly to maximise gains'   },
+  ];
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-violet-900 via-indigo-900 to-violet-950 flex flex-col items-center justify-center p-8">
+
+      {/* Trophy */}
+      <div className="w-24 h-24 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-5xl shadow-2xl mb-6">
+        🏆
+      </div>
+
+      <h1 className="text-5xl font-black text-white mb-2">Training Complete!</h1>
+      <p className="text-white/60 text-xl mb-10 text-center max-w-md">
+        You've mastered all 4 exercises. Time to go solo.
+      </p>
+
+      {/* Rules */}
+      <div className="bg-white/10 border border-white/15 rounded-3xl p-8 w-full max-w-lg mb-8">
+        <p className="text-white/40 text-xs font-bold uppercase tracking-widest mb-6">
+          Challenge Mode — what's different
+        </p>
+        <div className="grid grid-cols-2 gap-6">
+          {rules.map(r => (
+            <div key={r.title} className="flex items-start gap-3">
+              <span className="text-2xl mt-0.5 shrink-0">{r.icon}</span>
+              <div>
+                <p className="text-white font-bold text-base">{r.title}</p>
+                <p className="text-white/50 text-sm leading-snug mt-0.5">{r.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* CTA */}
+      <button
+        onClick={onStart}
+        className="w-full max-w-lg py-4 rounded-2xl font-black text-white text-xl bg-gradient-to-r from-violet-500 to-indigo-500 hover:opacity-90 active:scale-95 transition-all shadow-xl mb-4"
+      >
+        Start Challenge →
+      </button>
+      <button
+        onClick={onBack}
+        className="text-white/40 hover:text-white/70 text-base transition-colors"
+      >
+        ← Back to map
+      </button>
+
+    </div>
+  );
+}
+
 // ─── Root App ─────────────────────────────────────────────────────────────────
 
 export default function App() {
@@ -554,6 +543,7 @@ export default function App() {
   const goModeSelect = (mod) => { setModuleId(mod); setScreen('mode-select'); };
   const goRegular    = () => setScreen(moduleId === 'doubly' ? 'doubly' : 'singly');
 
+  if (screen === 'daily-challenge') return <DailyChallenge onBack={() => setScreen('mode-select')} />;
   if (screen === 'menu')        return <ModuleSelector onSelect={goModeSelect} xp={globalXp} />;
   if (screen === 'mode-select') return <ModeSelector moduleId={moduleId} xp={globalXp} onSelect={(mode, qIdx) => {
     setModeStartAt(qIdx ?? 0);
@@ -568,15 +558,15 @@ export default function App() {
       if (mode === 'training') setScreen('training');
       if (mode === 'regular')  goRegular();
     }
-  }} onBack={goMenu} />;
+  }} onBack={goMenu} onDailyChallenge={moduleId === 'singly' ? () => setScreen('daily-challenge') : undefined} />;
   if (screen === 'tutorial-intro') return <TutorialIntroPage xp={globalXp} onBack={() => setScreen('mode-select')} onComplete={() => setScreen('tutorial')} />;
   if (screen === 'dll-intro')      return <DLLIntroPage xp={globalXp} onBack={() => setScreen('mode-select')} onComplete={() => setScreen('dll-tutorial')} />;
   if (screen === 'dll-tutorial')   return <DLLTutorialGame xp={globalXp} onBack={() => setScreen('mode-select')} onGoTraining={() => setScreen('dll-training')} />;
   if (screen === 'dll-training')   return <DLLTrainingGame xp={globalXp} onBack={() => setScreen('mode-select')} onGoChallenge={() => setScreen('doubly')} />;
   if (screen === 'tutorial') return <TutorialGame startAt={modeStartAt} xp={globalXp} onBack={() => setScreen('mode-select')} onGoRegular={() => { setModeStartAt(0); setScreen('training'); }} />;
-  if (screen === 'training') return <TrainingGame startAt={modeStartAt} xp={globalXp} onBack={() => setScreen('mode-select')} onGoRegular={() => { setModeStartAt(0); goRegular(); }} />;
+  if (screen === 'training') return <TrainingGame startAt={modeStartAt} xp={globalXp} onBack={() => setScreen('mode-select')} onGoRegular={() => { setModeStartAt(0); setScreen('challenge-intro'); }} />;
+  if (screen === 'challenge-intro') return <ChallengeIntroScreen onStart={goRegular} onBack={() => setScreen('mode-select')} />;
   if (screen === 'singly')   return <SinglyLinkedListGame onBack={() => setScreen('mode-select')} initialXp={globalXp} onXpChange={setGlobalXp} initialLevel={modeStartAt || 1} />;
   if (screen === 'doubly')   return <DoublyLinkedListGame onBack={() => setScreen('mode-select')} initialXp={globalXp} onXpChange={setGlobalXp} />;
-  if (screen === 'sort')     return <SortLinkedListGame onBack={() => setScreen('mode-select')} />;
   return <ModuleSelector onSelect={goModeSelect} />;
 }

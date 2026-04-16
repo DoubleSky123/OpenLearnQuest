@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Lightbulb, RotateCcw, ChevronRight, Eye, EyeOff } from 'lucide-react';
-import HelpModal from './HelpModal';
 import { LinkedListVisualiser } from './GoalPattern';
-import { shuffleArray } from '../utils/helpers';
-import GameTimer from './GameTimer';
-import PetCanvas, { getStage } from './PetCanvas';
+import { shuffleArray, getCurrentPattern } from '../utils/helpers';
+import GameTopBar from './shared/GameTopBar';
+import GamePetCard from './shared/GamePetCard';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TRAINING QUESTION DEFINITIONS  (fixed values, no randomness, no distractors)
@@ -22,18 +21,29 @@ const TRAINING_QUESTIONS = [
       { id: 3, value: 3, next: null },
     ],
     goalPattern: [1, 2, 3, 4],
+    prediction: {
+      options: [[4, 1, 2, 3], [1, 2, 3, 4], [1, 2, 4, 3], [1, 2, 3]],
+      correct: 1,  // B
+    },
     pseudocode: [
+      'node = head',
       'while (node.next != NULL): node = node.next',
       'create newNode',
       'node.next = newNode',
       'newNode.next = NULL',
     ],
-    correctOrder: [0, 1, 2, 3],
+    correctOrder: [0, 1, 2, 3, 4],
+    validOrders: [
+      [0, 1, 2, 3, 4],
+      [0, 2, 1, 3, 4],
+      [2, 0, 1, 3, 4],
+    ],
     stepHints: [
-      'Step 1 of 4 — Traverse to the end of the list by moving node forward until node.next is NULL.',
-      'Step 2 of 4 — Create a new node to hold the value you want to append.',
-      'Step 3 of 4 — Link the current last node to the new node (node.next = newNode).',
-      'Step 4 of 4 — Terminate the list — the new tail must point to NULL.',
+      'Set node = head to start the traversal pointer. Creating newNode first is also fine — those two steps are independent.',
+      'Traverse to the last node: advance while node.next != NULL. If you already created newNode, do this now.',
+      'Create the new node. (Run the while loop first if you have not yet.)',
+      'Link the old tail forward: node.next = newNode.',
+      'Close the list: newNode.next = NULL marks the new tail.',
     ],
   },
   {
@@ -47,18 +57,24 @@ const TRAINING_QUESTIONS = [
       { id: 3, value: 3, next: null },
     ],
     goalPattern: [1, 2],
+    prediction: {
+      options: [[2, 3], [1, 2, 3], [1, 2], [1, 3]],
+      correct: 2,  // C
+    },
     pseudocode: [
+      'node = head',
       'while (node.next.next != NULL): node = node.next',
       'temp = node.next',
       'node.next = NULL',
       'free(temp)',
     ],
-    correctOrder: [0, 1, 2, 3],
+    correctOrder: [0, 1, 2, 3, 4],
     stepHints: [
-      'Step 1 of 4 — Traverse to the second-to-last node by stopping when node.next.next is NULL.',
-      'Step 2 of 4 — Save the last node in a temporary variable before disconnecting it.',
-      'Step 3 of 4 — Disconnect the last node by setting the second-to-last node\'s next to NULL.',
-      'Step 4 of 4 — Free the saved node to release its memory.',
+      'Set node = head to initialize the traversal pointer.',
+      'Traverse to the second-to-last node: stop when node.next.next is NULL.',
+      'Save the last node: temp = node.next (you will free it after unlinking).',
+      'Unlink the last node: node.next = NULL.',
+      'Release memory: free(temp).',
     ],
   },
   {
@@ -74,18 +90,34 @@ const TRAINING_QUESTIONS = [
       { id: 5, value: 5, next: null },
     ],
     goalPattern: [1, 2, 99, 3, 4, 5],
+    prediction: {
+      options: [[1, 2, 99, 3, 4, 5], [99, 1, 2, 3, 4, 5], [1, 99, 2, 3, 4, 5], [1, 2, 3, 99, 4, 5]],
+      correct: 0,  // A
+    },
     pseudocode: [
+      'node = head',
+      'i = 0',
       'while (i < 2): node = node.next',
       'create newNode',
       'newNode.next = node.next',
       'node.next = newNode',
     ],
-    correctOrder: [0, 1, 2, 3],
+    correctOrder: [0, 1, 2, 3, 4, 5],
+    validOrders: [
+      [0, 1, 2, 3, 4, 5],
+      [1, 0, 2, 3, 4, 5],
+      [0, 1, 3, 2, 4, 5],
+      [1, 0, 3, 2, 4, 5],
+      [3, 0, 1, 2, 4, 5],
+      [3, 1, 0, 2, 4, 5],
+    ],
     stepHints: [
-      'Step 1 of 4 — Traverse to the predecessor node — stop at position 2 (one before the target position 3).',
-      'Step 2 of 4 — Create a new node to hold the value to insert.',
-      'Step 3 of 4 — Link the new node to the current successor first (newNode.next = node.next). This must come before the next step or you lose the reference.',
-      'Step 4 of 4 — Attach the predecessor to the new node (node.next = newNode), completing the insertion.',
+      'Set node = head and i = 0 to initialize — these two can go in either order, or create newNode first.',
+      'Set i = 0 and node = head — order between these two does not matter.',
+      'Traverse to position 2: advance while i < 2. (Create newNode beforehand is also fine.)',
+      'Create the new node. (Run the while loop first if not done yet.)',
+      'Save the successor link first: newNode.next = node.next prevents losing the rest of the list.',
+      'Attach the predecessor: node.next = newNode completes the insertion.',
     ],
   },
   {
@@ -101,18 +133,80 @@ const TRAINING_QUESTIONS = [
       { id: 5, value: 5, next: null },
     ],
     goalPattern: [1, 2, 4, 5],
+    prediction: {
+      options: [[2, 3, 4, 5], [1, 3, 4, 5], [1, 2, 3, 5], [1, 2, 4, 5]],
+      correct: 3,  // D
+    },
     pseudocode: [
+      'node = head',
+      'i = 0',
       'while (i < 2): node = node.next',
       'temp = node.next',
       'node.next = temp.next',
       'free(temp)',
     ],
-    correctOrder: [0, 1, 2, 3],
+    correctOrder: [0, 1, 2, 3, 4, 5],
+    validOrders: [
+      [0, 1, 2, 3, 4, 5],
+      [1, 0, 2, 3, 4, 5],
+    ],
     stepHints: [
-      'Step 1 of 4 — Traverse to the predecessor node — stop at position 2 (one before the target position 3).',
-      'Step 2 of 4 — Save the target node in a temporary variable (temp = node.next).',
-      'Step 3 of 4 — Bypass the target by linking the predecessor directly to the successor (node.next = temp.next).',
-      'Step 4 of 4 — Free the saved target node to release its memory.',
+      'Set node = head to initialize the traversal pointer. (i = 0 can come first too.)',
+      'Set i = 0. (node = head can come first too — these two are interchangeable.)',
+      'Traverse to position 2: advance while i < 2.',
+      'Save the target node: temp = node.next.',
+      'Bypass the target: node.next = temp.next links the predecessor to the successor.',
+      'Release memory: free(temp).',
+    ],
+  },
+  {
+    id: 'train-insert-empty',
+    level: 1,
+    title: 'Insert into Empty List',
+    description: 'Insert the value 99 into an empty linked list.',
+    initialNodes: [],
+    goalPattern: [99],
+    prediction: {
+      options: [[], [99], [99, 99], [0]],
+      correct: 1,
+    },
+    pseudocode: [
+      'create newNode with value 99',
+      'newNode.next = NULL',
+      'head = newNode',
+    ],
+    correctOrder: [0, 1, 2],
+    validOrders: [[0, 1, 2], [0, 2, 1]],
+    stepHints: [
+      'The list is empty — no traversal needed. Start by creating the new node.',
+      'Set newNode.next = NULL to mark it as the only node in the list.',
+      'Set head = newNode so the list is no longer empty.',
+    ],
+  },
+  {
+    id: 'train-remove-only',
+    level: 1,
+    title: 'Remove Only Node',
+    description: 'Remove the only node from the list [42], leaving an empty list.',
+    initialNodes: [
+      { id: 1, value: 42, next: null },
+    ],
+    goalPattern: [],
+    prediction: {
+      options: [[42], [], [0], [1]],
+      correct: 1,
+    },
+    pseudocode: [
+      'temp = head',
+      'head = NULL',
+      'free(temp)',
+    ],
+    correctOrder: [0, 1, 2],
+    validOrders: [[0, 1, 2]],
+    stepHints: [
+      'Save a reference to the current head before changing the pointer.',
+      'Set head = NULL — the list is now logically empty.',
+      'Free the saved node to release its memory.',
     ],
   },
 ];
@@ -146,82 +240,130 @@ const executeOperation = (question, nodes) => {
       .map(n => n.next === target?.id ? { ...n, next: target.next } : n)
       .filter(n => n.id !== target?.id);
   }
+  if (question.id === 'train-insert-empty') {
+    return [{ id: 1, value: 99, next: null }];
+  }
+  if (question.id === 'train-remove-only') {
+    return [];
+  }
   return nodes;
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// HELPERS
+// PREDICT PHASE — shown before assembly; user picks the expected outcome
 // ─────────────────────────────────────────────────────────────────────────────
 
-const getValues = (nodes) => {
-  const allIds     = new Set(nodes.map(n => n.id));
-  const pointedIds = new Set(nodes.map(n => n.next).filter(Boolean));
-  let cur = [...allIds].find(id => !pointedIds.has(id)) ?? nodes[0]?.id ?? null;
-  const result = [];
-  while (cur !== null) {
-    const node = nodes.find(n => n.id === cur);
-    if (!node) break;
-    result.push(node.value);
-    cur = node.next;
+function MiniList({ values }) {
+  if (values.length === 0) {
+    return <span className="text-gray-400 text-sm italic">Empty list</span>;
   }
-  return result;
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TOP BAR
-// ─────────────────────────────────────────────────────────────────────────────
-
-const XP_PER_LEVEL_T = 500;
-const LEVEL_NAMES_T  = ['Novice','Explorer','Learner','Practitioner','Skilled','Advanced','Expert','Master'];
-
-function TopBar({ onBack, timerRef, assistCount, xp }) {
-  const level     = Math.floor(xp / XP_PER_LEVEL_T) + 1;
-  const levelName = LEVEL_NAMES_T[Math.min(level - 1, LEVEL_NAMES_T.length - 1)];
-  const xpInLevel = xp % XP_PER_LEVEL_T;
-  const xpPct     = Math.round((xpInLevel / XP_PER_LEVEL_T) * 100);
-  const [showHelp, setShowHelp] = React.useState(false);
   return (
-    <div className="bg-white border-b border-gray-200 px-6 py-3 sticky top-0 z-10">
-      <div className="max-w-7xl mx-auto flex items-center">
-
-        {/* Left */}
-        <div className="flex-1 flex items-center gap-2">
-          <button onClick={onBack} className="border border-gray-300 rounded-lg px-4 py-1.5 text-gray-600 font-semibold text-lg hover:bg-gray-50 transition-colors">
-            ← Back
-          </button>
-          <button onClick={() => setShowHelp(true)} className="w-8 h-8 rounded-full border border-gray-300 text-gray-500 font-bold text-base hover:bg-gray-50 transition-colors flex items-center justify-center" title="Game Guide">
-            ?
-          </button>
-        </div>
-
-        {/* Center */}
-        <div className="flex-1 flex justify-center">
-          <span className="text-amber-600 text-2xl font-bold">Training · Practice</span>
-        </div>
-
-        {/* Right */}
-        <div className="flex-1 flex justify-end items-center gap-4">
-          {assistCount > 0 && (
-            <div className="bg-gray-50 border border-gray-200 text-gray-500 text-xs px-3 py-1.5 rounded-full shrink-0">
-              {assistCount} assist{assistCount !== 1 ? 's' : ''}
-            </div>
-          )}
-          <span className="text-gray-700 text-lg font-semibold whitespace-nowrap">
-            Level {level} · {levelName}
+    <div className="flex items-center gap-1 flex-wrap">
+      {values.map((v, i) => (
+        <React.Fragment key={i}>
+          <span className="w-8 h-8 rounded-full border-2 border-gray-300 bg-gray-50 flex items-center justify-center text-sm font-semibold text-gray-700">
+            {v}
           </span>
-          <div className="w-36 shrink-0">
-            <div className="flex justify-between text-sm text-gray-400 mb-1">
-              <span>XP</span><span>{xpInLevel}/{XP_PER_LEVEL_T}</span>
-            </div>
-            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-              <div className="h-full bg-violet-500 rounded-full transition-all duration-500" style={{ width: `${xpPct}%` }} />
-            </div>
-          </div>
-          <GameTimer ref={timerRef} isRunning={true} />
-        </div>
+          {i < values.length - 1 && <span className="text-gray-400 text-sm">→</span>}
+        </React.Fragment>
+      ))}
+      <span className="text-gray-400 text-xs ml-1">→ NULL</span>
+    </div>
+  );
+}
 
+function PredictPhase({ question, onContinue }) {
+  const [selected, setSelected] = useState(null);
+  const isCorrect = selected !== null && selected === question.prediction.correct;
+  const initialValues = question.initialNodes.map(n => n.value);
+
+  return (
+    <div className="max-w-2xl mx-auto py-10 px-4">
+      {/* Header */}
+      <div className="flex items-center gap-3 mb-6">
+        <div className="w-10 h-10 rounded-full bg-amber-100 border border-amber-300 text-amber-700 flex items-center justify-center text-xl font-black">
+          ?
+        </div>
+        <div>
+          <p className="text-xs font-bold text-amber-600 uppercase tracking-wider">Predict First</p>
+          <h2 className="text-2xl font-black text-gray-900">{question.title}</h2>
+        </div>
       </div>
-      <HelpModal isOpen={showHelp} onClose={() => setShowHelp(false)} />
+
+      {/* Task card */}
+      <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 mb-6">
+        <p className="text-gray-600 text-lg mb-4">{question.description}</p>
+        <div>
+          <p className="text-xs font-semibold text-gray-400 uppercase mb-2">Starting list</p>
+          <MiniList values={initialValues} />
+        </div>
+      </div>
+
+      {/* Prediction question */}
+      <p className="text-xl font-bold text-gray-800 mb-4">
+        After the operation, what will the list look like?
+      </p>
+
+      <div className="flex flex-col gap-3 mb-6">
+        {question.prediction.options.map((opt, i) => {
+          const label = String.fromCharCode(65 + i);
+          const isSelected = selected === i;
+          const isThisCorrect = i === question.prediction.correct;
+
+          let style = 'bg-white border-gray-200 hover:border-amber-300 hover:bg-amber-50 cursor-pointer';
+          if (selected !== null) {
+            if (isThisCorrect) style = 'bg-emerald-50 border-emerald-400';
+            else if (isSelected) style = 'bg-red-50 border-red-300';
+            else style = 'bg-white border-gray-200 opacity-50';
+          }
+
+          return (
+            <button
+              key={i}
+              onClick={() => { if (selected === null) setSelected(i); }}
+              disabled={selected !== null}
+              className={`w-full text-left px-4 py-3 rounded-2xl border-2 transition-all ${style}`}
+            >
+              <div className="flex items-center gap-3">
+                <span className={`w-7 h-7 rounded-full border-2 flex items-center justify-center text-sm font-bold shrink-0 ${
+                  selected !== null && isThisCorrect ? 'border-emerald-500 text-emerald-700' :
+                  isSelected && !isThisCorrect      ? 'border-red-400 text-red-600' :
+                                                      'border-gray-300 text-gray-500'
+                }`}>
+                  {selected !== null && isThisCorrect ? '✓' : isSelected && !isThisCorrect ? '✗' : label}
+                </span>
+                <MiniList values={opt} />
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Feedback + continue */}
+      {selected !== null && (
+        <div className={`rounded-2xl px-5 py-4 mb-5 border-2 ${
+          isCorrect ? 'bg-emerald-50 border-emerald-300' : 'bg-red-50 border-red-200'
+        }`}>
+          {isCorrect ? (
+            <p className="text-lg font-bold text-emerald-700">
+              ✅ Correct! Great mental model — now assemble the code that makes it happen.
+            </p>
+          ) : (
+            <p className="text-lg font-bold text-red-700">
+              ❌ Not quite. The correct answer is <span className="font-black">{String.fromCharCode(65 + question.prediction.correct)}</span>. Study it, then assemble the code to see why.
+            </p>
+          )}
+        </div>
+      )}
+
+      {selected !== null && (
+        <button
+          onClick={onContinue}
+          className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl font-bold text-white text-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:opacity-90 active:scale-95 transition-all shadow-md"
+        >
+          Assemble the Code <ChevronRight size={22} />
+        </button>
+      )}
     </div>
   );
 }
@@ -276,65 +418,7 @@ function QuestNav({ questions, currentIndex, completedSet }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// PET CARD
-// ─────────────────────────────────────────────────────────────────────────────
-
-function PetCard({ mood = 'idle', xp = 0 }) {
-  const stage     = getStage(xp);
-  const level     = Math.floor(xp / XP_PER_LEVEL_T) + 1;
-  const xpInLevel = xp % XP_PER_LEVEL_T;
-  const xpPct     = Math.round((xpInLevel / XP_PER_LEVEL_T) * 100);
-  return (
-    <div className="bg-white rounded-xl border-2 border-dashed border-amber-200 overflow-hidden">
-      <div className="bg-[#c8dfa8] mx-3 mt-3 rounded-lg flex items-center justify-center py-16">
-        <PetCanvas stage={stage} mood={mood} />
-      </div>
-      <div className="px-4 py-4 flex flex-col items-center gap-2">
-        <p className="text-sm font-semibold text-gray-700">Algo</p>
-        <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
-          <div className="h-full bg-violet-400 rounded-full transition-all duration-500" style={{ width: `${xpPct}%` }} />
-        </div>
-        <p className="text-xs text-gray-400">Level {level} · {xpInLevel}/{XP_PER_LEVEL_T} XP</p>
-      </div>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ERROR FEEDBACK MODAL
-// ─────────────────────────────────────────────────────────────────────────────
-
-function ErrorFeedbackModal({ isOpen, wrongBlock, stepHint, onDismiss }) {
-  if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="relative w-full max-w-sm bg-slate-800 border border-red-500/60 rounded-2xl shadow-2xl overflow-hidden">
-        <div className="h-1.5 w-full bg-gradient-to-r from-red-500 to-rose-500" />
-        <div className="p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <span className="text-2xl">❌</span>
-            <h3 className="text-lg font-bold text-white">Not quite!</h3>
-          </div>
-          <div className="bg-slate-700 rounded-lg p-3 mb-3 text-sm">
-            <p className="text-slate-400 text-xs mb-1">You placed:</p>
-            <p className="font-mono text-red-300 font-semibold">"{wrongBlock}"</p>
-          </div>
-          <div className="bg-slate-700 rounded-lg p-3 mb-5 text-sm">
-            <p className="text-slate-400 text-xs mb-1">Hint for this step:</p>
-            <p className="text-amber-300 text-sm">{stepHint}</p>
-          </div>
-          <button
-            onClick={onDismiss}
-            className="w-full py-2.5 rounded-xl font-bold text-white bg-gradient-to-r from-red-500 to-rose-500 hover:opacity-90 active:scale-95 transition-all"
-          >
-            Try Again
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
+// (ErrorFeedbackModal removed — errors shown inline below assembly area)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TRAINING COMPLETE MODAL
@@ -374,7 +458,7 @@ function TrainingCompleteModal({ isOpen, hintCount, onRegular, onReplay, onBack 
 
           {/* Badges */}
           <div className="flex flex-wrap gap-2 justify-center mb-8">
-            {['Insert Tail','Remove Tail','Insert Pos','Remove Pos'].map(label => (
+            {['Insert Tail','Remove Tail','Insert Pos','Remove Pos','Insert Empty','Remove Only'].map(label => (
               <div key={label} className="flex items-center gap-1.5 bg-amber-50 border border-amber-200 text-amber-700 text-base font-semibold px-3 py-1.5 rounded-full">
                 ✅ {label}
               </div>
@@ -411,6 +495,7 @@ export default function TrainingGame({ onBack, onGoRegular, startAt = 0, xp = 0 
   const [showComplete, setShowComplete] = useState(false);
   const [qIndex, setQIndex]             = useState(startAt);
   const [completedSet, setCompletedSet] = useState(new Set());
+  const [phase, setPhase]               = useState('predict'); // 'predict' | 'assemble'
 
   const q = TRAINING_QUESTIONS[qIndex];
 
@@ -420,13 +505,34 @@ export default function TrainingGame({ onBack, onGoRegular, startAt = 0, xp = 0 
   const [nodes, setNodes]               = useState([]);
   const [executed, setExecuted]         = useState(false);
   const [success, setSuccess]           = useState(false);
-  const [errorModal, setErrorModal]     = useState({ open: false, wrongBlock: '', stepHint: '' });
+  const [inlineError, setInlineError]   = useState(null); // { wrongBlock, stepHint }
   const [draggedIdx, setDraggedIdx]     = useState(null);
   const [showHint, setShowHint]         = useState(false);
   const [assistCount, setAssistCount]   = useState(0);
+  const [petMessage, setPetMessage]     = useState('');
 
-  const timerRef     = useRef(null);
-  const advancingRef = useRef(false);
+  const timerRef      = useRef(null);
+  const advancingRef  = useRef(false);
+  const petMsgTimer   = useRef(null);
+
+  const PET_WRONG_MSGS = [
+    'Almost! Think about what comes next...',
+    'Not this one — check the hint below!',
+    'Keep trying, you\'re getting there!',
+    'Peek at the hint and try again 👇',
+  ];
+  const PET_SUCCESS_MSGS = [
+    'Amazing work! 🎉',
+    'You nailed it! 🌟',
+    'Perfect! Keep it up!',
+    'Excellent execution! 🔥',
+  ];
+
+  const showPetMsg = useCallback((msg) => {
+    if (petMsgTimer.current) clearTimeout(petMsgTimer.current);
+    setPetMessage(msg);
+    petMsgTimer.current = setTimeout(() => setPetMessage(''), 3000);
+  }, []);
 
   // ── Init ───────────────────────────────────────────────────────────────────
   const initQuestion = useCallback((index) => {
@@ -437,7 +543,10 @@ export default function TrainingGame({ onBack, onGoRegular, startAt = 0, xp = 0 
     setPlacedCount(0);
     setExecuted(false);
     setSuccess(false);
+    setInlineError(null);
     setShowHint(false);
+    setPetMessage('');
+    setPhase('predict');
     advancingRef.current = false;
   }, []);
 
@@ -448,20 +557,28 @@ export default function TrainingGame({ onBack, onGoRegular, startAt = 0, xp = 0 
   // ── Block placement ────────────────────────────────────────────────────────
   const handleBlockClick = (poolIdx) => {
     if (executed) return;
-    const blockIndex = codePool[poolIdx];
-    const expected   = q.correctOrder[placedCount];
+    const blockIndex  = codePool[poolIdx];
+    const validOrders = q.validOrders || [q.correctOrder];
 
-    if (blockIndex === expected) {
+    // A block is acceptable if it matches the next slot in at least one order
+    // that is still consistent with what has already been placed.
+    const isAcceptable = validOrders.some(order => {
+      const prefixOk = assemblyArea.every((idx, pos) => order[pos] === idx);
+      return prefixOk && order[placedCount] === blockIndex;
+    });
+
+    if (isAcceptable) {
       setAssemblyArea(prev => [...prev, blockIndex]);
       setCodePool(prev => prev.filter((_, i) => i !== poolIdx));
       setPlacedCount(prev => prev + 1);
+      setInlineError(null);
     } else {
       setAssistCount(prev => prev + 1);
-      setErrorModal({
-        open: true,
+      setInlineError({
         wrongBlock: q.pseudocode[blockIndex],
         stepHint: q.stepHints[placedCount],
       });
+      showPetMsg(PET_WRONG_MSGS[Math.floor(Math.random() * PET_WRONG_MSGS.length)]);
     }
   };
 
@@ -481,6 +598,7 @@ export default function TrainingGame({ onBack, onGoRegular, startAt = 0, xp = 0 
       setNodes(newNodes);
       setSuccess(true);
       setCompletedSet(prev => new Set([...prev, qIndex]));
+      showPetMsg(PET_SUCCESS_MSGS[Math.floor(Math.random() * PET_SUCCESS_MSGS.length)]);
 
       setTimeout(() => {
         if (qIndex < TRAINING_QUESTIONS.length - 1) {
@@ -494,14 +612,17 @@ export default function TrainingGame({ onBack, onGoRegular, startAt = 0, xp = 0 
   }, [placedCount]); // eslint-disable-line
 
   const handleReset   = () => initQuestion(qIndex);
-  const currentValues = getValues(nodes);
+  const currentValues = getCurrentPattern(nodes);
 
   // ─────────────────────────────────────────────────────────────────────────
   // RENDER
   // ─────────────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-50">
-      <TopBar onBack={onBack} timerRef={timerRef} assistCount={assistCount} xp={xp} />
+      <GameTopBar
+        onBack={onBack} timerRef={timerRef} assistCount={assistCount} xp={xp}
+        title="Training · Practice" titleColor="text-amber-600" barColor="bg-violet-500"
+      />
 
       <div className="max-w-7xl mx-auto p-5">
 
@@ -517,8 +638,13 @@ export default function TrainingGame({ onBack, onGoRegular, startAt = 0, xp = 0 
           </div>
         )}
 
-        {/* 3-column layout */}
-        <div className="grid grid-cols-[1fr_1fr_240px] gap-4 items-start">
+        {/* Predict phase */}
+        {phase === 'predict' && (
+          <PredictPhase question={q} onContinue={() => setPhase('assemble')} />
+        )}
+
+        {/* 3-column layout — assembly phase */}
+        {phase === 'assemble' && <div className="grid grid-cols-[1fr_1fr_240px] gap-4 items-start">
 
           {/* ── Col 1: Nav + Quest info ── */}
           <div className="flex flex-col gap-4">
@@ -559,6 +685,7 @@ export default function TrainingGame({ onBack, onGoRegular, startAt = 0, xp = 0 
                 <p className="text-gray-400 text-lg font-medium mb-1.5">Goal state</p>
                 <LinkedListVisualiser
                   values={q.goalPattern}
+                  emptyLabel="Empty list"
                   nodeColor="bg-amber-50 border-amber-300 text-amber-800"
                 />
               </div>
@@ -663,22 +790,33 @@ export default function TrainingGame({ onBack, onGoRegular, startAt = 0, xp = 0 
                 </div>
               )}
             </div>
+
+            {/* Inline error — shown below assembly area */}
+            {inlineError && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <span>❌</span>
+                  <p className="font-bold text-red-700 text-lg">Not quite!</p>
+                </div>
+                <div className="bg-white border border-red-100 rounded-lg p-2.5 mb-2">
+                  <p className="text-gray-400 text-xs mb-1">You placed:</p>
+                  <p className="font-mono text-red-600 font-semibold text-lg">"{inlineError.wrongBlock}"</p>
+                </div>
+                <div className="bg-amber-50 border border-amber-100 rounded-lg p-2.5">
+                  <p className="text-gray-400 text-xs mb-1">Hint for this step:</p>
+                  <p className="text-amber-800 text-lg">{inlineError.stepHint}</p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* ── Col 3: Pet ── */}
-          <PetCard mood={success ? 'happy' : errorModal.open ? 'sad' : 'idle'} xp={xp} />
+          <GamePetCard mood={success ? 'happy' : inlineError ? 'sad' : 'idle'} xp={xp} theme="amber" hideable message={petMessage} />
 
-        </div>
+        </div>}
       </div>
 
       {/* ── Modals ── */}
-      <ErrorFeedbackModal
-        isOpen={errorModal.open}
-        wrongBlock={errorModal.wrongBlock}
-        stepHint={errorModal.stepHint}
-        onDismiss={() => setErrorModal({ open: false, wrongBlock: '', stepHint: '' })}
-      />
-
       <TrainingCompleteModal
         isOpen={showComplete}
         hintCount={assistCount}
