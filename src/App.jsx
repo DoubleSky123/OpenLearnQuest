@@ -3,6 +3,7 @@ import { generateLevel1Question, generateLevel2Question, generateLevel3Question 
 import { shuffleArray, getCurrentPattern, XP_PER_LEVEL, LEVEL_NAMES } from './utils/helpers';
 import { executeLinkedListOperation } from './services/linkedListOperations';
 import { validateAssembly } from './services/validationLogic';
+import { loadXP, saveXP, addMistake } from './utils/storage';
 import GoalPattern, { LinkedListVisualiser } from './components/GoalPattern';
 import CodePool from './components/CodePool';
 import AssemblyArea from './components/AssemblyArea';
@@ -16,6 +17,7 @@ import DLLTutorialGame from './components/DLLTutorialGame';
 import DLLTrainingGame from './components/DLLTrainingGame';
 import TutorialIntroPage from './components/TutorialIntroPage';
 import DailyChallenge from './components/DailyChallenge';
+import MistakeBook from './components/MistakeBook';
 import LevelCompleteModal from './components/LevelCompleteModal';
 import GameTopBar from './components/shared/GameTopBar';
 import GamePetCard from './components/shared/GamePetCard';
@@ -255,6 +257,14 @@ function SinglyLinkedListGame({ onBack, initialXp = 0, onXpChange, initialLevel 
         setLives(prev => Math.max(0, prev - 1));
         lastErrorCountedRef.current = true;
         showPetMsg(CHALLENGE_WRONG_MSGS[Math.floor(Math.random() * CHALLENGE_WRONG_MSGS.length)]);
+        const cq = currentQuestionRef.current;
+        if (cq) {
+          const yourLines    = assemblyArea.map(item =>
+            item.isDistractor ? (cq.distractors?.[item.index] ?? '?') : (cq.pseudocode[item.index] ?? '?')
+          ).join(' → ');
+          const correctLines = cq.correctOrder.map(i => cq.pseudocode[i]).join(' → ');
+          addMistake({ source: 'challenge', title: cq.title, yourAnswer: yourLines, correctAnswer: correctLines, explanation: cq.hint });
+        }
       }
     } else if (!operationExecuted && !validation.errors) {
       setErrorDetails(null);
@@ -536,13 +546,16 @@ function ChallengeIntroScreen({ onStart, onBack }) {
 export default function App() {
   const [screen, setScreen]       = useState('menu');
   const [moduleId, setModuleId]   = useState(null);
-  const [globalXp, setGlobalXp]   = useState(0);
+  const [globalXp, setGlobalXp]   = useState(() => loadXP());
   const [modeStartAt, setModeStartAt] = useState(0);
+
+  useEffect(() => { saveXP(globalXp); }, [globalXp]);
 
   const goMenu       = () => setScreen('menu');
   const goModeSelect = (mod) => { setModuleId(mod); setScreen('mode-select'); };
   const goRegular    = () => setScreen(moduleId === 'doubly' ? 'doubly' : 'singly');
 
+  if (screen === 'mistake-book')    return <MistakeBook onBack={() => setScreen('mode-select')} />;
   if (screen === 'daily-challenge') return <DailyChallenge onBack={() => setScreen('mode-select')} />;
   if (screen === 'menu')        return <ModuleSelector onSelect={goModeSelect} xp={globalXp} />;
   if (screen === 'mode-select') return <ModeSelector moduleId={moduleId} xp={globalXp} onSelect={(mode, qIdx) => {
@@ -558,7 +571,7 @@ export default function App() {
       if (mode === 'training') setScreen('training');
       if (mode === 'regular')  goRegular();
     }
-  }} onBack={goMenu} onDailyChallenge={moduleId === 'singly' ? () => setScreen('daily-challenge') : undefined} />;
+  }} onBack={goMenu} onDailyChallenge={moduleId === 'singly' ? () => setScreen('daily-challenge') : undefined} onMistakeBook={() => setScreen('mistake-book')} />;
   if (screen === 'tutorial-intro') return <TutorialIntroPage xp={globalXp} onBack={() => setScreen('mode-select')} onComplete={() => setScreen('tutorial')} />;
   if (screen === 'dll-intro')      return <DLLIntroPage xp={globalXp} onBack={() => setScreen('mode-select')} onComplete={() => setScreen('dll-tutorial')} />;
   if (screen === 'dll-tutorial')   return <DLLTutorialGame xp={globalXp} onBack={() => setScreen('mode-select')} onGoTraining={() => setScreen('dll-training')} />;

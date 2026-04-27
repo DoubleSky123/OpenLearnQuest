@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Lightbulb, RotateCcw, ChevronRight, Eye, EyeOff } from 'lucide-react';
 import { LinkedListVisualiser } from './GoalPattern';
 import { shuffleArray, getCurrentPattern } from '../utils/helpers';
+import { addMistake } from '../utils/storage';
 import GameTopBar from './shared/GameTopBar';
 import GamePetCard from './shared/GamePetCard';
 
@@ -81,7 +82,7 @@ const TRAINING_QUESTIONS = [
     id: 'train-insert-position',
     level: 2,
     title: 'Insert at Position',
-    description: 'Insert the value 99 at position 3 in the list [1 → 2 → 3 → 4 → 5].',
+    description: 'Insert the value 99 at index 2 in the list [1 → 2 → 3 → 4 → 5].',
     initialNodes: [
       { id: 1, value: 1, next: 2 },
       { id: 2, value: 2, next: 3 },
@@ -114,7 +115,7 @@ const TRAINING_QUESTIONS = [
     stepHints: [
       'Set node = head and i = 0 to initialize — these two can go in either order, or create newNode first.',
       'Set i = 0 and node = head — order between these two does not matter.',
-      'Traverse to position 2: advance while i < 2. (Create newNode beforehand is also fine.)',
+      'Traverse to index 1 (the predecessor): advance while i < 2. (Create newNode beforehand is also fine.)',
       'Create the new node. (Run the while loop first if not done yet.)',
       'Save the successor link first: newNode.next = node.next prevents losing the rest of the list.',
       'Attach the predecessor: node.next = newNode completes the insertion.',
@@ -124,7 +125,7 @@ const TRAINING_QUESTIONS = [
     id: 'train-remove-position',
     level: 2,
     title: 'Remove at Position',
-    description: 'Remove the node at position 3 from the list [1 → 2 → 3 → 4 → 5].',
+    description: 'Remove the node at index 2 from the list [1 → 2 → 3 → 4 → 5].',
     initialNodes: [
       { id: 1, value: 1, next: 2 },
       { id: 2, value: 2, next: 3 },
@@ -153,7 +154,7 @@ const TRAINING_QUESTIONS = [
     stepHints: [
       'Set node = head to initialize the traversal pointer. (i = 0 can come first too.)',
       'Set i = 0. (node = head can come first too — these two are interchangeable.)',
-      'Traverse to position 2: advance while i < 2.',
+      'Traverse to index 1 (the predecessor): advance while i < 2.',
       'Save the target node: temp = node.next.',
       'Bypass the target: node.next = temp.next links the predecessor to the successor.',
       'Release memory: free(temp).',
@@ -253,21 +254,37 @@ const executeOperation = (question, nodes) => {
 // PREDICT PHASE — shown before assembly; user picks the expected outcome
 // ─────────────────────────────────────────────────────────────────────────────
 
-function MiniList({ values }) {
+function MiniList({ values, showIndices = false }) {
   if (values.length === 0) {
     return <span className="text-gray-400 text-sm italic">Empty list</span>;
   }
   return (
-    <div className="flex items-center gap-1 flex-wrap">
-      {values.map((v, i) => (
-        <React.Fragment key={i}>
-          <span className="w-8 h-8 rounded-full border-2 border-gray-300 bg-gray-50 flex items-center justify-center text-sm font-semibold text-gray-700">
-            {v}
-          </span>
-          {i < values.length - 1 && <span className="text-gray-400 text-sm">→</span>}
-        </React.Fragment>
-      ))}
-      <span className="text-gray-400 text-xs ml-1">→ NULL</span>
+    <div className="inline-flex flex-col gap-0.5">
+      <div className="flex items-center gap-1 flex-wrap">
+        {values.map((v, i) => (
+          <React.Fragment key={i}>
+            <span className="w-8 h-8 rounded-full border-2 border-gray-300 bg-gray-50 flex items-center justify-center text-sm font-semibold text-gray-700">
+              {v}
+            </span>
+            {i < values.length - 1 && (
+              <span className="w-5 text-center text-gray-400 text-sm">→</span>
+            )}
+          </React.Fragment>
+        ))}
+        <span className="text-gray-400 text-xs ml-1">→ NULL</span>
+      </div>
+      {showIndices && (
+        <div className="flex items-center gap-1">
+          {values.map((_, i) => (
+            <React.Fragment key={i}>
+              <span className="w-8 flex items-center justify-center text-xs text-sky-500 font-bold font-mono">
+                {i}
+              </span>
+              {i < values.length - 1 && <span className="w-5 invisible text-sm">→</span>}
+            </React.Fragment>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -295,7 +312,7 @@ function PredictPhase({ question, onContinue }) {
         <p className="text-gray-600 text-lg mb-4">{question.description}</p>
         <div>
           <p className="text-xs font-semibold text-gray-400 uppercase mb-2">Starting list</p>
-          <MiniList values={initialValues} />
+          <MiniList values={initialValues} showIndices />
         </div>
       </div>
 
@@ -579,6 +596,13 @@ export default function TrainingGame({ onBack, onGoRegular, startAt = 0, xp = 0 
         stepHint: q.stepHints[placedCount],
       });
       showPetMsg(PET_WRONG_MSGS[Math.floor(Math.random() * PET_WRONG_MSGS.length)]);
+      addMistake({
+        source:        'training',
+        title:         q.title,
+        yourAnswer:    q.pseudocode[blockIndex],
+        correctAnswer: q.pseudocode[q.correctOrder[placedCount]],
+        explanation:   q.stepHints[placedCount],
+      });
     }
   };
 

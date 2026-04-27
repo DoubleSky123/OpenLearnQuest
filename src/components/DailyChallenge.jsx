@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ChevronLeft } from 'lucide-react';
+import { addMistake } from '../utils/storage';
 
 // ── Debug question bank ────────────────────────────────────────────────────────
 const DEBUG_QUESTIONS = [
@@ -71,7 +72,8 @@ const DEBUG_QUESTIONS = [
   },
   {
     title: 'Insert at Position',
-    description: 'Find the bug in Insert at Position (0-indexed):',
+    description: 'Find the bug in Insert at Position:',
+    exampleList: [1, 2, 3, 4, 5],
     lines: [
       'node = head',
       'for i in range(pos): node = node.next',
@@ -106,7 +108,8 @@ const DEBUG_QUESTIONS = [
   },
   {
     title: 'Remove at Position',
-    description: 'Find the bug in Remove at Position (0-indexed):',
+    description: 'Find the bug in Remove at Position:',
+    exampleList: [1, 2, 3, 4, 5],
     lines: [
       'node = head',
       'for i in range(pos - 1): node = node.next',
@@ -126,6 +129,38 @@ const DEBUG_QUESTIONS = [
 // ── Day-of-week label ──────────────────────────────────────────────────────────
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
+// ── Indexed linked-list visual ─────────────────────────────────────────────────
+function IndexedMiniList({ values }) {
+  return (
+    <div className="inline-flex flex-col gap-0.5">
+      <div className="flex items-center gap-1">
+        {values.map((v, i) => (
+          <React.Fragment key={i}>
+            <span className="w-8 h-8 rounded-full border-2 border-gray-300 bg-gray-50
+                             flex items-center justify-center text-sm font-semibold text-gray-700">
+              {v}
+            </span>
+            {i < values.length - 1 && (
+              <span className="w-5 text-center text-gray-400 text-sm">→</span>
+            )}
+          </React.Fragment>
+        ))}
+        <span className="text-gray-400 text-xs ml-1">→ NULL</span>
+      </div>
+      <div className="flex items-center gap-1">
+        {values.map((_, i) => (
+          <React.Fragment key={i}>
+            <span className="w-8 flex items-center justify-center text-xs text-sky-500 font-bold font-mono">
+              {i}
+            </span>
+            {i < values.length - 1 && <span className="w-5 invisible text-sm">→</span>}
+          </React.Fragment>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Main component ─────────────────────────────────────────────────────────────
 export default function DailyChallenge({ onBack }) {
   const today        = new Date();
@@ -139,8 +174,18 @@ export default function DailyChallenge({ onBack }) {
 
   function handleSubmit() {
     if (selected === null) return;
-    setIsCorrect(selected === question.bugLine);
+    const correct = selected === question.bugLine;
+    setIsCorrect(correct);
     setSubmitted(true);
+    if (!correct) {
+      addMistake({
+        source:        'daily',
+        title:         question.title,
+        yourAnswer:    `Line ${selected + 1}: ${question.lines[selected]}`,
+        correctAnswer: `Line ${question.bugLine + 1}: ${question.lines[question.bugLine]}`,
+        explanation:   question.explanation,
+      });
+    }
   }
 
   function handleReset() {
@@ -215,6 +260,11 @@ export default function DailyChallenge({ onBack }) {
           <h2 className="text-2xl font-bold text-gray-800 mb-1">
             {question.description}
           </h2>
+          {question.exampleList && (
+            <div className="mt-3 mb-2">
+              <IndexedMiniList values={question.exampleList} />
+            </div>
+          )}
           <p className="text-gray-500 text-sm">
             Click the line you think contains the bug, then hit <strong>Submit</strong>.
           </p>

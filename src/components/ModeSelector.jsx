@@ -257,7 +257,7 @@ function TopBar({ onBack, moduleName, xp }) {
 //   // Overlay a 🔒 icon on locked nodes.
 // }
 
-export default function ModeSelector({ moduleId, onSelect, onBack, xp = 0, onDailyChallenge }) {
+export default function ModeSelector({ moduleId, onSelect, onBack, xp = 0, onDailyChallenge, onMistakeBook }) {
   const moduleName = moduleId === 'singly' ? 'Singly Linked List' : 'Doubly Linked List';
   const pathD      = buildPath(NODE_POS);
 
@@ -521,7 +521,7 @@ export default function ModeSelector({ moduleId, onSelect, onBack, xp = 0, onDai
 
       {/* Daily Debug Challenge — only shown for Singly LL */}
       {onDailyChallenge && (
-        <div style={{ padding: '0 60px 60px', display: 'flex', justifyContent: 'center' }}>
+        <div style={{ padding: '0 60px 0', display: 'flex', justifyContent: 'center' }}>
           <button
             onClick={onDailyChallenge}
             style={{
@@ -574,6 +574,65 @@ export default function ModeSelector({ moduleId, onSelect, onBack, xp = 0, onDai
               </div>
             </div>
             <span style={{ fontSize: 22, color: '#D97706', flexShrink: 0 }}>→</span>
+          </button>
+        </div>
+      )}
+
+      {/* Mistake Book — always shown */}
+      {onMistakeBook && (
+        <div style={{ padding: onDailyChallenge ? '16px 60px 60px' : '0 60px 60px', display: 'flex', justifyContent: 'center' }}>
+          <button
+            onClick={onMistakeBook}
+            style={{
+              width:          '100%',
+              maxWidth:       W,
+              display:        'flex',
+              alignItems:     'center',
+              justifyContent: 'space-between',
+              gap:            24,
+              background:     'rgba(124,58,237,0.07)',
+              border:         '1.5px solid rgba(124,58,237,0.25)',
+              borderRadius:   20,
+              padding:        '20px 28px',
+              cursor:         'pointer',
+              transition:     'background 0.15s, border-color 0.15s',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.background  = 'rgba(124,58,237,0.14)';
+              e.currentTarget.style.borderColor = 'rgba(124,58,237,0.5)';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background  = 'rgba(124,58,237,0.07)';
+              e.currentTarget.style.borderColor = 'rgba(124,58,237,0.25)';
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
+              <div style={{
+                width:          52,
+                height:         52,
+                borderRadius:   14,
+                background:     'rgba(124,58,237,0.15)',
+                display:        'flex',
+                alignItems:     'center',
+                justifyContent: 'center',
+                fontSize:       26,
+                flexShrink:     0,
+              }}>
+                📖
+              </div>
+              <div style={{ textAlign: 'left' }}>
+                <p style={{ fontSize: 12, fontWeight: 700, color: '#7C3AED', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 3 }}>
+                  Review
+                </p>
+                <p style={{ fontSize: 18, fontWeight: 800, color: '#1E1B4B', margin: 0 }}>
+                  Mistake Book
+                </p>
+                <p style={{ fontSize: 14, color: '#6B7280', marginTop: 3 }}>
+                  Review all wrong answers from quizzes, daily challenges, and exercises.
+                </p>
+              </div>
+            </div>
+            <span style={{ fontSize: 22, color: '#7C3AED', flexShrink: 0 }}>→</span>
           </button>
         </div>
       )}

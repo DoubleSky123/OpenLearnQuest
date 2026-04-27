@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Lightbulb, ChevronRight } from 'lucide-react';
 import { LinkedListVisualiser } from './GoalPattern';
 import { getCurrentPattern } from '../utils/helpers';
+import { addMistake } from '../utils/storage';
 import TutorialCompleteModal from './TutorialCompleteModal';
 import GameTopBar from './shared/GameTopBar';
 import GamePetCard from './shared/GamePetCard';
@@ -298,6 +299,13 @@ export default function TutorialGame({ onBack, onGoRegular, startAt = 0, xp = 0 
       // Wrong — show inline error
       setInlineError({ wrongWord: word, hint: line.hint });
       showPetMsg(PET_WRONG_MSGS[Math.floor(Math.random() * PET_WRONG_MSGS.length)]);
+      addMistake({
+        source:        'tutorial',
+        title:         `${q.title} — ${line.template}`,
+        yourAnswer:    word,
+        correctAnswer: line.answer,
+        explanation:   line.hint,
+      });
     }
   };
 

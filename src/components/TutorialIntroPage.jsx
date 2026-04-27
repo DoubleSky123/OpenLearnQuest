@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ChevronRight, ChevronLeft } from 'lucide-react';
 import HelpModal from './HelpModal';
 import EggRevealModal from './EggRevealModal';
+import { addMistake } from '../utils/storage';
 
 const XP_PER_LEVEL = 500;
 const LEVEL_NAMES  = ['Novice','Explorer','Learner','Practitioner','Skilled','Advanced','Expert','Master'];
@@ -15,7 +16,7 @@ const QUIZ_QUESTIONS = [
     id: 'q1',
     question: 'What two things does every node in a singly linked list contain?',
     options: [
-      'A key and an index',
+      'A value and an index',
       'A value and a next pointer',
       'Two values',
       'A previous pointer and a next pointer',
@@ -689,7 +690,7 @@ const CONCEPT_PAGES = [
     title:   'When to Use a Linked List',
     body:    'Imagine a student queue for lunch. Dan wants to stand after Ben. Finding Ben takes O(n) steps either way. But once found, a linked list needs only 2 pointer updates — Ben points to Dan, Dan points to Cal. An array must push every student behind Dan back one spot to make room.',
     diagram: <UseCaseDiagram />,
-    insight: 'Linked lists win when you insert or remove items often. They lose when you need to jump to a position by index.',
+    insight: 'Linked lists win when you add or remove items often — just 2 pointer updates. They lose when you need to reach a specific item directly, like item[3]: a linked list has no index, so every lookup must walk from the first node.',
   },
   {
     icon:    '🔄',
@@ -830,7 +831,17 @@ function QuizSection({ questions, onComplete, onReviewConcepts, completedQs, onM
     setSelected(optIdx);
     const correct = optIdx === q.correct;
     setIsCorrect(correct);
-    if (correct) onMarkComplete(qIdx);
+    if (correct) {
+      onMarkComplete(qIdx);
+    } else {
+      addMistake({
+        source:        'quiz',
+        title:         q.question,
+        yourAnswer:    q.options[optIdx],
+        correctAnswer: q.options[q.correct],
+        explanation:   q.explanation,
+      });
+    }
   };
 
   const handleNext = () => {
