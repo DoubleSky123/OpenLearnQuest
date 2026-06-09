@@ -21,6 +21,12 @@ import MistakeBook from './components/MistakeBook';
 import LevelCompleteModal from './components/LevelCompleteModal';
 import GameTopBar from './components/shared/GameTopBar';
 import GamePetCard from './components/shared/GamePetCard';
+import EmotionCheckIn from './components/EmotionCheckIn';
+import { EmotionProvider, useEmotion } from './contexts/EmotionContext';
+import { EMOTIONS } from './services/adaptiveEngine';
+import { useAdaptivePet } from './hooks/useAdaptivePet';
+import JeopardyChallenge, { JEOPARDY_BONUS_XP } from './components/JeopardyChallenge';
+import TutorialQuickLinks from './components/TutorialQuickLinks';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -41,19 +47,6 @@ const SUB_LABELS = {
 };
 
 const LEVEL_DIFFICULTY = ['Beginner', 'Intermediate', 'Advanced'];
-
-const CHALLENGE_WRONG_MSGS = [
-  'Wrong order — think through the steps!',
-  'Not quite right, try again!',
-  'Almost! Check the pointer logic.',
-  'Rethink the sequence 🤔',
-];
-const CHALLENGE_SUCCESS_MSGS = [
-  'Amazing work! 🎉',
-  'You nailed it! 🌟',
-  'Perfect! Keep it up!',
-  'Excellent! 🔥',
-];
 
 // ─── Nav Card (Col 1) ─────────────────────────────────────────────────────────
 
@@ -160,8 +153,10 @@ function SinglyLinkedListGame({ onBack, initialXp = 0, onXpChange, initialLevel 
   const [xpGained, setXpGained]   = useState(0);
 
   const timerRef = useRef(null);
-  const [showModal, setShowModal] = useState(false);
-  const [finalTime, setFinalTime] = useState(0);
+  const [showModal, setShowModal]   = useState(false);
+  const [finalTime, setFinalTime]   = useState(0);
+  const [showJeopardy, setShowJeopardy] = useState(false);
+  const pendingFinalTimeRef = useRef(0);
 
   const lastErrorCountedRef  = useRef(false);
   const completedLevelsRef   = useRef([]);
@@ -177,13 +172,8 @@ function SinglyLinkedListGame({ onBack, initialXp = 0, onXpChange, initialLevel 
     3: setCompletedSubs3,
   });
 
-  const [petMessage, setPetMessage] = useState('');
-  const petMsgTimer = useRef(null);
-  const showPetMsg = useCallback((msg) => {
-    if (petMsgTimer.current) clearTimeout(petMsgTimer.current);
-    setPetMessage(msg);
-    petMsgTimer.current = setTimeout(() => setPetMessage(''), 3000);
-  }, []);
+  const { message: petMessage, showWrong, showSuccess } = useAdaptivePet();
+  const { adaptiveConfig } = useEmotion();
 
   // ── Board init ──────────────────────────────────────────────────────────────
   const initBoard = useCallback((question, resetMistakes = true) => {
@@ -256,7 +246,7 @@ function SinglyLinkedListGame({ onBack, initialXp = 0, onXpChange, initialLevel 
         setErrorCount(prev => { const next = prev + 1; errorCountRef.current = next; return next; });
         setLives(prev => Math.max(0, prev - 1));
         lastErrorCountedRef.current = true;
-        showPetMsg(CHALLENGE_WRONG_MSGS[Math.floor(Math.random() * CHALLENGE_WRONG_MSGS.length)]);
+        showWrong();
         const cq = currentQuestionRef.current;
         if (cq) {
           const yourLines    = assemblyArea.map(item =>
@@ -293,7 +283,7 @@ function SinglyLinkedListGame({ onBack, initialXp = 0, onXpChange, initialLevel 
 
       if (goalMet && !modalShownForThisRef.current) {
         modalShownForThisRef.current = true;
-        showPetMsg(CHALLENGE_SUCCESS_MSGS[Math.floor(Math.random() * CHALLENGE_SUCCESS_MSGS.length)]);
+        showSuccess();
         const lvl  = currentLevelIdRef.current;
         const subI = q.subQuestionIndex ?? 0;
         const baseXP = lvl === 1 ? 80 : lvl === 2 ? 120 : 160;
@@ -311,8 +301,14 @@ function SinglyLinkedListGame({ onBack, initialXp = 0, onXpChange, initialLevel 
         }
         timerRef.current?.stop();
         setTimeout(() => {
-          setFinalTime(timerRef.current?.getElapsed() ?? 0);
-          setShowModal(true);
+          const elapsed = timerRef.current?.getElapsed() ?? 0;
+          if (adaptiveConfig.showJeopardyBonus) {
+            pendingFinalTimeRef.current = elapsed;
+            setShowJeopardy(true);
+          } else {
+            setFinalTime(elapsed);
+            setShowModal(true);
+          }
         }, 300);
       }
     }, 1000);
@@ -352,6 +348,15 @@ function SinglyLinkedListGame({ onBack, initialXp = 0, onXpChange, initialLevel 
   const jumpToSub     = (idx) => loadSub(currentLevelId, idx);
   const handleNextLevel = () => { setShowModal(false); setCurrentLevelId(prev => prev < 3 ? prev + 1 : 1); };
 
+  const handleJeopardyComplete = useCallback((bonusXp) => {
+    setShowJeopardy(false);
+    if (bonusXp > 0) {
+      setXp(prev => { const next = prev + bonusXp; onXpChange?.(next); return next; });
+    }
+    setFinalTime(pendingFinalTimeRef.current);
+    setShowModal(true);
+  }, [onXpChange]); // eslint-disable-line
+
   // ── Render ────────────────────────────────────────────────────────────────────
   const currentPattern = getCurrentPattern(nodes);
   const q = currentQuestion;
@@ -365,6 +370,16 @@ function SinglyLinkedListGame({ onBack, initialXp = 0, onXpChange, initialLevel 
       />
 
       <div className="max-w-7xl mx-auto p-5">
+
+        {/* Stressed mode banner */}
+        {adaptiveConfig.encouragingMessages && !feedback && (
+          <div className="mb-4 bg-blue-50 border border-blue-200 rounded-xl px-4 py-2.5 flex items-center gap-3">
+            <span className="text-lg">💙</span>
+            <p className="text-blue-700 font-medium text-base">
+              Relaxed mode active — timer penalty is reduced. Take your time!
+            </p>
+          </div>
+        )}
 
         {/* Feedback banner */}
         {feedback && (
@@ -468,6 +483,10 @@ function SinglyLinkedListGame({ onBack, initialXp = 0, onXpChange, initialLevel 
         </div>
       </div>
 
+      {/* ── Adaptive overlays ── */}
+      {showJeopardy && <JeopardyChallenge onComplete={handleJeopardyComplete} />}
+      {adaptiveConfig.showTutorialLinks && <TutorialQuickLinks operationTitle={currentQuestion?.title} />}
+
       <LevelCompleteModal
         isOpen={showModal}
         levelId={currentLevelId}
@@ -544,16 +563,54 @@ function ChallengeIntroScreen({ onStart, onBack }) {
 // ─── Root App ─────────────────────────────────────────────────────────────────
 
 export default function App() {
-  const [screen, setScreen]       = useState('menu');
-  const [moduleId, setModuleId]   = useState(null);
-  const [globalXp, setGlobalXp]   = useState(() => loadXP());
+  return (
+    <EmotionProvider>
+      <AppContent />
+    </EmotionProvider>
+  );
+}
+
+function AppContent() {
+  const { setEmotion } = useEmotion();
+
+  const [screen, setScreen]           = useState('menu');
+  const [moduleId, setModuleId]       = useState(null);
+  const [globalXp, setGlobalXp]       = useState(() => loadXP());
   const [modeStartAt, setModeStartAt] = useState(0);
+  // Screen to navigate to after emotion check-in completes
+  const [pendingScreen, setPendingScreen] = useState(null);
 
   useEffect(() => { saveXP(globalXp); }, [globalXp]);
 
   const goMenu       = () => setScreen('menu');
   const goModeSelect = (mod) => { setModuleId(mod); setScreen('mode-select'); };
-  const goRegular    = () => setScreen(moduleId === 'doubly' ? 'doubly' : 'singly');
+
+  /**
+   * Navigate to a game screen via the emotion check-in.
+   * Stores the target and redirects to the check-in first.
+   */
+  const goToGame = (targetScreen) => {
+    setPendingScreen(targetScreen);
+    setScreen('emotion-checkin');
+  };
+
+  const handleEmotionConfirm = (emotion) => {
+    setEmotion(emotion, 'self-report');
+    setScreen(pendingScreen ?? 'mode-select');
+    setPendingScreen(null);
+  };
+
+  const handleEmotionSkip = () => {
+    setEmotion(EMOTIONS.OK, 'self-report');
+    setScreen(pendingScreen ?? 'mode-select');
+    setPendingScreen(null);
+  };
+
+  // Within-session transitions (no re-check-in needed)
+  const goRegular = () => setScreen(moduleId === 'doubly' ? 'doubly' : 'singly');
+
+  if (screen === 'emotion-checkin')
+    return <EmotionCheckIn onConfirm={handleEmotionConfirm} onSkip={handleEmotionSkip} />;
 
   if (screen === 'mistake-book')    return <MistakeBook onBack={() => setScreen('mode-select')} />;
   if (screen === 'daily-challenge') return <DailyChallenge onBack={() => setScreen('mode-select')} />;
@@ -562,18 +619,18 @@ export default function App() {
     setModeStartAt(qIdx ?? 0);
     if (moduleId === 'doubly') {
       if (mode === 'intro')    setScreen('dll-intro');
-      if (mode === 'tutorial') setScreen('dll-tutorial');
-      if (mode === 'training') setScreen('dll-training');
-      if (mode === 'regular')  goRegular();
+      if (mode === 'tutorial') goToGame('dll-tutorial');
+      if (mode === 'training') goToGame('dll-training');
+      if (mode === 'regular')  goToGame('doubly');
     } else {
       if (mode === 'intro')    setScreen('tutorial-intro');
-      if (mode === 'tutorial') setScreen('tutorial');
-      if (mode === 'training') setScreen('training');
-      if (mode === 'regular')  goRegular();
+      if (mode === 'tutorial') goToGame('tutorial');
+      if (mode === 'training') goToGame('training');
+      if (mode === 'regular')  goToGame('challenge-intro');
     }
-  }} onBack={goMenu} onDailyChallenge={moduleId === 'singly' ? () => setScreen('daily-challenge') : undefined} onMistakeBook={() => setScreen('mistake-book')} />;
-  if (screen === 'tutorial-intro') return <TutorialIntroPage xp={globalXp} onBack={() => setScreen('mode-select')} onComplete={() => setScreen('tutorial')} />;
-  if (screen === 'dll-intro')      return <DLLIntroPage xp={globalXp} onBack={() => setScreen('mode-select')} onComplete={() => setScreen('dll-tutorial')} />;
+  }} onBack={goMenu} onDailyChallenge={moduleId === 'singly' ? () => goToGame('daily-challenge') : undefined} onMistakeBook={() => setScreen('mistake-book')} />;
+  if (screen === 'tutorial-intro') return <TutorialIntroPage xp={globalXp} onBack={() => setScreen('mode-select')} onComplete={() => goToGame('tutorial')} />;
+  if (screen === 'dll-intro')      return <DLLIntroPage xp={globalXp} onBack={() => setScreen('mode-select')} onComplete={() => goToGame('dll-tutorial')} />;
   if (screen === 'dll-tutorial')   return <DLLTutorialGame xp={globalXp} onBack={() => setScreen('mode-select')} onGoTraining={() => setScreen('dll-training')} />;
   if (screen === 'dll-training')   return <DLLTrainingGame xp={globalXp} onBack={() => setScreen('mode-select')} onGoChallenge={() => setScreen('doubly')} />;
   if (screen === 'tutorial') return <TutorialGame startAt={modeStartAt} xp={globalXp} onBack={() => setScreen('mode-select')} onGoRegular={() => { setModeStartAt(0); setScreen('training'); }} />;

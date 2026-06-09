@@ -5,6 +5,10 @@ import { shuffleArray, getCurrentPattern } from '../utils/helpers';
 import { addMistake } from '../utils/storage';
 import GameTopBar from './shared/GameTopBar';
 import GamePetCard from './shared/GamePetCard';
+import { useAdaptivePet } from '../hooks/useAdaptivePet';
+import { useEmotion } from '../contexts/EmotionContext';
+import JeopardyChallenge from './JeopardyChallenge';
+import TutorialQuickLinks from './TutorialQuickLinks';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TRAINING QUESTION DEFINITIONS  (fixed values, no randomness, no distractors)
@@ -526,30 +530,14 @@ export default function TrainingGame({ onBack, onGoRegular, startAt = 0, xp = 0 
   const [draggedIdx, setDraggedIdx]     = useState(null);
   const [showHint, setShowHint]         = useState(false);
   const [assistCount, setAssistCount]   = useState(0);
-  const [petMessage, setPetMessage]     = useState('');
+  const [showJeopardy, setShowJeopardy] = useState(false);
+
+  const { message: petMessage, showWrong, showSuccess, showStepEncouragement } = useAdaptivePet();
+  const { adaptiveConfig } = useEmotion();
 
   const timerRef      = useRef(null);
   const advancingRef  = useRef(false);
-  const petMsgTimer   = useRef(null);
-
-  const PET_WRONG_MSGS = [
-    'Almost! Think about what comes next...',
-    'Not this one — check the hint below!',
-    'Keep trying, you\'re getting there!',
-    'Peek at the hint and try again 👇',
-  ];
-  const PET_SUCCESS_MSGS = [
-    'Amazing work! 🎉',
-    'You nailed it! 🌟',
-    'Perfect! Keep it up!',
-    'Excellent execution! 🔥',
-  ];
-
-  const showPetMsg = useCallback((msg) => {
-    if (petMsgTimer.current) clearTimeout(petMsgTimer.current);
-    setPetMessage(msg);
-    petMsgTimer.current = setTimeout(() => setPetMessage(''), 3000);
-  }, []);
+  const qIndexRef     = useRef(0);
 
   // ── Init ───────────────────────────────────────────────────────────────────
   const initQuestion = useCallback((index) => {
@@ -562,12 +550,11 @@ export default function TrainingGame({ onBack, onGoRegular, startAt = 0, xp = 0 
     setSuccess(false);
     setInlineError(null);
     setShowHint(false);
-    setPetMessage('');
     setPhase('predict');
     advancingRef.current = false;
   }, []);
 
-  useEffect(() => { initQuestion(qIndex); }, [qIndex, initQuestion]);
+  useEffect(() => { qIndexRef.current = qIndex; initQuestion(qIndex); }, [qIndex, initQuestion]);
 
   const currentStepHint = placedCount < q.stepHints.length ? q.stepHints[placedCount] : null;
 
@@ -589,13 +576,14 @@ export default function TrainingGame({ onBack, onGoRegular, startAt = 0, xp = 0 
       setCodePool(prev => prev.filter((_, i) => i !== poolIdx));
       setPlacedCount(prev => prev + 1);
       setInlineError(null);
+      showStepEncouragement();
     } else {
       setAssistCount(prev => prev + 1);
       setInlineError({
         wrongBlock: q.pseudocode[blockIndex],
         stepHint: q.stepHints[placedCount],
       });
-      showPetMsg(PET_WRONG_MSGS[Math.floor(Math.random() * PET_WRONG_MSGS.length)]);
+      showWrong();
       addMistake({
         source:        'training',
         title:         q.title,
@@ -622,18 +610,31 @@ export default function TrainingGame({ onBack, onGoRegular, startAt = 0, xp = 0 
       setNodes(newNodes);
       setSuccess(true);
       setCompletedSet(prev => new Set([...prev, qIndex]));
-      showPetMsg(PET_SUCCESS_MSGS[Math.floor(Math.random() * PET_SUCCESS_MSGS.length)]);
+      showSuccess();
 
       setTimeout(() => {
-        if (qIndex < TRAINING_QUESTIONS.length - 1) {
-          setQIndex(prev => prev + 1);
+        if (adaptiveConfig.showJeopardyBonus) {
+          setShowJeopardy(true);
         } else {
-          timerRef.current?.stop();
-          setShowComplete(true);
+          advanceQuestion();
         }
       }, 1800);
     }, 600);
   }, [placedCount]); // eslint-disable-line
+
+  const advanceQuestion = useCallback(() => {
+    if (qIndexRef.current < TRAINING_QUESTIONS.length - 1) {
+      setQIndex(prev => prev + 1);
+    } else {
+      timerRef.current?.stop();
+      setShowComplete(true);
+    }
+  }, []);
+
+  const handleJeopardyComplete = useCallback((_bonusXp) => {
+    setShowJeopardy(false);
+    advanceQuestion();
+  }, [advanceQuestion]);
 
   const handleReset   = () => initQuestion(qIndex);
   const currentValues = getCurrentPattern(nodes);
@@ -649,6 +650,16 @@ export default function TrainingGame({ onBack, onGoRegular, startAt = 0, xp = 0 
       />
 
       <div className="max-w-7xl mx-auto p-5">
+
+        {/* Stressed encouraging banner */}
+        {adaptiveConfig.encouragingMessages && !success && phase === 'assemble' && (
+          <div className="mb-4 bg-blue-50 border border-blue-200 rounded-xl px-4 py-2.5 flex items-center gap-3">
+            <span className="text-lg">💙</span>
+            <p className="text-blue-700 font-medium text-base">
+              Hints are available — use them freely. You're doing great!
+            </p>
+          </div>
+        )}
 
         {/* Success banner */}
         {success && (
@@ -839,6 +850,10 @@ export default function TrainingGame({ onBack, onGoRegular, startAt = 0, xp = 0 
 
         </div>}
       </div>
+
+      {/* ── Adaptive overlays ── */}
+      {showJeopardy && <JeopardyChallenge onComplete={handleJeopardyComplete} />}
+      {adaptiveConfig.showTutorialLinks && <TutorialQuickLinks operationTitle={q.title} />}
 
       {/* ── Modals ── */}
       <TrainingCompleteModal

@@ -6,6 +6,9 @@ import { addMistake } from '../utils/storage';
 import TutorialCompleteModal from './TutorialCompleteModal';
 import GameTopBar from './shared/GameTopBar';
 import GamePetCard from './shared/GamePetCard';
+import { useAdaptivePet } from '../hooks/useAdaptivePet';
+import { useEmotion } from '../contexts/EmotionContext';
+import TutorialQuickLinks from './TutorialQuickLinks';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TUTORIAL QUESTION DEFINITIONS  — fill-in-the-blank format
@@ -212,30 +215,11 @@ export default function TutorialGame({ onBack, onGoRegular, startAt = 0, xp = 0 
   const [executed, setExecuted]           = useState(false);
   const [success, setSuccess]             = useState(false);
   const [inlineError, setInlineError]     = useState(null); // { wrongWord, hint }
-  const [petMessage, setPetMessage]       = useState('');
+  const { message: petMessage, showWrong, showSuccess, showStepEncouragement } = useAdaptivePet(q.id);
+  const { adaptiveConfig } = useEmotion();
 
   const timerRef     = useRef(null);
   const advancingRef = useRef(false);
-  const petMsgTimer  = useRef(null);
-
-  const PET_WRONG_MSGS = [
-    'Almost! Check the hint on the left.',
-    'Not that one — think again!',
-    'Keep going, you\'re close!',
-    'Read the hint carefully 💡',
-  ];
-  const PET_SUCCESS_MSGS = [
-    'Nailed it! 🎉',
-    'Perfect fill! 🌟',
-    'Great work! Keep going!',
-    'Yes! That\'s the one! 🔥',
-  ];
-
-  const showPetMsg = useCallback((msg) => {
-    if (petMsgTimer.current) clearTimeout(petMsgTimer.current);
-    setPetMessage(msg);
-    petMsgTimer.current = setTimeout(() => setPetMessage(''), 3000);
-  }, []);
 
   // active blank = first unfilled index
   const activeBlankIdx = filledAnswers.findIndex(a => a === null);
@@ -250,7 +234,6 @@ export default function TutorialGame({ onBack, onGoRegular, startAt = 0, xp = 0 
     setExecuted(false);
     setSuccess(false);
     setInlineError(null);
-    setPetMessage('');
     advancingRef.current = false;
   }, []);
 
@@ -269,7 +252,7 @@ export default function TutorialGame({ onBack, onGoRegular, startAt = 0, xp = 0 
       setNodes(newNodes);
       setSuccess(true);
       setCompletedSet(prev => new Set([...prev, qIndex]));
-      showPetMsg(PET_SUCCESS_MSGS[Math.floor(Math.random() * PET_SUCCESS_MSGS.length)]);
+      showSuccess();
 
       setTimeout(() => {
         if (qIndex < TUTORIAL_QUESTIONS.length - 1) {
@@ -295,10 +278,11 @@ export default function TutorialGame({ onBack, onGoRegular, startAt = 0, xp = 0 
         return next;
       });
       setInlineError(null);
+      showStepEncouragement();
     } else {
       // Wrong — show inline error
       setInlineError({ wrongWord: word, hint: line.hint });
-      showPetMsg(PET_WRONG_MSGS[Math.floor(Math.random() * PET_WRONG_MSGS.length)]);
+      showWrong();
       addMistake({
         source:        'tutorial',
         title:         `${q.title} — ${line.template}`,
@@ -323,6 +307,16 @@ export default function TutorialGame({ onBack, onGoRegular, startAt = 0, xp = 0 
       />
 
       <div className="max-w-7xl mx-auto p-5">
+
+        {/* Stressed encouraging banner */}
+        {adaptiveConfig.encouragingMessages && !success && (
+          <div className="mb-4 bg-blue-50 border border-blue-200 rounded-xl px-4 py-2.5 flex items-center gap-3">
+            <span className="text-lg">💙</span>
+            <p className="text-blue-700 font-medium text-base">
+              No pressure — hints are right here. Take it one step at a time.
+            </p>
+          </div>
+        )}
 
         {/* Success banner */}
         {success && (
@@ -469,6 +463,9 @@ export default function TutorialGame({ onBack, onGoRegular, startAt = 0, xp = 0 
 
         </div>
       </div>
+
+      {/* ── Adaptive overlays ── */}
+      {adaptiveConfig.showTutorialLinks && <TutorialQuickLinks operationTitle={q.title} />}
 
       {/* ── Modals ── */}
       <TutorialCompleteModal
