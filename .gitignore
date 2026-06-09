@@ -15,8 +15,29 @@ dist-ssr
 # Python virtual environment
 venv/
 
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
+
+# Backend secrets
+backend/.env
+
+# Alembic versions are tracked
+!backend/alembic/versions/
+
+# Frontend build
+frontend/dist
+
+# Vite cache
+.vite/
+
 # Claude Code metadata
 .claude/
+
+# Documentation / local-only folders
+research/
+memory/
 
 # Editor directories and files
 .vscode/*
