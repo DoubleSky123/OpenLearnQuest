@@ -20,8 +20,9 @@ __pycache__/
 *.pyc
 *.pyo
 
-# Backend secrets
+# Secrets / local env (keep .env.example tracked)
 backend/.env
+frontend/.env
 
 # Alembic versions are tracked
 !backend/alembic/versions/
@@ -35,7 +36,8 @@ frontend/dist
 # Claude Code metadata
 .claude/
 
-# Documentation / local-only folders
+# Documentation / local-only folders (reports, research notes, auto-memory)
+docs/
 research/
 memory/
 
