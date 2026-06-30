@@ -1,3 +1,18 @@
+/**
+ * Convert an assemblyArea item array into the actual step text strings.
+ * Centralises the repeated pattern used across AgenticSession and game screens.
+ */
+export const assemblyToText = (assemblyArea, pseudocode, distractors) =>
+  assemblyArea.map(it =>
+    it.isDistractor ? (distractors?.[it.index] ?? '?') : (pseudocode?.[it.index] ?? '?')
+  );
+
+/**
+ * Shallow-clone a nodes array.  Each node only has {id, value, next} so a
+ * one-level spread is sufficient — no need for JSON.parse/stringify.
+ */
+export const cloneNodes = (nodes) => (nodes ?? []).map(n => ({ ...n }));
+
 /** Shared XP constants — used by all game screens and the shared TopBar/PetCard. */
 export const XP_PER_LEVEL = 500;
 export const LEVEL_NAMES  = ['Novice','Explorer','Learner','Practitioner','Skilled','Advanced','Expert','Master'];

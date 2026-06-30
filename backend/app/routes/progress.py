@@ -1,4 +1,7 @@
+import uuid
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from ..database import get_db
 from ..schemas.progress import XPUpdate, MistakeCreate, MistakeOut, SessionCreate, SessionOut, AttemptCreate
@@ -35,12 +38,30 @@ def create_session(body: SessionCreate, db: Session = Depends(get_db), current_u
     return session
 
 
+class SessionCompleteBody(BaseModel):
+    lives_remaining: int | None = None
+    game_mode_detail: str | None = None   # 'practice-comp' | 'challenge-comp'
+
+
 @router.patch("/sessions/{session_id}/complete", response_model=SessionOut)
-def complete_session(session_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    session = db.query(GameSession).filter(GameSession.id == session_id, GameSession.user_id == current_user.id).first()
+def complete_session(
+    session_id: str,
+    body: SessionCompleteBody | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    session = db.query(GameSession).filter(
+        GameSession.id == session_id,
+        GameSession.user_id == current_user.id,
+    ).first()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     session.completed_at = datetime.utcnow()
+    if body:
+        if body.lives_remaining is not None:
+            session.lives_remaining = body.lives_remaining
+        if body.game_mode_detail:
+            session.game_mode_detail = body.game_mode_detail
     db.commit()
     db.refresh(session)
     return session
@@ -123,3 +144,63 @@ def get_stats(db: Session = Depends(get_db), current_user: User = Depends(get_cu
         "total_mistakes": total_mistakes,
         "completed_sessions": len(sessions_by_mode),
     }
+
+
+# ── Leaderboard — one row per completed question_attempt in competitive sessions ──
+
+class LeaderboardEntry(BaseModel):
+    id: str
+    question_id: str     # used as the display title
+    module_id: str
+    game_mode_detail: str
+    difficulty: int
+    time_seconds: float
+    lives_after: int | None
+    error_count: int
+    xp_gained: int
+    completed_at: datetime
+
+
+@router.get("/leaderboard", response_model=list[LeaderboardEntry])
+def get_leaderboard(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    rows = (
+        db.query(
+            QuestionAttempt.id,
+            QuestionAttempt.question_id,
+            QuestionAttempt.difficulty,
+            QuestionAttempt.time_spent_ms,
+            QuestionAttempt.error_count,
+            QuestionAttempt.xp_gained,
+            QuestionAttempt.lives_after,
+            QuestionAttempt.completed_at,
+            GameSession.module_id,
+            GameSession.game_mode_detail,
+        )
+        .join(GameSession, GameSession.id == QuestionAttempt.session_id)
+        .filter(
+            GameSession.user_id == current_user.id,
+            GameSession.game_mode_detail.in_(["practice-comp", "challenge-comp"]),
+            QuestionAttempt.passed == True,
+        )
+        .order_by(QuestionAttempt.completed_at.desc())
+        .all()
+    )
+
+    return [
+        LeaderboardEntry(
+            id=r.id,
+            question_id=r.question_id,
+            module_id=r.module_id,
+            game_mode_detail=r.game_mode_detail,
+            difficulty=r.difficulty,
+            time_seconds=round(r.time_spent_ms / 1000, 1),
+            lives_after=r.lives_after,
+            error_count=r.error_count,
+            xp_gained=r.xp_gained,
+            completed_at=r.completed_at,
+        )
+        for r in rows
+    ]

@@ -23,6 +23,8 @@ class UserOut(BaseModel):
     email: str
     username: str
     xp: int
+    is_admin: bool = False
+    onboarding_singly_done: bool = False
     created_at: datetime
 
     model_config = {"from_attributes": True}

@@ -49,7 +49,7 @@ export const validateAssembly = (assemblyArea, complexityArea, currentLevel) => 
       .filter(Boolean)
       .map(({ item, position }) => ({
         position,
-        code: currentLevel.distractors[item.index]
+        code: currentLevel.distractors?.[item.index] ?? '?'
       }));
 
     const fb = analyzeDistractorError(wrongBlocks, currentLevel);
@@ -89,7 +89,7 @@ export const validateAssembly = (assemblyArea, complexityArea, currentLevel) => 
       errors: {
         type: 'code_order',
         message: '📝 Code Sequence Incorrect',
-        hint: 'Check the order of each step. Think about what must be set up before the next line can work correctly.',
+        hint: currentLevel.hint || 'Check the order of each step. Think about what must be set up before the next line can work correctly.',
       }
     };
   }

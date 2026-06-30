@@ -28,13 +28,13 @@ const analyzeDistractorError = (wrongBlocks, level) => {
   }
 
   // 2. Fallback: derive feedback from the operation type
-  return generateFallbackFeedback(level.operation);
+  return generateFallbackFeedback(level.operation, level.hint);
 };
 
 /**
  * Fallback feedback when no specific map entry exists.
  */
-const generateFallbackFeedback = (operation) => {
+const generateFallbackFeedback = (operation, questionHint) => {
   const reasoningMap = {
     insertAtHead:     'Head insertion: create node → newNode.next = head → head = newNode. Order matters!',
     insertAtTail:     'Tail insertion: traverse to last → create node → lastNode.next = newNode → newNode.next = NULL.',
@@ -48,7 +48,7 @@ const generateFallbackFeedback = (operation) => {
     explanation: `This code block does not belong in a ${operation} operation.`,
     reasoning:   reasoningMap[operation] ?? 'Each step must logically contribute to the operation goal.',
     keyPoint:    'Compare the block with what each step of the operation is supposed to achieve.',
-    hint:        'Ask yourself: does this line help create, connect, or clean up in the right order?',
+    hint:        questionHint || 'Ask yourself: does this line help create, connect, or clean up in the right order?',
   };
 };
 

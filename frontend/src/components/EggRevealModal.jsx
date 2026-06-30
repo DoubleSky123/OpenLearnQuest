@@ -98,7 +98,7 @@ function Sparkles() {
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────
-export default function EggRevealModal({ onContinue }) {
+export default function EggRevealModal({ onContinue, continueLabel = "Begin Tutorial Mode →" }) {
   // phases: 'idle' | 'cracking' | 'revealed'
   const [phase, setPhase] = useState('idle');
 
@@ -245,7 +245,7 @@ export default function EggRevealModal({ onContinue }) {
               animation: 'btn-in 0.5s ease-out 0.6s both',
             }}
           >
-            Begin Tutorial Mode →
+            {continueLabel}
           </button>
         </div>
       )}

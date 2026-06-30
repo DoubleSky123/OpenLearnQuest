@@ -3,31 +3,16 @@ import GameTimer from '../GameTimer';
 import HelpModal from '../HelpModal';
 import { XP_PER_LEVEL, LEVEL_NAMES } from '../../utils/helpers';
 
-const MAX_LIVES = 5;
-
-/**
- * Shared top bar used by all game screens.
- *
- * Props:
- *   onBack       — back button handler
- *   xp           — current global XP
- *   title        — center title text  e.g. "Challenge · Solo"
- *   titleColor   — full Tailwind class for title color  e.g. "text-violet-600"
- *   barColor     — full Tailwind class for XP bar fill  e.g. "bg-violet-500"
- *   lives        — (optional) current lives count; omit to hide hearts
- *   showModal    — (optional) pauses timer when true; omit to always run timer
- *   assistCount  — (optional) show assist badge when > 0
- */
 export default function GameTopBar({
   onBack,
   xp,
   title,
   titleColor = 'text-violet-600',
   barColor   = 'bg-violet-500',
-  lives,
   showModal,
   assistCount,
   timerRef,
+  showTimer = true,
 }) {
   const level     = Math.floor(xp / XP_PER_LEVEL) + 1;
   const levelName = LEVEL_NAMES[Math.min(level - 1, LEVEL_NAMES.length - 1)];
@@ -80,19 +65,7 @@ export default function GameTopBar({
               <div className={`h-full ${barColor} rounded-full transition-all duration-500`} style={{ width: `${xpPct}%` }} />
             </div>
           </div>
-          {lives !== undefined && (
-            <div className="flex items-center gap-1">
-              {Array.from({ length: MAX_LIVES }).map((_, i) => (
-                <svg key={i} width="18" height="16" viewBox="0 0 18 16">
-                  <path
-                    d="M9 14S1 9 1 4.5A4 4 0 019 2a4 4 0 018 2.5C17 9 9 14 9 14z"
-                    fill={i < lives ? '#E24B4A' : '#D1D5DB'}
-                  />
-                </svg>
-              ))}
-            </div>
-          )}
-          <GameTimer ref={timerRef} isRunning={timerRunning} />
+          {showTimer && <GameTimer ref={timerRef} isRunning={timerRunning} />}
         </div>
 
       </div>

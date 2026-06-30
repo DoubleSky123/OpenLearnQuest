@@ -10,8 +10,8 @@ class MistakeCreate(BaseModel):
     question_id: str
     source: str
     title: str
-    your_answer: str
-    correct_answer: str
+    your_answer: list[str]
+    correct_answer: list[str]
     explanation: str
 
 
@@ -20,8 +20,8 @@ class MistakeOut(BaseModel):
     question_id: str
     source: str
     title: str
-    your_answer: str
-    correct_answer: str
+    your_answer: list[str]
+    correct_answer: list[str]
     explanation: str
     created_at: datetime
 
@@ -50,3 +50,4 @@ class AttemptCreate(BaseModel):
     error_count: int
     xp_gained: int
     passed: bool
+    lives_after: int | None = None

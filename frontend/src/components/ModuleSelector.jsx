@@ -62,7 +62,7 @@ const COLOR_MAP = {
 };
 
 // ── Component ──────────────────────────────────────────────────────────────────
-export default function ModuleSelector({ onSelect, completedModules = [], xp = 0, onDailyChallenge }) {
+export default function ModuleSelector({ onSelect, completedModules = [], xp = 0, username, onMistakeBook, onLogout }) {
   const level     = Math.floor(xp / XP_PER_LEVEL) + 1;
   const levelName = LEVEL_NAMES[Math.min(level - 1, LEVEL_NAMES.length - 1)];
   const xpInLevel = xp % XP_PER_LEVEL;
@@ -70,6 +70,23 @@ export default function ModuleSelector({ onSelect, completedModules = [], xp = 0
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-8">
+
+      {/* Top-right user bar */}
+      {(username || onLogout) && (
+        <div className="fixed top-4 right-6 flex items-center gap-3 z-10">
+          {username && <span className="text-gray-500 text-sm">{username}</span>}
+          {onMistakeBook && (
+            <button onClick={onMistakeBook} className="text-sm text-gray-400 hover:text-gray-700 transition-colors border border-gray-200 rounded-xl px-3 py-1.5">
+              📖 Mistakes
+            </button>
+          )}
+          {onLogout && (
+            <button onClick={onLogout} className="text-sm text-gray-400 hover:text-gray-700 transition-colors">
+              Logout
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Header */}
       <div className="text-center mb-8">

@@ -23,6 +23,14 @@ function LinkedListVisualiser({ values = [], emptyLabel = 'Empty', nodeColor = '
         return (
           <React.Fragment key={idx}>
             <div className="flex flex-col items-center gap-0.5 shrink-0">
+              {idx === 0 ? (
+                <div className="flex flex-col items-center leading-tight">
+                  <span className="text-[11px] font-mono font-semibold text-indigo-500">head</span>
+                  <span className="text-indigo-400 text-xs">↓</span>
+                </div>
+              ) : (
+                <div className="h-7" />
+              )}
               <div className={`w-11 h-11 rounded-full border-2 flex items-center justify-center font-semibold text-sm transition-all ${circleClass}`}>
                 {formatPatternValue(val)}
               </div>

@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import String, DateTime, ForeignKey, Text
+from sqlalchemy import String, DateTime, ForeignKey, Text, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .base import Base
 
@@ -13,8 +13,8 @@ class Mistake(Base):
     question_id: Mapped[str] = mapped_column(String, nullable=False)
     source: Mapped[str] = mapped_column(String, nullable=False)  # 'quiz' | 'regular' | 'challenge' | 'daily'
     title: Mapped[str] = mapped_column(String, nullable=False)
-    your_answer: Mapped[str] = mapped_column(Text, nullable=False)
-    correct_answer: Mapped[str] = mapped_column(Text, nullable=False)
+    your_answer: Mapped[list] = mapped_column(JSON, nullable=False)
+    correct_answer: Mapped[list] = mapped_column(JSON, nullable=False)
     explanation: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 

@@ -1,58 +1,93 @@
-import React, { createContext, useContext, useState, useMemo } from 'react';
+import React, { createContext, useContext, useState, useRef, useMemo, useCallback } from 'react';
 import { getAdaptiveConfig, EMOTIONS } from '../services/adaptiveEngine';
-
-/**
- * EmotionContext
- *
- * Holds the current detected/reported emotional state and the derived
- * adaptive-behavior configuration.  Consumed by game screens and the pet
- * companion to adjust difficulty, messages, and UI overlays.
- *
- * Phase 0  → emotion is set by the self-report slider (EmotionCheckIn)
- * Phase 1  → emotion is set by SensorFusionService (camera + HR + temp)
- * Phase 2  → emotion can also be set by AIEmotionService (Claude API)
- *
- * The context API is the same across all phases — only the setter's caller changes.
- */
 
 const EmotionContext = createContext(null);
 
 export function EmotionProvider({ children }) {
-  const [emotion, setEmotionState] = useState(EMOTIONS.OK);
-
-  /**
-   * Source tracks WHERE the current emotion value came from.
-   * Useful for Phase 2 comparison logging.
-   * 'self-report' | 'sensor' | 'ai'
-   */
+  const [emotion, setEmotionState] = useState(EMOTIONS.ENGAGED);
   const [emotionSource, setEmotionSource] = useState('self-report');
 
-  /**
-   * Full adaptive config derived from current emotion.
-   * Re-computed only when emotion changes.
-   */
+  // Behavioral signals accumulated during the current session
+  const signals = useRef({
+    sessionId: null,
+    initialEmotion: EMOTIONS.ENGAGED,
+    questionsDone: 0,
+    totalErrors: 0,
+    totalAttempts: 0,
+    consecutiveErrors: 0,
+    resets: 0,
+    usedTutor: false,
+    level: 1,
+    totalTimeMs: 0,
+  });
+
   const adaptiveConfig = useMemo(() => getAdaptiveConfig(emotion), [emotion]);
 
-  /**
-   * Set the emotion and record which system detected it.
-   * @param {string} newEmotion — EMOTIONS constant
-   * @param {'self-report'|'sensor'|'ai'} source
-   */
-  const setEmotion = (newEmotion, source = 'self-report') => {
+  // ── Emotion setter (self-report, sensor, or LLM) ──────────────────────────
+  const setEmotion = useCallback((newEmotion, source = 'self-report') => {
     setEmotionState(newEmotion);
     setEmotionSource(source);
-  };
+  }, []);
+
+  // ── Session init — call at start of each game session ────────────────────
+  const initSession = useCallback((sessionId, initialEmotion) => {
+    signals.current = {
+      sessionId,
+      initialEmotion,
+      questionsDone: 0,
+      totalErrors: 0,
+      totalAttempts: 0,
+      consecutiveErrors: 0,
+      resets: 0,
+      usedTutor: false,
+      level: 1,
+      totalTimeMs: 0,
+    };
+  }, []);
+
+  // ── Signal recorders — called by games ───────────────────────────────────
+  const recordQuestion = useCallback((timeMs, errorCount, level) => {
+    const s = signals.current;
+    s.questionsDone += 1;
+    s.totalErrors += errorCount;
+    s.totalAttempts += errorCount + 1;   // errors + the final correct attempt
+    s.consecutiveErrors = errorCount > 0 ? s.consecutiveErrors + 1 : 0;
+    s.totalTimeMs += timeMs;
+    s.level = level;
+  }, []);
+
+  const recordReset = useCallback(() => { signals.current.resets += 1; }, []);
+
+  const markUsedTutor = useCallback(() => { signals.current.usedTutor = true; }, []);
+
+  // ── Snapshot for inference call ──────────────────────────────────────────
+  const getSignalsSnapshot = useCallback(() => {
+    const s = signals.current;
+    const avgTimeS = s.questionsDone > 0 ? (s.totalTimeMs / s.questionsDone) / 1000 : 0;
+    const errorRate = s.totalAttempts > 0 ? (s.totalErrors / s.totalAttempts) * 100 : 0;
+    return {
+      session_id: s.sessionId,
+      questions_done: s.questionsDone,
+      error_rate: Math.round(errorRate * 10) / 10,
+      avg_time_s: Math.round(avgTimeS * 10) / 10,
+      consecutive_errors: s.consecutiveErrors,
+      resets: s.resets,
+      used_tutor: s.usedTutor,
+      level: s.level,
+      initial_emotion: s.initialEmotion,
+    };
+  }, []);
 
   return (
-    <EmotionContext.Provider value={{ emotion, setEmotion, emotionSource, adaptiveConfig }}>
+    <EmotionContext.Provider value={{
+      emotion, setEmotion, emotionSource, adaptiveConfig,
+      initSession, recordQuestion, recordReset, markUsedTutor, getSignalsSnapshot,
+    }}>
       {children}
     </EmotionContext.Provider>
   );
 }
 
-/**
- * Hook to consume emotion state and adaptive config from any game component.
- */
 export function useEmotion() {
   const ctx = useContext(EmotionContext);
   if (!ctx) throw new Error('useEmotion must be used inside <EmotionProvider>');

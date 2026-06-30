@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft } from 'lucide-react';
-import { getMistakes, clearMistakes } from '../utils/storage';
+import { progressApi } from '../services/api';
 
 const SOURCE_META = {
   quiz:      { label: 'Quiz',     color: '#7C3AED', bg: 'rgba(124,58,237,0.1)',  border: 'rgba(124,58,237,0.3)'  },
@@ -13,7 +13,7 @@ const SOURCE_META = {
 const FILTERS = ['all', 'quiz', 'daily', 'tutorial', 'training', 'challenge'];
 
 function formatDate(ts) {
-  const d = new Date(ts);
+  const d = new Date(typeof ts === 'number' ? ts : ts + 'Z');
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
@@ -21,11 +21,13 @@ export default function MistakeBook({ onBack }) {
   const [mistakes, setMistakes] = useState([]);
   const [filter,   setFilter]   = useState('all');
 
-  useEffect(() => { setMistakes(getMistakes()); }, []);
+  useEffect(() => {
+    progressApi.getMistakes().then(setMistakes).catch(() => {});
+  }, []);
 
-  const handleClear = () => {
+  const handleClear = async () => {
     if (!window.confirm('Clear all mistakes? This cannot be undone.')) return;
-    clearMistakes();
+    await progressApi.clearMistakes().catch(() => {});
     setMistakes([]);
   };
 
@@ -169,7 +171,7 @@ export default function MistakeBook({ onBack }) {
                     {m.title}
                   </span>
                   <span style={{ color: '#9CA3AF', fontSize: 13, whiteSpace: 'nowrap' }}>
-                    {formatDate(m.date)}
+                    {formatDate(m.created_at)}
                   </span>
                 </div>
 
@@ -181,9 +183,16 @@ export default function MistakeBook({ onBack }) {
                     borderRadius: 10, padding: '10px 14px',
                   }}>
                     <span style={{ fontSize: 16, flexShrink: 0 }}>❌</span>
-                    <div>
-                      <p style={{ fontSize: 12, fontWeight: 700, color: '#EF4444', marginBottom: 3, textTransform: 'uppercase', letterSpacing: 0.4 }}>Your answer</p>
-                      <p style={{ fontSize: 15, color: '#374151', fontFamily: 'monospace' }}>{m.yourAnswer}</p>
+                    <div style={{ flex: 1 }}>
+                      <p style={{ fontSize: 12, fontWeight: 700, color: '#EF4444', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.4 }}>Your answer</p>
+                      {Array.isArray(m.your_answer)
+                        ? m.your_answer.map((step, i) => (
+                            <p key={i} style={{ fontSize: 14, color: '#374151', fontFamily: 'monospace', marginBottom: 2 }}>
+                              <span style={{ color: '#9CA3AF', marginRight: 6 }}>{i + 1}.</span>{step}
+                            </p>
+                          ))
+                        : <p style={{ fontSize: 14, color: '#374151', fontFamily: 'monospace' }}>{m.your_answer}</p>
+                      }
                     </div>
                   </div>
 
@@ -193,9 +202,16 @@ export default function MistakeBook({ onBack }) {
                     borderRadius: 10, padding: '10px 14px',
                   }}>
                     <span style={{ fontSize: 16, flexShrink: 0 }}>✅</span>
-                    <div>
-                      <p style={{ fontSize: 12, fontWeight: 700, color: '#059669', marginBottom: 3, textTransform: 'uppercase', letterSpacing: 0.4 }}>Correct answer</p>
-                      <p style={{ fontSize: 15, color: '#374151', fontFamily: 'monospace' }}>{m.correctAnswer}</p>
+                    <div style={{ flex: 1 }}>
+                      <p style={{ fontSize: 12, fontWeight: 700, color: '#059669', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.4 }}>Correct answer</p>
+                      {Array.isArray(m.correct_answer)
+                        ? m.correct_answer.map((step, i) => (
+                            <p key={i} style={{ fontSize: 14, color: '#374151', fontFamily: 'monospace', marginBottom: 2 }}>
+                              <span style={{ color: '#9CA3AF', marginRight: 6 }}>{i + 1}.</span>{step}
+                            </p>
+                          ))
+                        : <p style={{ fontSize: 14, color: '#374151', fontFamily: 'monospace' }}>{m.correct_answer}</p>
+                      }
                     </div>
                   </div>
 

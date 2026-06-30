@@ -1,0 +1,9 @@
+{
+  "name": "openlearnquest",
+  "private": true,
+  "scripts": {
+    "frontend": "cd frontend && npm run dev",
+    "backend": "cd backend && ../venv/Scripts/uvicorn app.main:app --reload --port 8000",
+    "dev": "start npm run backend && npm run frontend"
+  }
+}
