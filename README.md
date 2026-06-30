@@ -116,7 +116,7 @@ Queries `CONCEPT_RESOURCE_LIBRARY` — a static dict of curated NeetCode videos 
 
 **Problem with vanilla chatbots**: The student must initiate. If they don't open the tutor, no AI assistance occurs. This is a pure pull model.
 
-**Solution**: After the 2nd error on a question, the backend is called automatically (without student action). Claude generates a targeted Socratic observation. This is delivered as a toast notification.
+**Solution**: When the scaffold level reaches the Socratic band (driven by errors + emotion — see §5), the backend is called automatically (without student action). Claude generates a targeted Socratic observation, phrased for the current question **type** (blank / buggy line / step order). This is delivered as a toast notification.
 
 ```
 Student submits 2nd wrong answer
@@ -170,29 +170,34 @@ detail:        Position 1: placed 'head = newNode', correct is 'newNode.next = h
 2. **Cross-session history** — queried from `mistakes` table (last 5 mistakes matching `title == question_title`) and `mastery` table (lifetime attempts/passes/streak). This is what makes the tutor "remember" across sessions without in-memory state.  
 3. **Deterministic error diagnosis** — `error_analyzer.py` classifies the student's error into concept + error_type + confidence purely with Python rules (no LLM). This is injected as a high-reliability signal so Claude knows exactly which pointer concept to ask about.
 
-**Multi-turn context refresh**: On turns 2+, a `[Context refresh]` block replaces the full context block — updating error count and current assembly without re-sending the full history.
+**Multi-turn context refresh**: On turns 2+, a `[Context refresh]` block replaces the full context block — updating error count and current attempt without re-sending the full history.
+
+**Type-aware wording**: the context block adapts to the question type — for `fill_blank` it talks about "the blank / the value that belongs here", for `find_bug` "the line", for `ordering` "the step order" — so the tutor never says "assembly" on a fill-in-the-blank question.
 
 ---
 
-### 5. Adaptive Difficulty System
+### 5. Two-Axis Adaptive System
 
-**Not an LLM** — the difficulty adjustment is a deterministic rule engine:
+Difficulty is decomposed into **two orthogonal axes** so a transient mood never overrides earned skill.
 
+**Competence axis → question TYPE** (deterministic, earned, monotonic)
 ```
 mastery.type_unlocked ∈ {1, 2, 3}  →  fill_blank / find_bug / ordering
-consecutive_passes ≥ 1              →  unlock find_bug
-consecutive_passes ≥ 2              →  unlock ordering
-any error                           →  reset consecutive_passes (type_unlocked never decreases)
-
-emotion adjustment (±1 level):
-  frustrated / confused  →  drop one level
-  bored                  →  raise one level
-  engaged / neutral      →  stay
+consecutive perfect passes ≥ 1     →  unlock find_bug
+consecutive perfect passes ≥ 2     →  unlock ordering
+any error resets the streak; type_unlocked never decreases
 ```
+Students **choose when to advance**: on unlock, a non-dismissing popup offers *Try the new type* or *Keep practicing*, and a persistent 🔓 Level Up button lets them advance any time. The chosen level (`active_type_level`, ≤ ceiling, persisted per operation) is what drives the question type — unlocking is an invitation, not a forced jump.
 
-**Why deterministic**: Difficulty decisions have a clear logic and must be explainable and predictable. Using an LLM here would introduce variance and latency without benefit.
+**State axis → within-type difficulty + scaffolding** (driven by inferred emotion)
+- **ZPD controller** (`compute_intra_difficulty`): targets a ~25–30% error rate; difficulty is driven by the recent error rate, with emotion only scaling the control gain (the naïve "bored→harder / frustrated→easier" mapping is unsound).
+- **Scaffold orchestrator** (`useScaffold`): `scaffold_level = emotion baseline + per-error climb − mastery fading cap`; escalates error-highlight → Socratic hint → step animation → near-reveal. **confused raises scaffolding but keeps difficulty; frustrated lowers difficulty** (D'Mello affect dynamics).
 
-**Why LLM for tutoring**: Natural language guidance requires understanding the specific mistake, choosing the right level of abstraction, and adapting tone. These are tasks where LLMs outperform rules.
+Emotion is inferred **every question** (instant behavioral rules) and from tutor chat (LLM), each with a confidence that weights its influence. Per-question telemetry (`intra_difficulty` / `scaffold_level` / `emotion`) is logged; `analytics/difficulty_eval.py` computes intervention-success rate, emotion-transition matrix, and difficulty-oscillation rate.
+
+**Why deterministic for the competence axis / control loop**: progression and difficulty must be explainable, predictable, and stable; an LLM would add variance and latency without benefit. **Why LLM for tutoring**: natural-language guidance needs to understand the specific mistake and adapt tone — tasks where LLMs outperform rules.
+
+**Grounded in**: ZPD / Flow (desirable difficulty), D'Mello & Graesser affect dynamics, Wood's contingent scaffolding + fading, Kalyuga's expertise-reversal effect. See `docs/research-difficulty-adaptation.md` and `docs/report-phase2-ai-emotion.md`.
 
 ---
 
@@ -305,18 +310,24 @@ backend/
       concept_graph.py         # concept dependency graph
       emotion_agent.py         # behavioral signal → emotion label
       claude_service.py        # Claude API wrapper with retry
+    analytics/
+      difficulty_eval.py       # offline eval: transition matrix, intervention success, oscillation
 
 frontend/src/
   components/
-    AgenticSession.jsx         # main game loop + proactive push
-    TutorChat.jsx              # streaming tutor sidebar (ReAct client)
+    AgenticSession.jsx         # main game loop + proactive push + scaffold orchestration
+    TutorChat.jsx              # streaming tutor sidebar (ReAct client, type-aware)
     TutorToast.jsx             # proactive hint toast notification
-    LinkedListHintAnimation.jsx # CSS animation hint (no AI)
-    FillBlankBoard.jsx
+    UnlockPopup.jsx            # level-up choice (advance / keep practicing)
+    LinkedListHintAnimation.jsx # CSS animation hint (no AI); AnimNode reused by FillBlankBoard
+    FillBlankBoard.jsx         # fill-in-the-blank with per-step animation
     FindBugBoard.jsx
     AssemblyArea.jsx
+  hooks/
+    useScaffold.js             # scaffold-level orchestrator (emotion + errors + mastery cap)
   services/
     api.js                     # all API calls including streamTutorChat()
+    fillBlankSteps.js          # per-operation per-step linked-list states
     adaptiveEngine.js
 ```
 

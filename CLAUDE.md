@@ -114,6 +114,9 @@ When the student is stuck (error_count ≥ 2 or 3+ stalled exchanges), Claude au
 
 Claude decides WHEN to call the tool — this is the agentic behaviour (not a hardcoded threshold).
 
+### Type-aware context
+`build_context_block()` adapts its wording to the question type (passed as `question_type`): `fill_blank` → "the blank / value that belongs here", `find_bug` → "the line", `ordering` → "assembly / step order". This prevents the tutor from saying "assembly" on a fill-in-the-blank question. The proactive push (in `AgenticSession.jsx`) likewise uses a type-specific `PROACTIVE_INIT`.
+
 ### Cross-Session History Injection (context engineering)
 On every first turn, `build_context_block()` injects a `[STUDENT HISTORY]` block:
 - Past mastery stats for the current operation (attempts, passes, pass rate, streak) — from `mastery` table
@@ -147,11 +150,16 @@ Each operation has a `type_unlocked` (int, 1–3) stored in `mastery` table — 
 - `consecutive_passes >= 1` → unlock level 2 (`find_bug`)
 - `consecutive_passes >= 2` → unlock level 3 (`ordering`)
 
-### Emotion Adjustment (`question_spec.py`)
-Emotion shifts the effective difficulty level by ±1:
-- `frustrated` / `confused` → drop one level
-- `bored` → raise one level
-- `engaged` / `neutral` → stay at `type_unlocked`
+**Student-controlled progression (`active_type_level`)**: `type_unlocked` is the *ceiling* (what's earned); `active_type_level` (≤ ceiling, in `mastery`, persisted) is what the student is *practicing* and is what actually drives the question type. Unlocking does NOT auto-advance — on unlock a non-dismissing popup (`UnlockPopup.jsx`) offers *advance* or *stay*, and a persistent 🔓 Level Up button (`POST /api/gm/session/level-up`, `gm.level_up`) lets them advance any time.
+
+### State Axis — within-type difficulty + scaffolding (emotion-driven)
+**Two-axis design**: the competence axis above owns the question *type*; emotion drives two orthogonal channels that never change the type:
+- **ZPD difficulty controller** (`game_master.compute_intra_difficulty`): targets a ~25–30% error rate using the session's recent error rate; emotion only scales the gain (frustrated → ease faster, bored → ramp faster, confused → neutral). Output `intra_difficulty` (1–3) drives `select_spec` params + `INTRA_KNOBS` (node count, distractor count/similarity, blanks, bug subtlety) in `question_spec.py` / `static_questions.py`.
+- **Scaffold orchestrator** (`hooks/useScaffold.js`): `scaffold_level = emotion baseline + per-error climb − mastery fading cap`; gates error-highlight → Socratic hint / proactive push → animation → near-reveal. `confused` raises scaffolding but keeps difficulty; `frustrated` lowers difficulty.
+
+Emotion is inferred **every question** (`emotion_agent.infer_from_behavior`, instant rules) + from tutor chat (`infer_from_chat`, LLM), each with a confidence. Per-question telemetry (`intra_difficulty`/`scaffold_level`/`emotion`) is recorded on `question_attempts`; `app/analytics/difficulty_eval.py` is the offline evaluator.
+
+> Note: the old "emotion shifts difficulty ±1 on the type ladder" behaviour was **replaced** by this two-axis system — emotion no longer changes the question type.
 
 ### Question Generation Flow
 1. `select_spec()` → `QuestionSpec` (type + difficulty + params)
@@ -167,16 +175,20 @@ Emotion shifts the effective difficulty level by ±1:
 ### Animation Hint (`LinkedListHintAnimation.jsx`)
 Always-visible hint button (no error threshold). Click → modal with a per-node CSS transition animation showing the operation step-by-step (cursor traversal, nodes appearing/disappearing). Has a Replay button. Does not use AI — purely deterministic based on `question.operation`.
 
+### Per-step animation in fill_blank (`fillBlankSteps.js` + `FillBlankBoard.jsx`)
+`fill_blank` animates **each step as the student fills it** (not one animation at the end). `computeStepStates(operation, ...)` returns the list state after each pseudocode step (aligned to TEMPLATES); the board reuses `AnimNode`/`Arrow` (exported from `LinkedListHintAnimation.jsx`). Operations not modelled fall back to executing once at the end.
+
 ## Database Schema (key tables)
 
 | Table | Key columns |
 |---|---|
 | `users` | id, email, username, xp, is_admin |
 | `game_sessions` | id, user_id, module_id, mode |
-| `question_attempts` | session_id, operation, question_type, passed, error_count |
-| `mastery` | user_id, operation, module_id, attempts, passes, consecutive_passes, type_unlocked |
+| `question_attempts` | session_id, question_id, difficulty, passed, error_count, error_type, error_concept, **intra_difficulty, scaffold_level, emotion** (state-axis telemetry) |
+| `mastery` | user_id, operation, module_id, attempts, passes, consecutive_passes, perfect_pass, type_unlocked, **active_type_level** |
+| `concept_mastery` | user_id, concept, mastery (0–1 float), attempts — Bayesian-style per-concept posterior |
 | `mistakes` | user_id, question_id, source, title, your_answer (JSON), correct_answer (JSON), explanation, created_at |
-| `emotion_logs` | user_id, session_id, emotion, source |
+| `emotion_logs` | user_id, session_id, emotion, source, confidence, signals (JSON), action_taken |
 
 **Note**: `mistakes.title` matches `q.title` sent from the frontend. Filter by `title == question_title` to get operation-specific history. `your_answer` may be an empty list for early-stage wrong attempts — skip these when building tutor context.
 
@@ -186,7 +198,7 @@ Always-visible hint button (no error threshold). Click → modal with a per-node
 - Frontend calls backend directly (no Vite proxy) — `VITE_API_URL` sets the base
 - Frontend uses `/api/ai/tutor/stream` (SSE) for tutor chat, not the non-streaming endpoint
 - `consecutive_passes` in `Mastery` = consecutive **perfect** passes (error_count == 0)
-- When creating a new `Mastery` record, always pass `type_unlocked=1` explicitly — SQLAlchemy `default=` doesn't apply at Python object creation
+- When creating a new `Mastery` record, always pass `type_unlocked=1` and `active_type_level=1` explicitly — SQLAlchemy `default=` doesn't apply at Python object creation
 - `backend/main.py` (root level) is the uvicorn entry point; `backend/app/main.py` is the same app for import use
 - Alembic migrations live in `backend/alembic/versions/` — run from `backend/` directory
 
