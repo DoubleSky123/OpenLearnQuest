@@ -2,12 +2,14 @@
 AI question generation — dispatches to question_registry based on mastery spec.
 """
 import logging
+import random
 
 from anthropic import Anthropic
 
 from ..config import settings
 from .question_spec import select_spec
 from .question_registry import get_handler
+from .static_questions import consider_for
 
 logger = logging.getLogger(__name__)
 
@@ -83,9 +85,7 @@ def generate_question(
     # fill_blank is a structured beginner exercise — static is more reliable than AI here
     if spec.type == "fill_blank":
         q = handler.build_static(operation, spec)
-        q["difficulty"]    = spec.difficulty
-        q["question_type"] = spec.type
-        return q
+        return _finalize(q, operation, spec)
 
     last_error = ""
     for attempt in range(1, MAX_RETRIES + 1):
@@ -95,15 +95,19 @@ def generate_question(
         raw = _call_model(prompt)
         try:
             q = handler.validate(raw, operation, meta)
-            q["difficulty"]    = spec.difficulty
-            q["question_type"] = spec.type
-            return q
+            return _finalize(q, operation, spec)
         except Exception as e:
             last_error = str(e)
             logger.warning("generate_question attempt %d/%d failed: %s", attempt, MAX_RETRIES, last_error)
 
     logger.warning("All retries failed for '%s' (%s), using static fallback", operation, spec.type)
     fallback = handler.build_static(operation, spec)
-    fallback["difficulty"]    = spec.difficulty
-    fallback["question_type"] = spec.type
-    return fallback
+    return _finalize(fallback, operation, spec)
+
+
+def _finalize(q: dict, operation: str, spec) -> dict:
+    """Fields every question carries regardless of generation path."""
+    q["difficulty"]    = spec.difficulty
+    q["question_type"] = spec.type
+    q["consider"]      = random.choice(consider_for(operation))  # analysis-card extension question
+    return q

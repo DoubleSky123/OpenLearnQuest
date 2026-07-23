@@ -402,6 +402,63 @@ CONCEPT_HINTS: dict[str, str] = {
     "list_structure":     "Consider the whole list state — what does head point to after each step?",
 }
 
+# ── Post-question extension questions (analysis card "Consider" section) ───────
+# One is picked at random per question; "Ask the tutor" seeds the chat with it.
+CONSIDER: dict[str, list[str]] = {
+    "insertAtHead": [
+        "What would change if the list were empty when this ran?",
+        "Why must newNode.next = head happen before head = newNode?",
+    ],
+    "insertAtTail": [
+        "Which line would break if the list were empty, and how would you guard it?",
+        "How could a tail pointer make this O(1) instead of walking the whole list?",
+    ],
+    "removeAtHead": [
+        "What should happen if the list is already empty?",
+        "Why do we save head into temp before advancing it?",
+    ],
+    "removeAtTail": [
+        "Why does the loop check node.next.next instead of node.next?",
+        "What happens if the list has only one node?",
+    ],
+    "insertIntoEmpty": [
+        "How is this different from insertAtHead on a non-empty list?",
+        "Why must newNode.next be NULL here rather than head?",
+    ],
+    "deleteEntireList": [
+        "Why do we save node.next into temp before freeing the node?",
+        "What would go wrong if we set head = NULL first and then tried to free the nodes?",
+    ],
+    "insertAtPosition": [
+        "What should happen if position is larger than the list length?",
+        "Why does the loop walk to position-1 instead of position?",
+    ],
+    "removeAtPosition": [
+        "Why does the loop stop at the node BEFORE the target?",
+        "Would this code still work if the target were the head node?",
+    ],
+    "reverseList": [
+        "Why do we need THREE pointers (prev, node, temp) instead of two?",
+        "What does head point to at the moment the loop finishes?",
+    ],
+    "mergeSortedLists": [
+        "Why does the dummy-node trick simplify this code?",
+        "What happens to the leftover nodes when one list runs out first?",
+    ],
+    "detectCycle": [
+        "Why are the fast and slow pointers guaranteed to meet if there is a cycle?",
+        "How would you find WHERE the cycle starts, not just whether one exists?",
+    ],
+    "sortList": [
+        "Why is merge sort a better fit for linked lists than quicksort?",
+        "How do you find the middle of a linked list in a single pass?",
+    ],
+}
+
+
+def consider_for(operation: str) -> list[str]:
+    return CONSIDER.get(operation, ["What edge case could break this operation?"])
+
 
 def generate_static_question(
     operation: str,

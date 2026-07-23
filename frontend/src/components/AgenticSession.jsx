@@ -21,6 +21,7 @@ import { LinkedListVisualiser } from './GoalPattern';
 import LinkedListHintAnimation from './LinkedListHintAnimation';
 import TutorToast from './TutorToast';
 import UnlockPopup from './UnlockPopup';
+import AnalysisCard from './AnalysisCard';
 
 const MAX_LIVES = 5;
 
@@ -34,6 +35,14 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
   const [questionNumber, setQuestionNumber] = useState(1);
   const [, setMasteryData] = useState(null);   // mastery_summary kept for API parity; not rendered
   const [conceptMastery, setConceptMastery] = useState({});
+  // Post-question analysis card (LC-style verdict + concept/speed/consider)
+  const [analysisData,  setAnalysisData]  = useState(null);  // recordResult response
+  const [masteryDelta,  setMasteryDelta]  = useState(null);  // [{concept, before, after}]
+  const [tutorSeed,     setTutorSeed]     = useState(null);  // "consider" question pre-typed into tutor
+  const [showAnalysis,  setShowAnalysis]  = useState(false); // non-blocking analysis panel toggle
+  const conceptMasteryRef = useRef({});
+  const answerTimeMsRef   = useRef(0);
+  useEffect(() => { conceptMasteryRef.current = conceptMastery; }, [conceptMastery]);
   const [loading,        setLoading]        = useState(true);
   const [loadError,      setLoadError]      = useState(null);
 
@@ -273,6 +282,7 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
     timerRef.current?.stop?.();
     const q       = qRef.current;
     const timeMs  = Date.now() - attemptStartRef.current;
+    answerTimeMsRef.current = timeMs;   // frozen snapshot for the analysis card
     const level   = _opLevel(q.operation);
     const gained  = Math.max(Math.round(80 * 0.3), 80 - boardErrors * 20);
     const isPerfect = boardErrors === 0;
@@ -293,6 +303,16 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
       { intraDifficulty: q.intra_difficulty ?? null, scaffoldLevel: maxScaffoldRef.current, emotion },
     ).then(data => {
       resultRecordedRef.current = true;
+      // Mastery delta for the analysis card: before (ref) vs after (response)
+      if (data.concept_mastery && data.concepts_exercised) {
+        const before = conceptMasteryRef.current || {};
+        setMasteryDelta(data.concepts_exercised.map(c => ({
+          concept: c,
+          before:  before[c] ?? 0,
+          after:   data.concept_mastery[c] ?? 0,
+        })));
+      }
+      setAnalysisData(data);
       if (data.concept_mastery) setConceptMastery(data.concept_mastery);
       if (data.mastery_summary) setMasteryData(data.mastery_summary);
       inferEmotion().then(em => startPrefetch(sessionId, q.operation, em));
@@ -391,6 +411,7 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
     timerRef.current?.stop?.();
 
     const timeMs   = Date.now() - attemptStartRef.current;
+    answerTimeMsRef.current = timeMs;   // frozen snapshot for the analysis card
     const level    = _opLevel(q.operation);
     const gained   = Math.max(Math.round(80 * 0.3), 80 - errorCountRef.current * 20);
     const isPerfect = errorCountRef.current === 0;
@@ -415,6 +436,16 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
       { intraDifficulty: q.intra_difficulty ?? null, scaffoldLevel: maxScaffoldRef.current, emotion },
     ).then(data => {
       resultRecordedRef.current = true;
+      // Mastery delta for the analysis card: before (ref) vs after (response)
+      if (data.concept_mastery && data.concepts_exercised) {
+        const before = conceptMasteryRef.current || {};
+        setMasteryDelta(data.concepts_exercised.map(c => ({
+          concept: c,
+          before:  before[c] ?? 0,
+          after:   data.concept_mastery[c] ?? 0,
+        })));
+      }
+      setAnalysisData(data);
       if (data.concept_mastery) setConceptMastery(data.concept_mastery);
       if (data.mastery_summary) setMasteryData(data.mastery_summary);
       inferEmotion().then(em => startPrefetch(sessionId, q.operation, em));
@@ -427,6 +458,10 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
   const handleNext = useCallback(async () => {
     if (!sessionId || !qRef.current) return;
     setShowSuccess(false);
+    setShowAnalysis(false);
+    setAnalysisData(null);
+    setMasteryDelta(null);
+    setTutorSeed(null);
 
     const timeMs     = Date.now() - attemptStartRef.current;
     const nextNum    = questionNumber + 1;
@@ -621,6 +656,28 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
 
             {/* Col 2: Game board (dispatched by question type) */}
             <div className="flex flex-col gap-4">
+              {/* Pass strip — non-blocking: the student reviews the board or moves on */}
+              {showSuccess && (
+                <div className="flex items-center gap-2.5 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2.5">
+                  <span className="text-emerald-700 font-bold text-sm">✓ Passed</span>
+                  <span className="text-xs font-semibold bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full">+{xpGained} XP</span>
+                  <div className="flex-1" />
+                  <button
+                    onClick={() => setShowAnalysis(v => !v)}
+                    className={`text-xs font-semibold px-3 py-1.5 rounded-full transition-colors ${
+                      showAnalysis ? 'bg-indigo-100 text-indigo-700' : 'bg-indigo-500 text-white hover:bg-indigo-600'
+                    }`}
+                  >
+                    📊 Analysis
+                  </button>
+                  <button
+                    onClick={handleNext}
+                    className="text-xs font-bold bg-gradient-to-r from-violet-600 to-indigo-600 text-white px-4 py-1.5 rounded-full hover:opacity-90 transition-opacity"
+                  >
+                    {questionNumber >= plannedQuestions ? 'Finish Session →' : 'Next Question →'}
+                  </button>
+                </div>
+              )}
               {(!q.question_type || q.question_type === 'ordering') && (
                 <>
                   <CodePool
@@ -675,7 +732,8 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
                   errorCount={errorCount}
                   errorDiagnosis={null}
                   initialMessages={proactiveHistory}
-                  onClose={() => setShowTutor(false)}
+                  initialInput={tutorSeed}
+                  onClose={() => { setShowTutor(false); setTutorSeed(null); }}
                 />
               )}
             </div>
@@ -693,35 +751,26 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
         )}
       </div>
 
-      {/* Success overlay */}
-      {showSuccess && q && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-8 text-center shadow-2xl max-w-sm w-full mx-4">
-            <div className="text-5xl mb-4">✅</div>
-            <h3 className="text-2xl font-black text-gray-800 mb-1">Correct!</h3>
-            <p className="text-gray-500 mb-1">{q.title}</p>
-            <p className="text-xs text-gray-400 mb-3">
-              Question {questionNumber} of {plannedQuestions}
-              {errorCountRef.current === 0 ? ' · Perfect!' : ''}
-            </p>
-            {isCompetitive && (
-              <div className="flex justify-center gap-1 mb-3">
-                {livesArr.map((alive, i) => (
-                  <span key={i} className={`text-lg ${alive ? '' : 'opacity-20'}`}>❤️</span>
-                ))}
-              </div>
-            )}
-            <div className="inline-flex items-center gap-1.5 bg-violet-100 text-violet-700 rounded-full px-4 py-1.5 font-bold text-sm mb-4">
-              +{xpGained} XP
-            </div>
-            <button
-              onClick={handleNext}
-              className="w-full py-3 bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-bold rounded-xl text-lg hover:opacity-90 transition-opacity"
-            >
-              {questionNumber >= plannedQuestions ? 'Finish Session →' : 'Next Question →'}
-            </button>
-          </div>
-        </div>
+      {/* Analysis panel — floating, never blocks the board (LC-style) */}
+      {showSuccess && showAnalysis && q && (
+        <AnalysisCard
+          q={q}
+          errorCount={errorCountRef.current}
+          timeMs={answerTimeMsRef.current}
+          xpGained={xpGained}
+          questionNumber={questionNumber}
+          plannedQuestions={plannedQuestions}
+          analysis={analysisData}
+          masteryDelta={masteryDelta}
+          isCompetitive={isCompetitive}
+          livesArr={livesArr}
+          onClose={() => setShowAnalysis(false)}
+          onAskTutor={() => {
+            setTutorSeed(q.consider ?? null);
+            setShowTutor(true);
+            markUsedTutor();
+          }}
+        />
       )}
 
       {showHintAnim && q && (

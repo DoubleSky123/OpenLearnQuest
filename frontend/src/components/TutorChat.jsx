@@ -23,6 +23,7 @@ export default function TutorChat({
   errorCount = 0,
   errorDiagnosis = null,
   initialMessages = null,
+  initialInput = null,   // pre-typed question (e.g. the analysis card's "Consider")
   onClose,
 }) {
   const { setEmotion } = useEmotion();
@@ -32,7 +33,7 @@ export default function TutorChat({
       content: `Hi! I'm here to help you with "${questionTitle}". What part are you confused about? Try describing what you think each code block does.`,
     }]
   );
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState(initialInput ?? "");
   const [streaming, setStreaming] = useState(false);
   const [streamingText, setStreamingText] = useState("");
   const bottomRef = useRef(null);
@@ -123,7 +124,7 @@ export default function TutorChat({
   }
 
   return (
-    <div className="fixed bottom-6 right-6 w-96 max-h-[600px] flex flex-col bg-white rounded-2xl shadow-2xl border border-gray-200 z-50 overflow-hidden">
+    <div className="fixed bottom-6 right-6 w-96 max-h-[600px] flex flex-col bg-white rounded-2xl shadow-2xl border border-gray-200 z-[60] overflow-hidden">
 
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-indigo-600 to-violet-600 shrink-0">
