@@ -22,3 +22,4 @@ class User(Base):
     emotion_logs: Mapped[list["EmotionLog"]] = relationship("EmotionLog", back_populates="user", cascade="all, delete-orphan")
     mastery_records: Mapped[list["Mastery"]] = relationship("Mastery", back_populates="user", cascade="all, delete-orphan")
     concept_mastery_records: Mapped[list["ConceptMastery"]] = relationship("ConceptMastery", back_populates="user", cascade="all, delete-orphan")
+    tutor_conversations: Mapped[list["TutorConversation"]] = relationship("TutorConversation", back_populates="user", cascade="all, delete-orphan")

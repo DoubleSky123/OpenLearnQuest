@@ -10,7 +10,11 @@ class EmotionLog(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), nullable=False)
-    session_id: Mapped[str | None] = mapped_column(String, ForeignKey("game_sessions.id"), nullable=True)
+    # SET NULL: emotion telemetry belongs to the USER (research data) — it must
+    # survive session-row cleanup, and this removes the FK delete-ordering hazard
+    session_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("game_sessions.id", ondelete="SET NULL"), nullable=True
+    )
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     # 'self_report' | 'behavioral' | 'tutor_chat'
     source: Mapped[str] = mapped_column(String, nullable=False)

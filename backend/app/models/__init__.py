@@ -6,3 +6,4 @@ from .mistake import Mistake
 from .emotion_log import EmotionLog
 from .mastery import Mastery
 from .concept_mastery import ConceptMastery
+from .tutor_conversation import TutorConversation, TutorMessage

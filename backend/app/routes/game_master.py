@@ -9,7 +9,7 @@ POST /api/gm/test-generation  — Sprint-1 quality test
 GET  /api/gm/operations       — list all supported operations
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -18,6 +18,7 @@ from ..dependencies import get_current_user
 from ..models.user import User
 from ..services.claude_service import run_generation_test, OP_META
 from ..services import game_master as gm
+from ..services import tutor_memory
 
 router = APIRouter(prefix="/api/gm", tags=["game_master"])
 
@@ -119,6 +120,7 @@ def start_session(
 @router.post("/session/record")
 def record_result(
     body: RecordResultRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -128,6 +130,8 @@ def record_result(
     Returns updated concept_mastery for immediate UI refresh.
     """
     _assert_session_owner(db, body.session_id, current_user.id)
+    # episodic memory: summarise any tutor conversation for this question (idempotent)
+    background_tasks.add_task(tutor_memory.summarize_pending, body.session_id, body.operation, body.passed)
     return gm.record_result(
         db=db,
         user_id=current_user.id,
@@ -148,6 +152,7 @@ def record_result(
 @router.post("/session/next")
 def next_question(
     body: NextQuestionRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -157,6 +162,8 @@ def next_question(
     selects next operation, generates next question.
     """
     _assert_session_owner(db, body.session_id, current_user.id)
+    # episodic memory: summarise any tutor conversation for this question (idempotent)
+    background_tasks.add_task(tutor_memory.summarize_pending, body.session_id, body.operation, body.passed)
     try:
         return gm.next_question(
             db=db,

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { streamTutorChat, emotionApi } from "../services/api";
+import { streamTutorChat, emotionApi, tutorApi } from "../services/api";
 import { useEmotion } from "../contexts/EmotionContext";
 
 /**
@@ -42,6 +42,14 @@ export default function TutorChat({
 
   useEffect(() => {
     inputRef.current?.focus();
+    // Restore persisted conversation for this question (memory survives close/reopen)
+    if (sessionId && questionTitle) {
+      tutorApi.getHistory(sessionId, questionTitle)
+        .then((h) => {
+          if (h.messages?.length) setMessages(h.messages);
+        })
+        .catch((e) => console.warn("[tutor history restore failed]", e));
+    }
     // Cancel any in-flight stream when the component unmounts
     return () => cancelRef.current?.();
   }, []);
@@ -62,13 +70,14 @@ export default function TutorChat({
 
     cancelRef.current = streamTutorChat(
       {
+        session_id:      sessionId,   // conversation memory key (backend persists by it)
         question_title:  questionTitle,
         operation,
         question_type:   questionType,
         your_answer:     yourAnswer,
         correct_answer:  correctAnswer,
         error_count:     errorCount,
-        messages:        messages,   // history BEFORE this user message
+        messages:        messages,   // legacy fallback; DB history is authoritative
         user_message:    text.trim(),
         error_diagnosis: messages.length === 0 ? errorDiagnosis : null,
       },
@@ -81,9 +90,10 @@ export default function TutorChat({
         accumulatedRef.current = "";
         setMessages((m) => {
           const next = [...m, { role: "assistant", content: finalText }];
-          // Infer emotion from chat text after each exchange (LLM, async)
+          // Infer emotion from chat text after each exchange (LLM, async).
+          // question_title makes the backend read the persisted conversation.
           if (sessionId) {
-            emotionApi.inferChat(sessionId, next)
+            emotionApi.inferChat(sessionId, next, questionTitle)
               .then(res => setEmotion(res.emotion, 'llm'))
               .catch(e => console.warn('[inferChat failed]', e));
           }

@@ -58,8 +58,9 @@ export const progressApi = {
 // Emotion inference
 export const emotionApi = {
   inferBehavior: (signals) => request("POST", "/api/emotion/infer-behavior", signals),
-  inferChat: (sessionId, messages) =>
-    request("POST", "/api/emotion/infer-chat", { session_id: sessionId, messages }),
+  // questionTitle lets the backend read the persisted conversation (label stays traceable)
+  inferChat: (sessionId, messages, questionTitle = null) =>
+    request("POST", "/api/emotion/infer-chat", { session_id: sessionId, messages, question_title: questionTitle }),
   logSelfReport: (emotion, sessionId) =>
     request("POST", "/api/emotion/log-self-report", { emotion, session_id: sessionId }),
 };
@@ -116,6 +117,15 @@ export const adminApi = {
   getEmotionTimeline: (userId) => request("GET", `/api/admin/users/${userId}/emotion-timeline`),
   registerAdmin: (email, username, password, adminKey) =>
     request("POST", "/api/auth/register-admin", { email, username, password, admin_key: adminKey }),
+};
+
+// Tutor agent — persisted memory
+export const tutorApi = {
+  getHistory: (sessionId, questionTitle) =>
+    request(
+      "GET",
+      `/api/ai/tutor/history?session_id=${encodeURIComponent(sessionId)}&question_title=${encodeURIComponent(questionTitle)}`
+    ),
 };
 
 // Tutor agent (streaming)

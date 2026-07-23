@@ -4,7 +4,8 @@ from sqlalchemy.orm import Session
 from ..dependencies import get_current_user, get_db
 from ..models.user import User
 from ..models.emotion_log import EmotionLog
-from ..services import emotion_agent
+from ..models.tutor_conversation import TutorConversation, TutorMessage
+from ..services import emotion_agent, tutor_memory
 import uuid
 from datetime import datetime
 
@@ -25,7 +26,8 @@ class BehaviorSignals(BaseModel):
 
 class ChatMessages(BaseModel):
     session_id: str | None = None
-    messages: list[dict]          # [{role, content}, ...]
+    question_title: str | None = None   # with session_id, selects the persisted conversation
+    messages: list[dict] = []           # legacy fallback when no persisted conversation exists
 
 
 class EmotionResult(BaseModel):
@@ -51,8 +53,35 @@ def infer_chat(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    result = emotion_agent.infer_from_chat(body.messages)
-    _save_log(db, current_user.id, body.session_id, "tutor_chat", result, {"message_count": len(body.messages)})
+    # Prefer the persisted conversation (DB is authoritative) — the label becomes
+    # traceable to the exact stored messages it was inferred from.
+    messages = body.messages
+    signals: dict = {"message_count": len(messages)}
+    if body.session_id and body.question_title:
+        conv = (
+            db.query(TutorConversation)
+            .filter(
+                TutorConversation.user_id == current_user.id,
+                TutorConversation.session_id == body.session_id,
+                TutorConversation.question_title == body.question_title,
+            )
+            .first()
+        )
+        if conv and conv.message_count > 0:
+            stored = tutor_memory.visible_messages(db, conv)
+            if stored:
+                messages = stored
+                last = db.query(TutorMessage).filter(
+                    TutorMessage.conversation_id == conv.id
+                ).order_by(TutorMessage.created_at.desc(), TutorMessage.id.desc()).first()
+                signals = {
+                    "message_count": len(stored),
+                    "conversation_id": conv.id,
+                    "last_message_id": last.id if last else None,
+                }
+
+    result = emotion_agent.infer_from_chat(messages)
+    _save_log(db, current_user.id, body.session_id, "tutor_chat", result, signals)
     return result
 
 
