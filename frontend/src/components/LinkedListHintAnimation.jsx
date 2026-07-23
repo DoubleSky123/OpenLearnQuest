@@ -72,6 +72,9 @@ export default function LinkedListHintAnimation({ question, onClose }) {
   const [cursor, setCursor] = useState(null);   // index into nodes array
   const [label, setLabel]   = useState('');
   const [replayKey, setReplayKey] = useState(0);
+  const [stepIdx, setStepIdx] = useState(0);    // manual stepping (frame-by-frame)
+  const [totalSteps, setTotalSteps] = useState(0);
+  const stepsRef = useRef([]);
 
   // ── helpers that mutate nodes state ─────────────────────────────────────────
   const addNode = (setN, idx, val, color = 'new') => {
@@ -102,18 +105,20 @@ export default function LinkedListHintAnimation({ question, onClose }) {
 
   const resetNodes = (setN, vals) => setN(makeNodes(vals));
 
-  // ── Animation timeline ───────────────────────────────────────────────────────
+  // ── Animation timeline (collected as manual steps, not auto-scheduled) ────────
+  // Professor feedback: auto-play was too fast — each at() call is now one
+  // frame the student advances with the Next button. Per-operation cases below
+  // are unchanged; the delay argument is kept for signature compatibility.
   useEffect(() => {
     // Reset
     idRef.current = 0;
-    const initN = makeNodes(initialValues);
-    setNodes(initN);
+    setNodes(makeNodes(initialValues));
     setCursor(null);
-    setLabel('');
+    setLabel('Press ▶ Next to walk through the steps');
+    setStepIdx(0);
 
-    const timers = [];
-    let t = 400;
-    const at = (delay, fn) => { timers.push(setTimeout(fn, t)); t += delay; };
+    const steps = [];
+    const at = (_delay, fn) => { steps.push(fn); };
 
     switch (operation) {
 
@@ -215,8 +220,18 @@ export default function LinkedListHintAnimation({ question, onClose }) {
         break;
     }
 
-    return () => timers.forEach(clearTimeout);
+    stepsRef.current = steps;
+    setTotalSteps(steps.length);
   }, [replayKey]); // eslint-disable-line
+
+  const done = stepIdx >= totalSteps && totalSteps > 0;
+
+  const nextStep = () => {
+    const steps = stepsRef.current;
+    if (stepIdx >= steps.length) return;
+    steps[stepIdx]();
+    setStepIdx(i => i + 1);
+  };
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
@@ -261,12 +276,24 @@ export default function LinkedListHintAnimation({ question, onClose }) {
         {/* Step label */}
         <p className="text-sm text-indigo-600 font-medium text-center mt-3 min-h-[20px]">{label}</p>
 
+        {/* Step progress */}
+        <p className="text-xs text-gray-400 text-center mt-1">
+          {totalSteps > 0 ? `Step ${Math.min(stepIdx, totalSteps)} / ${totalSteps}` : ''}
+        </p>
+
         {/* Buttons */}
-        <div className="flex gap-2 mt-4">
-          <button onClick={() => setReplayKey(k => k + 1)} className="flex-1 py-2 text-sm bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors">
-            ↺ Replay
+        <div className="flex gap-2 mt-3">
+          <button onClick={() => setReplayKey(k => k + 1)} className="py-2 px-4 text-sm bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors">
+            ↺ Restart
           </button>
-          <button onClick={onClose} className="flex-1 py-2 text-sm bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition-colors">
+          <button
+            onClick={nextStep}
+            disabled={done}
+            className="flex-1 py-2 text-sm bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 disabled:opacity-40 transition-colors"
+          >
+            {done ? '✓ Done' : '▶ Next'}
+          </button>
+          <button onClick={onClose} className="py-2 px-4 text-sm bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors">
             Got it
           </button>
         </div>

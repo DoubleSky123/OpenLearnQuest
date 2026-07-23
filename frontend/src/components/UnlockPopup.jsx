@@ -10,8 +10,8 @@ const TYPE_INFO = {
  * Does NOT auto-dismiss — it requires an explicit choice.
  */
 export default function UnlockPopup({ currentLevel, unlockedLevel, onAdvance, onStay }) {
-  const next = TYPE_INFO[unlockedLevel] ?? { name: `Level ${unlockedLevel}`, desc: '' };
-  const cur  = TYPE_INFO[currentLevel]  ?? { name: `Level ${currentLevel}`, desc: '' };
+  const next = TYPE_INFO[unlockedLevel] ?? { name: 'a new question type', desc: '' };
+  const cur  = TYPE_INFO[currentLevel]  ?? { name: 'the current type', desc: '' };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -35,7 +35,7 @@ export default function UnlockPopup({ currentLevel, unlockedLevel, onAdvance, on
             Keep practicing {cur.name}
           </button>
         </div>
-        <p className="text-[11px] text-gray-400 mt-4">You can level up any time from the 🔓 button.</p>
+        <p className="text-[11px] text-gray-400 mt-4">You can switch to the new question type any time from the 🔓 button.</p>
       </div>
     </div>
   );

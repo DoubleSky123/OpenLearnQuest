@@ -120,6 +120,7 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
     let accumulated = "";
     streamTutorChat(
       {
+        session_id:      sessionId,   // persists the proactive exchange into memory
         question_title:  q.title,
         operation:       q.operation,
         question_type:   qType,
@@ -611,7 +612,7 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
                       onClick={handleLevelUp}
                       className="text-xs bg-emerald-500 text-white px-2 py-1 rounded-full hover:bg-emerald-600"
                     >
-                      🔓 Level up →
+                      🔓 New question type →
                     </button>
                   )}
                 </div>

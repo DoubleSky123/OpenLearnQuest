@@ -1,20 +1,14 @@
 import { useState, useEffect } from 'react';
 
-const AUTO_DISMISS_MS = 10000;
-
 export default function TutorToast({ message, onOpen, onDismiss }) {
   const [visible, setVisible] = useState(false);
 
-  // Slide-in on mount
+  // Slide-in on mount. No auto-dismiss: the push stays until the student
+  // opens the chat or closes it themselves (professor feedback — a stuck
+  // student may need time before noticing it).
   useEffect(() => {
     requestAnimationFrame(() => setVisible(true));
   }, []);
-
-  // Auto-dismiss
-  useEffect(() => {
-    const t = setTimeout(onDismiss, AUTO_DISMISS_MS);
-    return () => clearTimeout(t);
-  }, []); // eslint-disable-line
 
   const preview = message.length > 120 ? message.slice(0, 120) + '…' : message;
 

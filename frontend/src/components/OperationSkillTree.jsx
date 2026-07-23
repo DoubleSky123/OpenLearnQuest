@@ -11,7 +11,9 @@ const LEVEL_OPS = {
   3: ['reverseList', 'mergeSortedLists', 'detectCycle', 'sortList'],
 };
 
-const LEVEL_LABELS = { 1: 'Level 1 · Basics', 2: 'Level 2 · Intermediate', 3: 'Level 3 · Advanced' };
+// Semantic tier names only — "Level" is reserved for the character's XP level
+// (professor feedback: three different things were all called "Level")
+const LEVEL_LABELS = { 1: '🌱 Basics', 2: '🔧 Intermediate', 3: '🚀 Advanced' };
 
 const OP_ICONS = {
   insertAtHead:    '⬆',
@@ -203,12 +205,12 @@ export default function OperationSkillTree({ moduleId, xp = 0, onStart, onBack, 
 
                   {locked && level === 2 && (
                     <p style={{ textAlign: 'center', fontSize: 13, color: '#9CA3AF', marginBottom: 12 }}>
-                      Master any Level 1 operation to unlock
+                      Master any Basics operation to unlock
                     </p>
                   )}
                   {locked && level === 3 && (
                     <p style={{ textAlign: 'center', fontSize: 13, color: '#9CA3AF', marginBottom: 12 }}>
-                      Master any Level 2 operation to unlock
+                      Master any Intermediate operation to unlock
                     </p>
                   )}
 

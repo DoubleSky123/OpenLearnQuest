@@ -13,112 +13,113 @@ from ..config import settings
 
 _client = Anthropic(api_key=settings.anthropic_api_key)
 
-TUTOR_SYSTEM_PROMPT = """You are a Socratic algorithm tutor. Your only tool is questions — plus one resource lookup tool when students are genuinely stuck.
+TUTOR_SYSTEM_PROMPT = """You are a Socratic algorithm tutor. You give an honest verdict on what the student just said, ask ONE focused question about their actual mistake, and hand out one curated video when questioning isn't landing.
 
 RESPONSE FORMAT — strictly enforced:
-- Reply with EXACTLY ONE sentence. One question, or one short observation followed by one question.
-- Never write two sentences. Never use bullet points or numbered lists.
-- If you feel the urge to explain more, stop — ask instead.
-- Exception: if you called lookup_resource, include the URL on its own line, then ONE question.
+- Reply with AT MOST TWO sentences: (1) a VERDICT on the student's last answer, (2) ONE question.
+- The verdict is MANDATORY whenever the student made a claim, guess, or attempt. Start with one of: "Right —", "Exactly —", "Close —", "Not quite —" so the student always knows if they are correct, wrong, or getting warm. Never respond to an answer with only another question.
+- Be GENEROUS when judging: if the student's claim is essentially correct at the level of this exercise, open with "Right —" or "Exactly —". Do not nitpick technicalities or downgrade a correct insight to keep the conversation going — earned confirmation is the feedback they need.
+- If the student asked a neutral question (nothing to judge), skip the verdict and reply with one guiding question.
+- Never use bullet points or numbered lists.
+- Exception: if you called lookup_resource, format as: verdict (if any) → the URL on its own line → one sentence telling them what to watch for → ONE question connecting the video to their current mistake.
 
 ABSOLUTE RULES — zero exceptions:
-1. NEVER state, confirm, or imply the correct order of steps. Not directly, not indirectly.
-2. NEVER say things like "you need to set X before Y" or "the issue is at step N" — these reveal the answer.
-3. If the student says "just tell me" or "I give up" — respond with ONE warm sentence and ONE question.
-4. Never confirm that a specific step is correct. Treat all student guesses as hypotheses to examine.
+1. NEVER state the full correct order or dictate the exact fix ("you need to set X before Y" / "the answer is ..." are forbidden).
+2. Judging the STUDENT'S OWN words is required; revealing the ANSWER is forbidden. Know the difference: "Right — that node would be lost" is good feedback; "Correct, so the first step is newNode.next = head" is a violation because it hands over the solution.
+3. If the student says "just tell me" or "I give up": give the verdict on their latest attempt, then call lookup_resource if you haven't used it yet; otherwise one warm sentence and one question.
 
-QUESTION STRATEGY — pick the lowest-level question the student hasn't answered yet:
-- Turn 1–2: Ask what a single line or token in their current attempt does to memory.
-- Turn 3–4: Ask what would be lost or broken if that line/value were wrong or ran at the wrong moment.
-- Turn 5+: Ask about the exact pointer that the wrong line/value affects.
+FOCUS — always anchor on the student's actual mistake:
+- The context includes a deterministic error analysis naming the exact step / blank / line that is wrong. Your question MUST target that specific location or the pointer it affects — never a generic "what do you think happens?".
 - Use the vocabulary of the exercise type given in the context (a blank, a buggy line, or a step order).
+- If the student's message drifts away from their error, give your verdict on it, then steer back to the wrong step.
 
-WHEN TO USE lookup_resource:
-- When error_count >= 2 AND you haven't suggested a resource yet in this conversation.
-- When the student explicitly asks for a video, example, or resource.
-- When the student has been stuck on the same concept for 3+ exchanges with no progress.
-- Call it AT MOST ONCE per conversation — do not call it repeatedly.
+QUESTION STRATEGY — escalate concreteness, not difficulty:
+- Question 1: what does the wrong line/blank/step in THEIR attempt do to memory?
+- Question 2: what is lost or broken because it runs there?
+- After that, prefer the video (below) over more questions.
 
-TONE: One casual sentence. Warm but brief. No praise longer than two words ("Nice!", "Good.").
+WHEN TO USE lookup_resource (call it AT MOST ONCE per conversation):
+- You have already asked 2 questions in this conversation and the student still hasn't got it — STOP quizzing and call it. Do not interrogate a stuck student endlessly.
+- The student explicitly asks for a video, example, or resource.
+- error_count >= 2 on their board.
+
+TONE: warm, brief, honest. Praise no longer than two words ("Nice!", "Exactly!").
 
 CONTEXT YOU WILL RECEIVE:
 - The operation the student is implementing
 - The exercise type (fill-in-the-blank, find-the-bug, or step ordering) — match its vocabulary
 - Their current (wrong) attempt
-- The reference solution (DO NOT reveal — use only to know WHICH pointer to ask about)
+- The reference solution (DO NOT reveal — use it to judge their claims and to know WHICH pointer to ask about)
 - Error count and conversation history
 
-Always respond in English. One sentence (plus optional URL on its own line). End with a question mark."""
+Always respond in English. At most two sentences (plus optional URL on its own line). End with a question."""
 
 
 # ── Concept resource library ──────────────────────────────────────────────────
 # Organized by concept (not by operation) so the tool can match the student's
 # specific difficulty rather than just the operation they're practicing.
 
+# Beginner-level fundamentals only — professor feedback: LeetCode problem
+# walkthroughs are too hard for students still learning the basic operations.
 CONCEPT_RESOURCE_LIBRARY: dict[str, list[dict]] = {
     "pointer_assignment": [
         {
-            "title": "Linked List Operations (NeetCode)",
-            "url": "https://www.youtube.com/watch?v=Wf4QhpdVFQo",
-            "focus": "Pay attention to pointer reassignment order — which pointer must be saved first?",
+            "title": "Insert a Node in a Linked List — Animations (Study Algorithms)",
+            "url": "https://www.youtube.com/watch?v=5ao9KfGga3c",
+            "focus": "Watch the order the pointers are re-wired when inserting — which pointer must be saved before it gets overwritten?",
         },
         {
-            "title": "Linked List Basics (NeetCode)",
-            "url": "https://www.youtube.com/watch?v=5qZ2GwSgqm4",
-            "focus": "The 'lost node' section shows what happens when you overwrite a pointer too early",
+            "title": "Linked Lists Explained Visually",
+            "url": "https://www.youtube.com/watch?v=PsTvZ_htHT8",
+            "focus": "How each node points to the next — and what gets lost when you overwrite a pointer too early",
         },
     ],
     "traversal": [
         {
-            "title": "Linked List Operations (NeetCode)",
-            "url": "https://www.youtube.com/watch?v=Wf4QhpdVFQo",
-            "focus": "Watch the traversal section — focus on the while-loop stop condition",
+            "title": "Learn Linked Lists in 13 minutes",
+            "url": "https://www.youtube.com/watch?v=N6dOwBde7-M",
+            "focus": "The traversal part — how the loop walks node by node and exactly when it stops",
         },
         {
-            "title": "Remove Node (NeetCode)",
-            "url": "https://www.youtube.com/watch?v=JI71sxtHTng",
-            "focus": "How to stop one node before the target when traversing",
+            "title": "Insert a Node in a Linked List — Animations (Study Algorithms)",
+            "url": "https://www.youtube.com/watch?v=5ao9KfGga3c",
+            "focus": "Finding the right position before inserting — why you stop one node BEFORE the target",
         },
     ],
     "memory_management": [
         {
-            "title": "Remove Node (NeetCode)",
-            "url": "https://www.youtube.com/watch?v=JI71sxtHTng",
-            "focus": "How to properly null-out pointers and avoid dangling references",
+            "title": "Learn Linked Lists in 13 minutes",
+            "url": "https://www.youtube.com/watch?v=N6dOwBde7-M",
+            "focus": "The deletion part — reconnect the neighbours before dropping a node so nothing dangles",
         },
         {
-            "title": "Delete Entire List",
-            "url": "https://www.youtube.com/watch?v=5qZ2GwSgqm4",
-            "focus": "Setting head = null and freeing memory — what order matters?",
+            "title": "Linked Lists Explained Visually",
+            "url": "https://www.youtube.com/watch?v=PsTvZ_htHT8",
+            "focus": "What a node in memory really is — and what 'losing' a node means",
         },
     ],
     "node_creation": [
         {
-            "title": "Linked List Operations (NeetCode)",
-            "url": "https://www.youtube.com/watch?v=Wf4QhpdVFQo",
-            "focus": "Node creation and initialization — what fields does a new node need?",
+            "title": "Learn Linked Lists in 13 minutes",
+            "url": "https://www.youtube.com/watch?v=N6dOwBde7-M",
+            "focus": "Creating a node — which fields it needs (value + next) before you link it in",
+        },
+        {
+            "title": "Insert a Node in a Linked List — Animations (Study Algorithms)",
+            "url": "https://www.youtube.com/watch?v=5ao9KfGga3c",
+            "focus": "Create the node FIRST, then wire it in — watch the animation of both steps",
         },
     ],
     "list_structure": [
         {
-            "title": "Reverse Linked List (NeetCode)",
-            "url": "https://www.youtube.com/watch?v=G0_I-ZF0S38",
-            "focus": "The three-pointer technique for restructuring list pointers",
+            "title": "Linked Lists Explained Visually",
+            "url": "https://www.youtube.com/watch?v=PsTvZ_htHT8",
+            "focus": "The overall shape of a singly linked list — head, the chain of next pointers, and null at the end",
         },
         {
-            "title": "Merge Two Sorted Lists (NeetCode)",
-            "url": "https://www.youtube.com/watch?v=XIdigk956u0",
-            "focus": "Dummy node technique and how to build the result list step by step",
-        },
-        {
-            "title": "Detect Cycle (NeetCode)",
-            "url": "https://www.youtube.com/watch?v=gBTe7lFR3vc",
-            "focus": "Fast/slow pointer pattern — why does the math guarantee they meet?",
-        },
-        {
-            "title": "Sort Linked List (NeetCode)",
-            "url": "https://www.youtube.com/watch?v=TGveA1oFhrc",
-            "focus": "Merge sort on a linked list — splitting and merging phases",
+            "title": "Learn Linked Lists in 13 minutes",
+            "url": "https://www.youtube.com/watch?v=N6dOwBde7-M",
+            "focus": "Bigger operations (reverse, merge) reuse the same pointer moves you've already practised",
         },
     ],
 }
@@ -315,7 +316,7 @@ Error analysis:
 [VOCABULARY] {_VOCAB[qt]}
 [END CONTEXT]
 
-Note: You have a lookup_resource tool. Use it if error_count >= 2 and you haven't used it yet."""
+Note: You have a lookup_resource tool (once per conversation). Use it if error_count >= 2, or once you have already asked 2 questions and the student is still stuck."""
 
 
 # ── Message builder (shared by chat() and streaming route) ────────────────────
@@ -348,10 +349,19 @@ def build_api_messages(
         for msg in messages:
             api_messages.append({"role": msg["role"], "content": msg["content"]})
         fresh_analysis = analyze_error(your_answer, correct_answer)
+        # keep the two-questions-then-video policy visible on EVERY turn — the
+        # first-turn note alone gets forgotten by turn 3
+        questions_asked = sum(1 for m in messages if m.get("role") == "assistant")
+        video_shared = any("youtube.com" in m.get("content", "") for m in messages if m.get("role") == "assistant")
+        tool_note = (
+            "" if video_shared else
+            f"\nQuestions you have asked so far: {questions_asked}. "
+            "If that is 2 or more and the student is still stuck, STOP quizzing — call lookup_resource now."
+        )
         context_refresh = (
             f"[Context refresh — errors: {error_count}, "
             f"current attempt: {' → '.join(your_answer) if your_answer else 'nothing'}\n"
-            f"Updated error analysis:\n{fresh_analysis}]\n"
+            f"Updated error analysis:\n{fresh_analysis}{tool_note}]\n"
         )
         api_messages.append({"role": "user", "content": context_refresh + user_message})
 
