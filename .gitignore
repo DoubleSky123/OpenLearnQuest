@@ -33,8 +33,9 @@ frontend/dist
 # Vite cache
 .vite/
 
-# Claude Code metadata
-.claude/
+# Claude Code metadata (project skills ARE committed - CLAUDE.md routing references them)
+.claude/*
+!.claude/skills/
 
 # Documentation / local-only folders (reports, research notes, auto-memory)
 docs/

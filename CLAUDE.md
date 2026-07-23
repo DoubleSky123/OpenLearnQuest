@@ -69,6 +69,7 @@ backend/
       emotion_agent.py        # behavioral signal → emotion label
       hint_agent.py           # generates hints on error_count ≥ 2
       tutor_agent.py          # ReAct Socratic tutor (see Tutor Agent section)
+      tutor_memory.py         # tutor memory: persistence + view compaction + episodic recall
       error_analyzer.py       # structured error diagnosis
       ll_executor.py          # simulates linked-list ops for goalPattern
       concept_graph.py        # concept dependency graph per operation
@@ -121,8 +122,16 @@ Claude decides WHEN to call the tool — this is the agentic behaviour (not a ha
 On every first turn, `build_context_block()` injects a `[STUDENT HISTORY]` block:
 - Past mastery stats for the current operation (attempts, passes, pass rate, streak) — from `mastery` table
 - Recurring wrong answers from previous sessions — from `mistakes` table (filtered by `title == question_title`, last 5, skipping empty `your_answer`)
+- `[PAST TUTOR CONVERSATIONS]` — episodic memories from `tutor_memory.episodic_block()` (see below)
 
 This lets Claude say "I see you've made this mistake before" without the student having to explain.
+
+### Tutor Memory (`tutor_memory.py`) — three layers
+1. **Working memory (per question)**: every turn is persisted to `tutor_messages` (clean text, append-only). The DB is the authoritative history when `session_id` is present — `body.messages` from the client is a legacy fallback only. `GET /api/ai/tutor/stream`'s reply is saved *before* `[DONE]` (the client's onDone immediately calls infer-chat, which reads the DB). Window restore: `GET /api/ai/tutor/history?session_id&question_title`.
+2. **Compaction (view, not storage)**: when a conversation's uncompacted messages exceed 20, the oldest are compressed into `compact_summary` keeping the last 8 verbatim (`maybe_compact`, runs after `[DONE]`). What Claude receives = recap pair + verbatim tail; storage stays complete.
+3. **Episodic memory (cross-question)**: after a question attempt is recorded (`/session/record` and `/session/next` add a BackgroundTask), `summarize_pending` writes `summary` + `key_struggles` (concepts validated against the concept graph) + `resolved` (backfilled from the attempt, never LLM-guessed). Retrieval (`episodic_block`) is deterministic with decay: concept overlap via `OP_CONCEPTS` → mastery fading (skip if all concepts ≥ 0.75) → unresolved first → LIMIT 3. Conversations with no real student message get `summary=""` (sentinel: summarised, nothing to remember).
+
+**Memory design rules**: forgetting happens at read time (filters), never by deleting rows; `summary=NULL` means "not yet summarised" and is retried, `summary=""` means "nothing worth remembering"; memory belongs to the user — `session_id` FK is SET NULL so memories survive session deletion.
 
 ### ReAct Loop (max 3 iterations)
 ```
@@ -188,7 +197,9 @@ Always-visible hint button (no error threshold). Click → modal with a per-node
 | `mastery` | user_id, operation, module_id, attempts, passes, consecutive_passes, perfect_pass, type_unlocked, **active_type_level** |
 | `concept_mastery` | user_id, concept, mastery (0–1 float), attempts — Bayesian-style per-concept posterior |
 | `mistakes` | user_id, question_id, source, title, your_answer (JSON), correct_answer (JSON), explanation, created_at |
-| `emotion_logs` | user_id, session_id, emotion, source, confidence, signals (JSON), action_taken |
+| `emotion_logs` | user_id, session_id (SET NULL on session delete), emotion, source, confidence, signals (JSON), action_taken — tutor_chat rows carry `signals.last_message_id` linking the label to the stored transcript |
+| `tutor_conversations` | user_id, session_id (SET NULL on session delete), operation, question_title, message_count, **summary/key_struggles/resolved** (episodic layer), **compact_summary/compacted_through_id** (working-memory view); UNIQUE (session_id, question_title) |
+| `tutor_messages` | conversation_id, role, content, created_at — verbatim append-only transcript (clean text; prompt wrappers are never stored) |
 
 **Note**: `mistakes.title` matches `q.title` sent from the frontend. Filter by `title == question_title` to get operation-specific history. `your_answer` may be an empty list for early-stage wrong attempts — skip these when building tutor context.
 
@@ -205,3 +216,36 @@ Always-visible hint button (no error threshold). Click → modal with a per-node
 ## Supported Operations (12 total)
 
 `insertAtHead`, `insertAtTail`, `removeAtHead`, `removeAtTail`, `insertIntoEmpty`, `deleteEntireList`, `insertAtPosition`, `removeAtPosition`, `reverseList`, `mergeSortedLists`, `detectCycle`, `sortList`
+
+## Skill Routing
+
+### Project skills (`.claude/skills/`)
+
+| Situation | Skill |
+|---|---|
+| Need the app running (start backend/frontend, before QA or manual testing) | `/dev` |
+| Edited `question_registry.py` prompts/validators, `static_questions.py` TEMPLATES, or `question_spec.py` | `/gen-check` (scope with `--ops`/`--types` — full sweep costs 24–72 Haiku calls) |
+| Adding a new linked-list operation (touches ~10 files; never do this ad hoc) | `/add-operation` |
+| Edited `tutor_agent.py` (system prompt, context block, tools, ReAct loop) | `/tutor-sim` (`--show-context` is free; full run ≈ 5–10 Haiku calls) |
+| Tuned the adaptive system (`compute_intra_difficulty`, `useScaffold.js`, `emotion_agent`) or collected new play data | `/eval-adaptivity` (DB read-only, free) |
+
+**Skill maintenance rule**: project skills reference real code. When a change touches a surface a skill depends on, update the skill **in the same change**:
+- Renaming/moving per-op registries (`TEMPLATES`/`_BLANKS`/`_BUGS`, `OP_META`, `LEVEL_OPS`, `_opLevel()`, animation/step switches) → edit `/add-operation`'s checklist
+- Changing signatures in `claude_service.py`/`question_registry.py`/`question_spec.py` or `tutor_agent.chat()` → run `/gen-check` / `/tutor-sim` (they import the real code, so drift fails loudly) and fix the script
+- Adding a question type, emotion label, or tutor rule → extend `gen_check.py` `AI_TYPES` / `tutor_sim.py` `SCENARIOS` / `/eval-adaptivity`'s interpretation table
+
+### gstack skills (globally installed at `~/.claude/skills/gstack/`)
+
+- Bugs, 500 errors, "why is this broken" → `/investigate`
+- Test the site, find bugs, browser QA against localhost:5173 → `/qa` (report-only: `/qa-only`); web browsing → `/browse`
+- Ship, push, create PR → `/ship`; check my diff → `/review`
+- Docs out of sync after shipping → `/document-release`
+- Save/resume work across sessions → `/context-save` / `/context-restore`
+
+## Backend Identity Rule
+
+Every route that needs the caller's identity MUST take it from `Depends(get_current_user)` (`app/dependencies.py`). NEVER read `user_id` from the request body, query params, or URL path — a client can send anyone's id there. Admin-only routes use `Depends(require_admin)` (`app/routes/admin.py`).
+
+## Schema Change Rule
+
+Any edit to `app/models/` requires an Alembic migration in the same change: from `backend/`, run `alembic revision --autogenerate -m "..."`, review the generated diff by hand (autogenerate misses renames), then `alembic upgrade head`. Never alter tables directly in the DB.
