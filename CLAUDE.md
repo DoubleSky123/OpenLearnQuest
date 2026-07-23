@@ -46,6 +46,13 @@ cd backend
 d:/openLearnquest/venv/Scripts/alembic upgrade head
 ```
 
+### Run Tests
+```bash
+cd backend
+d:/openLearnquest/venv/Scripts/python.exe -m pytest tests/ -q
+```
+In-memory SQLite fixtures (no Postgres needed); covers the deterministic core: `ll_executor`, mastery/unlock rules, `select_spec`, `error_analyzer`, the ZPD controller contract, scaffold clamp + closed-loop telemetry. `scaffold_level` from the client is clamped server-side (`game_master.clamp_scaffold`) — never trust client-computed telemetry.
+
 ## Architecture
 
 ### Backend Structure
@@ -163,7 +170,7 @@ Each operation has a `type_unlocked` (int, 1–3) stored in `mastery` table — 
 
 ### State Axis — within-type difficulty + scaffolding (emotion-driven)
 **Two-axis design**: the competence axis above owns the question *type*; emotion drives two orthogonal channels that never change the type:
-- **ZPD difficulty controller** (`game_master.compute_intra_difficulty`): targets a ~25–30% error rate using the session's recent error rate; emotion only scales the gain (frustrated → ease faster, bored → ramp faster, confused → neutral). Output `intra_difficulty` (1–3) drives `select_spec` params + `INTRA_KNOBS` (node count, distractor count/similarity, blanks, bug subtlety) in `question_spec.py` / `static_questions.py`.
+- **ZPD difficulty controller** (`game_master._intra_from_history`, pure; DB wrapper `compute_intra_difficulty`): targets ~25–30% error rate via **EMA + hysteresis** (dead zone 0.22–0.40, 2 consecutive confirmations, one level per move — replaced the windowed-rate version that oscillated). Emotion only scales the gain (frustrated → eases sooner, bored → ramps sooner, confused → neutral). Behavioural contract in `tests/test_intra_controller.py`. Output `intra_difficulty` (1–3) drives `select_spec` params + `INTRA_KNOBS` (node count, distractor count/similarity, blanks, bug subtlety) in `question_spec.py` / `static_questions.py`.
 - **Scaffold orchestrator** (`hooks/useScaffold.js`): `scaffold_level = emotion baseline + per-error climb − mastery fading cap`; gates error-highlight → Socratic hint / proactive push → animation → near-reveal. `confused` raises scaffolding but keeps difficulty; `frustrated` lowers difficulty.
 
 Emotion is inferred **every question** (`emotion_agent.infer_from_behavior`, instant rules) + from tutor chat (`infer_from_chat`, LLM), each with a confidence. Per-question telemetry (`intra_difficulty`/`scaffold_level`/`emotion`) is recorded on `question_attempts`; `app/analytics/difficulty_eval.py` is the offline evaluator.
@@ -197,7 +204,7 @@ Always-visible hint button (no error threshold). Click → modal with a per-node
 | `mastery` | user_id, operation, module_id, attempts, passes, consecutive_passes, perfect_pass, type_unlocked, **active_type_level** |
 | `concept_mastery` | user_id, concept, mastery (0–1 float), attempts — Bayesian-style per-concept posterior |
 | `mistakes` | user_id, question_id, source, title, your_answer (JSON), correct_answer (JSON), explanation, created_at |
-| `emotion_logs` | user_id, session_id (SET NULL on session delete), emotion, source, confidence, signals (JSON), action_taken — tutor_chat rows carry `signals.last_message_id` linking the label to the stored transcript |
+| `emotion_logs` | user_id, session_id (SET NULL on session delete), emotion, source, confidence, signals (JSON), action_taken, **outcome (JSON)** — closed-loop: the question result is written back onto interventions when the attempt is recorded; tutor_chat rows carry `signals.last_message_id` linking the label to the stored transcript |
 | `tutor_conversations` | user_id, session_id (SET NULL on session delete), operation, question_title, message_count, **summary/key_struggles/resolved** (episodic layer), **compact_summary/compacted_through_id** (working-memory view); UNIQUE (session_id, question_title) |
 | `tutor_messages` | conversation_id, role, content, created_at — verbatim append-only transcript (clean text; prompt wrappers are never stored) |
 

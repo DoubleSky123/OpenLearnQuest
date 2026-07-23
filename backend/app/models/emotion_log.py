@@ -25,5 +25,10 @@ class EmotionLog(Base):
     signals: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     # 'none' | 'reduce_difficulty' | 'increase_difficulty' | 'show_hint' | 'encourage'
     action_taken: Mapped[str | None] = mapped_column(String, nullable=True)
+    # closed-loop intervention telemetry: what happened to the question this
+    # intervention belonged to — {question_id, operation, passed, error_count}.
+    # Written back by game_master when the attempt is recorded; NULL = no
+    # attempt recorded after this intervention (yet).
+    outcome: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     user: Mapped["User"] = relationship("User", back_populates="emotion_logs")

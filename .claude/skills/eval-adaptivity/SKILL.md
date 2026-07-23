@@ -42,8 +42,8 @@ db.close()"
 |---|---|---|
 | 1. Emotion distribution | mostly `engaged`, per source | one source (behavioral vs tutor_chat) wildly disagreeing with the other → check that inference path |
 | 2. Transition matrix | `frustrated → engaged/confused` transitions exist | `frustrated → frustrated` dominant → interventions not landing |
-| 3. Intervention success | >50% of actions followed by improvement | a specific `action_taken` consistently <50% → that intervention is miscalibrated |
-| 4. Difficulty oscillation | avg rate near 0 (monotonic ramps) | high rate (≈0.5+) → controller gain too high, it's thrashing; lower the emotion gain scaling |
+| 3. Intervention success | >50% of actions followed by improvement; **closed-loop subsection** (from `emotion_logs.outcome`) is authoritative once populated — per-action pass rates + avg errors | a specific `action_taken` consistently <50% → that intervention is miscalibrated |
+| 4. Difficulty oscillation | avg rate ≈ 0 — the EMA+hysteresis controller (2026-07) should produce monotonic staircases | rate creeping back up → controller thresholds/confirmations were changed without re-running `tests/test_intra_controller.py` |
 | 5. Distributions | intra_difficulty spread across L1–L3 | stuck at one level → controller output is pinned; check `compute_intra_difficulty` inputs |
 | 6. Summary + ZPD check | error rate 25–30%, telemetry coverage high | error rate ≪25% = too easy (bored risk); ≫30% = too hard (frustration risk). Low coverage = old pre-telemetry data — judge from recent sessions only |
 

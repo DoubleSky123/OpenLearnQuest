@@ -38,6 +38,7 @@ logger = logging.getLogger(__name__)
 
 from ..models.mastery import Mastery
 from ..models.concept_mastery import ConceptMastery
+from ..models.emotion_log import EmotionLog
 from ..models.game_session import GameSession
 from ..models.question_attempt import QuestionAttempt
 from .claude_service import generate_question, OP_META
@@ -301,6 +302,48 @@ def start_session(
 
 # ── Next question (after student answers) ─────────────────────────────────────
 
+def clamp_scaffold(scaffold_level: int | None, error_count: int) -> int | None:
+    """Server-side integrity clamp for client-computed scaffold telemetry.
+
+    Mirrors useScaffold.js: level = emotion baseline (max 2, frustrated) +
+    one climb per error, ceiling 4. Anything above that cap cannot have been
+    produced by the real orchestrator — reject it at the door so telemetry
+    (and any future ablation arm) stays trustworthy.
+    """
+    if scaffold_level is None:
+        return None
+    cap = min(4, (error_count or 0) + 2)
+    return max(0, min(int(scaffold_level), cap))
+
+
+def _close_intervention_loop(
+    db: Session, session_id: str, question_id: str, operation: str,
+    passed: bool, error_count: int,
+) -> None:
+    """Closed-loop intervention telemetry: interventions logged since the last
+    recorded attempt belong to this question — write the question's outcome
+    back onto them so their effectiveness becomes measurable."""
+    pending = (
+        db.query(EmotionLog)
+        .filter(
+            EmotionLog.session_id == session_id,
+            EmotionLog.action_taken.isnot(None),
+            EmotionLog.action_taken != "none",
+            EmotionLog.outcome.is_(None),
+        )
+        .all()
+    )
+    for log in pending:
+        log.outcome = {
+            "question_id": question_id,
+            "operation": operation,
+            "passed": passed,
+            "error_count": error_count,
+        }
+    if pending:
+        db.commit()
+
+
 def record_result(
     db: Session,
     user_id: str,
@@ -321,10 +364,12 @@ def record_result(
     Called by the frontend as soon as the correct answer is detected, before
     the student clicks Next. Returns updated concept_mastery for UI refresh.
     """
+    scaffold_level = clamp_scaffold(scaffold_level, error_count)
     attempt = QuestionAttempt(
         id=str(uuid.uuid4()),
         session_id=session_id,
         question_id=question_id,
+        operation=operation,
         difficulty=next(lv for lv, ops in LEVEL_OPS.items() if operation in ops),
         time_spent_ms=time_ms,
         error_count=error_count,
@@ -336,12 +381,36 @@ def record_result(
     )
     db.add(attempt)
     db.commit()
+    _close_intervention_loop(db, session_id, question_id, operation, passed, error_count)
     update_mastery(db, user_id, module_id, operation, passed, error_count)
     mastery_map = get_mastery_map(db, user_id, module_id)
     return {
         "concept_mastery":  get_concept_mastery_map(db, user_id),
         "mastery_summary":  mastery_summary(mastery_map, module_id),
+        # for the post-question analysis card
+        "xp_gained":          attempt.xp_gained,
+        "concepts_exercised": concepts_for_op(operation),
+        "peer":               _peer_stats(db, operation, attempt.id, time_ms),
     }
+
+
+def _peer_stats(db: Session, operation: str, attempt_id: str, time_ms: int) -> dict | None:
+    """'Beats N%' time percentile among passed attempts on the same operation.
+    Returns None below a minimum sample (a percentile over 2 attempts is noise)."""
+    times = [
+        t for (t,) in db.query(QuestionAttempt.time_spent_ms)
+        .filter(
+            QuestionAttempt.operation == operation,
+            QuestionAttempt.passed.is_(True),
+            QuestionAttempt.id != attempt_id,
+        )
+        .all()
+        if t is not None
+    ]
+    if len(times) < 3:
+        return None
+    slower = sum(1 for t in times if t > time_ms)
+    return {"beats_pct": round(100 * slower / len(times)), "sample": len(times)}
 
 
 def level_up(
@@ -415,17 +484,19 @@ def next_question(
             id=str(uuid.uuid4()),
             session_id=session_id,
             question_id=question_id,
+            operation=operation,
             difficulty=next(lv for lv, ops in LEVEL_OPS.items() if operation in ops),
             time_spent_ms=time_ms,
             error_count=error_count,
             xp_gained=_calc_xp(operation, error_count) if passed else 0,
             passed=passed,
             intra_difficulty=intra_difficulty,
-            scaffold_level=scaffold_level,
+            scaffold_level=clamp_scaffold(scaffold_level, error_count),
             emotion=emotion,
         )
         db.add(attempt)
         db.commit()
+        _close_intervention_loop(db, session_id, question_id, operation, passed, error_count)
         update_mastery(db, user_id, module_id, operation, passed, error_count)
     mastery_map = get_mastery_map(db, user_id, module_id)
 
@@ -547,41 +618,68 @@ def prefetch_question(
 
 
 # ── State axis: ZPD within-type difficulty controller ───────────────────────────
-_INTRA_WINDOW   = 4
-_P_LOW, _P_HIGH = 0.15, 0.5   # target error-rate band (desirable difficulty ≈ 0.25–0.30)
+# EMA + hysteresis controller — behavioural contract in tests/test_intra_controller.py.
+# Old version (windowed rate + hard thresholds) oscillated: one question moved the
+# estimate by 1/window and jumped a whole level (observed reversal rate 0.5/session).
+_EMA_ALPHA = 0.25    # per-question learning rate of the error-rate estimate
+_EMA_SEED  = 0.275   # start mid target band (desirable difficulty ≈ 25–30% errors)
+_UP_T      = 0.22    # estimated error rate below this → candidate to ramp up
+_DOWN_T    = 0.40    # above this → candidate to ease off (dead zone in between)
+_CONFIRM   = 2       # consecutive out-of-band readings required to move a level
 
 
 def compute_intra_difficulty(db: Session, session_id: str, emotion: str = "engaged") -> int:
     """
-    Within-type difficulty (1=easy, 2=medium, 3=hard) for the next question.
-
-    Driven by the recent error rate in this session (ZPD / desirable difficulty):
-    too many errors → ease off; too few → ramp up. Emotion only *modulates*:
-    frustrated eases, bored ramps, confused/engaged stay neutral (confusion is
-    handled by scaffolding, not by lowering difficulty).
+    Within-type difficulty (1=easy, 2=medium, 3=hard) for the next question —
+    deterministic replay of the session history; see _intra_from_history.
     """
     rows = (
         db.query(QuestionAttempt.error_count)
           .filter(QuestionAttempt.session_id == session_id)
-          .order_by(QuestionAttempt.completed_at.desc())
-          .limit(_INTRA_WINDOW)
+          .order_by(QuestionAttempt.completed_at)
           .all()
     )
-    if not rows:
-        level = 2   # seed medium on the first question
-    else:
-        err_rate = sum(1 for (ec,) in rows if (ec or 0) > 0) / len(rows)
-        if err_rate > _P_HIGH:
-            level = 1
-        elif err_rate < _P_LOW:
-            level = 3
-        else:
-            level = 2
+    flags = [(ec or 0) > 0 for (ec,) in rows]
+    return _intra_from_history(flags, emotion)
 
+
+def _intra_from_history(error_flags: list[bool], emotion: str = "engaged") -> int:
+    """
+    Pure deterministic fold of the session's pass/fail history into a level.
+
+    Two anti-oscillation mechanisms (target: desirable difficulty, ~25-30% errors):
+      - EMA: each question nudges the error-rate estimate by _EMA_ALPHA instead
+        of yanking it by 1/window — no cliff when old results "fall out".
+      - Hysteresis: a dead zone between _UP_T and _DOWN_T plus _CONFIRM
+        consecutive out-of-band readings before any move; levels change one
+        step at a time. A single lucky/unlucky question can never flip a level.
+
+    Emotion only scales the controller's GAIN (never the question type):
+    frustrated eases sooner (lower threshold, single confirmation), bored ramps
+    sooner; confused/engaged stay neutral — confusion is handled by
+    scaffolding, not by easier work.
+    """
+    up_t, down_t = _UP_T, _DOWN_T
+    up_confirm = down_confirm = _CONFIRM
     if emotion == "frustrated":
-        level = max(1, level - 1)
+        down_t, down_confirm = 0.32, 1
     elif emotion == "bored":
-        level = min(3, level + 1)
+        up_t, up_confirm = 0.30, 1
+
+    level, ema = 2, _EMA_SEED
+    up_streak = down_streak = 0
+    for erred in error_flags:
+        ema = _EMA_ALPHA * (1.0 if erred else 0.0) + (1 - _EMA_ALPHA) * ema
+        if ema < up_t:
+            up_streak, down_streak = up_streak + 1, 0
+        elif ema > down_t:
+            down_streak, up_streak = down_streak + 1, 0
+        else:
+            up_streak = down_streak = 0
+        if up_streak >= up_confirm:
+            level, up_streak = min(3, level + 1), 0
+        elif down_streak >= down_confirm:
+            level, down_streak = max(1, level - 1), 0
     return level
 
 

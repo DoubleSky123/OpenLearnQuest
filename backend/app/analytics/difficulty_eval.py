@@ -101,12 +101,27 @@ def intervention_success(logs: list[EmotionLog]) -> None:
 
     if not by_action_total:
         print("  (no interventions with a following log — actions all 'none', or too little data)")
-        return
-    tot = sum(by_action_total.values())
-    ok = sum(by_action_ok.values())
-    print(f"  overall: {ok}/{tot} = {_pct(ok, tot)} improved (or stayed engaged) on the next log")
-    for act, n in by_action_total.most_common():
-        print(f"    {act:20} {by_action_ok.get(act, 0)}/{n} = {_pct(by_action_ok.get(act, 0), n)}")
+    else:
+        tot = sum(by_action_total.values())
+        ok = sum(by_action_ok.values())
+        print(f"  overall: {ok}/{tot} = {_pct(ok, tot)} improved (or stayed engaged) on the next log")
+        for act, n in by_action_total.most_common():
+            print(f"    {act:20} {by_action_ok.get(act, 0)}/{n} = {_pct(by_action_ok.get(act, 0), n)}")
+
+    # ── Closed-loop outcomes (authoritative once emotion_logs.outcome is populated) ──
+    closed = [l for l in logs if l.action_taken and l.action_taken != "none" and l.outcome]
+    if closed:
+        print(f"  closed-loop outcomes ({len(closed)} interventions with recorded results):")
+        by_action: dict[str, list] = defaultdict(list)
+        for l in closed:
+            by_action[l.action_taken].append(l.outcome)
+        for act, outs in sorted(by_action.items(), key=lambda kv: -len(kv[1])):
+            passed = sum(1 for o in outs if o.get("passed"))
+            avg_err = sum(o.get("error_count", 0) for o in outs) / len(outs)
+            print(f"    {act:20} question passed after: {passed}/{len(outs)} = {_pct(passed, len(outs))}"
+                  f"  avg errors on that question: {avg_err:.1f}")
+    else:
+        print("  closed-loop outcomes: (none yet — populated for attempts recorded after the outcome column landed)")
 
 
 def difficulty_oscillation(attempts: list[QuestionAttempt]) -> None:
