@@ -189,12 +189,70 @@ def run_scenario(name: str, show_context: bool) -> list[str]:
     return failures
 
 
+def auto_conversation(turns: int, persona: str) -> None:
+    """Watch a full conversation unfold: Haiku plays the student for N turns.
+    Costs ~2 calls per turn (student + tutor). Prints the transcript; no checks."""
+    from anthropic import Anthropic
+    from app.config import settings
+    client = Anthropic(api_key=settings.anthropic_api_key)
+
+    base = SCENARIOS["fresh_error1"]["kwargs"]
+    history: list[dict] = []
+    student_msg = "I don't get why my order is wrong."
+    tool_calls: list = []
+
+    orig = ta._execute_tool
+    def recording_execute(tool_name, input_data):
+        tool_calls.append(input_data.get("concept"))
+        return orig(tool_name, input_data)
+    ta._execute_tool = recording_execute
+
+    print(f"=== auto conversation: {turns} turns, student persona: {persona} ===")
+    print(f"(operation: {base['operation']}, error_count: {base['error_count']})\n")
+    try:
+        for i in range(turns):
+            print(f"  student: {student_msg}")
+            reply = ta.chat(**{**base, "messages": history, "user_message": student_msg})
+            print(f"  tutor:   {reply}")
+            if tool_calls:
+                print(f"           [lookup_resource called: {tool_calls[-1]}]")
+                tool_calls.clear()
+            print()
+            history += [{"role": "user", "content": student_msg},
+                        {"role": "assistant", "content": reply}]
+            if i == turns - 1:
+                break
+            # Haiku plays the student for the next turn
+            sim = client.messages.create(
+                model="claude-haiku-4-5", max_tokens=120,
+                messages=[{"role": "user", "content":
+                    f"You are role-playing a student in a linked-list tutoring session. "
+                    f"Persona: {persona}. Your (wrong) attempt was: "
+                    f"{' then '.join(base['your_answer'])}. Below is the conversation so far. "
+                    f"Reply with ONLY the student's next short message (1-2 sentences, casual, "
+                    f"stay in character, do not solve it instantly).\n\n"
+                    + "\n".join(f"{m['role']}: {m['content']}" for m in history)}],
+            )
+            student_msg = sim.content[0].text.strip()
+    finally:
+        ta._execute_tool = orig
+    print(f"=== transcript complete: {len(history) // 2} exchanges ===")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--scenario", default="all", choices=["all", *SCENARIOS])
     parser.add_argument("--show-context", action="store_true",
                         help="print the built first-turn context block instead of calling the API")
+    parser.add_argument("--auto-student", type=int, metavar="N", default=0,
+                        help="watch a live N-turn conversation (Haiku plays the student)")
+    parser.add_argument("--persona", default="a confused beginner who understands slowly and sometimes guesses wrong",
+                        help="student persona for --auto-student")
     args = parser.parse_args()
+
+    if args.auto_student > 0:
+        auto_conversation(args.auto_student, args.persona)
+        return 0
 
     names = list(SCENARIOS) if args.scenario == "all" else [args.scenario]
     all_failures: list[str] = []

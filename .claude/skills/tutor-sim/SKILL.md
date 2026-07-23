@@ -18,8 +18,10 @@ cd backend
 d:/openLearnquest/venv/Scripts/python.exe ../.claude/skills/tutor-sim/tutor_sim.py [--scenario NAME] [--show-context]
 ```
 
-- Full run = 5 scenarios ≈ 5–10 Haiku calls (~10s). `--scenario NAME` runs one.
+- Full run = 8 scenarios ≈ 8–12 Haiku calls (~20s). `--scenario NAME` runs one.
 - `--show-context` prints the built first-turn context block **without any API call** — use this (free) to eyeball `[TUTOR CONTEXT]` / `[STUDENT HISTORY]` changes after editing `build_context_block()`.
+- `--auto-student N [--persona "..."]` — watch a full N-turn conversation unfold: Haiku role-plays the student, the transcript prints turn by turn (≈2 calls/turn). No pass/fail checks — this is for reading how the tutor actually behaves across a whole dialogue (verdict tone, when the video appears, whether it stays anchored on the error).
+- Stochasticity note: single runs can flake; before declaring a prompt regression fixed, re-run the failing scenario several times (`for i in 1..6`). Judgment-sensitive rules work best injected in-context near the data (`[JUDGING]` in `build_context_block`) rather than only in the system prompt.
 
 ## Scenarios and what they enforce
 

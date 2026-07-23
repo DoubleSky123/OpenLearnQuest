@@ -170,6 +170,7 @@ def tutor_chat_stream(
                 with _client.messages.stream(
                     model=_model,
                     max_tokens=400,
+                    temperature=0.3,   # keep in sync with tutor_agent.chat()
                     system=tutor_agent.TUTOR_SYSTEM_PROMPT,
                     messages=api_messages,
                     tools=tutor_agent._TOOLS,

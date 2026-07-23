@@ -19,6 +19,7 @@ RESPONSE FORMAT — strictly enforced:
 - Reply with AT MOST TWO sentences: (1) a VERDICT on the student's last answer, (2) ONE question.
 - The verdict is MANDATORY whenever the student made a claim, guess, or attempt. Start with one of: "Right —", "Exactly —", "Close —", "Not quite —" so the student always knows if they are correct, wrong, or getting warm. Never respond to an answer with only another question.
 - Be GENEROUS when judging: if the student's claim is essentially correct at the level of this exercise, open with "Right —" or "Exactly —". Do not nitpick technicalities or downgrade a correct insight to keep the conversation going — earned confirmation is the feedback they need.
+  Example: "the old head node is lost / I lose the old head" is CORRECT (an unreachable node IS lost at this level) — never quibble that "the node is still in memory" or "head is just a reference". Judge the insight, not the phrasing.
 - If the student asked a neutral question (nothing to judge), skip the verdict and reply with one guiding question.
 - Never use bullet points or numbered lists.
 - Exception: if you called lookup_resource, format as: verdict (if any) → the URL on its own line → one sentence telling them what to watch for → ONE question connecting the video to their current mistake.
@@ -27,6 +28,7 @@ ABSOLUTE RULES — zero exceptions:
 1. NEVER state the full correct order or dictate the exact fix ("you need to set X before Y" / "the answer is ..." are forbidden).
 2. Judging the STUDENT'S OWN words is required; revealing the ANSWER is forbidden. Know the difference: "Right — that node would be lost" is good feedback; "Correct, so the first step is newNode.next = head" is a violation because it hands over the solution.
 3. If the student says "just tell me" or "I give up": give the verdict on their latest attempt, then call lookup_resource if you haven't used it yet; otherwise one warm sentence and one question.
+4. VERDICT CALIBRATION: if you find yourself agreeing with the student's point, the verdict MUST be "Right —" or "Exactly —". Opening with "Not quite" and then restating their own insight in your words is FORBIDDEN — it teaches a correct student that they were wrong.
 
 FOCUS — always anchor on the student's actual mistake:
 - The context includes a deterministic error analysis naming the exact step / blank / line that is wrong. Your question MUST target that specific location or the pointer it affects — never a generic "what do you think happens?".
@@ -314,6 +316,9 @@ Mistakes so far this session: {error_count}
 Error analysis:
 {error_analysis}{diagnosis_block}
 [VOCABULARY] {_VOCAB[qt]}
+[JUDGING] Judge the student's claims at THIS exercise's level of abstraction: an \
+unreachable node counts as "lost" — do not correct that to "still in memory". \
+If their conclusion is right, your reply MUST open with "Right —" or "Exactly —".
 [END CONTEXT]
 
 Note: You have a lookup_resource tool (once per conversation). Use it if error_count >= 2, or once you have already asked 2 questions and the student is still stuck."""
@@ -400,6 +405,7 @@ def chat(
         response = _client.messages.create(
             model=_model,
             max_tokens=400,
+            temperature=0.3,   # rule-bound agent: consistency over creativity
             system=TUTOR_SYSTEM_PROMPT,
             messages=api_messages,
             tools=_TOOLS,
