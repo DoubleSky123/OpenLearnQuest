@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from anthropic import Anthropic, APIError
 from sqlalchemy.orm import Session
 from ..services import tutor_agent, tutor_memory
+from ..services.error_analyzer import analyze_error as _diagnose
 from ..dependencies import get_current_user
 from ..database import get_db
 from ..models.user import User
@@ -28,6 +29,7 @@ class TutorRequest(BaseModel):
     question_title: str
     operation: str
     your_answer: list[str] = []
+    board_note: str | None = None   # "where the student is right now" (fill_blank/find_bug boards)
     correct_answer: list[str] = []
     error_count: int = 0
     # legacy client-held history — ignored when a persisted conversation exists
@@ -64,6 +66,17 @@ def _fetch_history(db: Session, user_id: str, question_title: str, operation: st
     if episodic:
         parts.append(episodic)
     return "\n\n".join(p for p in parts if p)
+
+
+def _auto_diagnosis(body: "TutorRequest") -> dict | None:
+    """Server-side structured error diagnosis when the client didn't supply one.
+    (The client always sent null — this makes [ERROR DIAGNOSIS] actually fire.)"""
+    if body.error_diagnosis is not None:
+        return body.error_diagnosis
+    if not body.your_answer or not body.correct_answer:
+        return None
+    diag = _diagnose(body.operation, body.your_answer, body.correct_answer)
+    return diag if diag.get("error_type") not in (None, "correct") else None
 
 
 @router.get("/history")
@@ -115,9 +128,10 @@ def tutor_chat(
             messages=history,
             user_message=body.user_message,
             model=body.model,
-            error_diagnosis=body.error_diagnosis,
+            error_diagnosis=_auto_diagnosis(body),
             student_history=student_history,
             question_type=body.question_type,
+            board_note=body.board_note,
         )
     except APIError as e:
         raise HTTPException(status_code=503, detail=f"Claude API error: {str(e)}")
@@ -160,7 +174,8 @@ def tutor_chat_stream(
             body.question_title, body.operation,
             body.your_answer, body.correct_answer,
             body.error_count, history, body.user_message,
-            body.error_diagnosis, student_history, body.question_type,
+            _auto_diagnosis(body), student_history, body.question_type,
+            body.board_note,
         )
         _model = body.model or "claude-haiku-4-5"
         full_text = ""

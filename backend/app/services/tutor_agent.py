@@ -28,7 +28,8 @@ ABSOLUTE RULES — zero exceptions:
 1. NEVER state the full correct order or dictate the exact fix ("you need to set X before Y" / "the answer is ..." are forbidden).
 2. Judging the STUDENT'S OWN words is required; revealing the ANSWER is forbidden. Know the difference: "Right — that node would be lost" is good feedback; "Correct, so the first step is newNode.next = head" is a violation because it hands over the solution.
 3. If the student says "just tell me" or "I give up": give the verdict on their latest attempt, then call lookup_resource if you haven't used it yet; otherwise one warm sentence and one question.
-4. VERDICT CALIBRATION: if you find yourself agreeing with the student's point, the verdict MUST be "Right —" or "Exactly —". Opening with "Not quite" and then restating their own insight in your words is FORBIDDEN — it teaches a correct student that they were wrong.
+4. VERDICT CALIBRATION: if you find yourself agreeing with the student's point, the verdict MUST be "Right —" or "Exactly —". Opening with "Not quite" and then restating their own insight in your words is FORBIDDEN — it teaches a correct student that they were wrong. If a message contains a correct statement PLUS a question, verdict the statement first ("Right — ..."), then address the question.
+5. ENDGAME: when the student has articulated the fix or correct order THEMSELVES, confirm once ("Right — exactly, go make that change") and stop guiding. Do NOT re-explain it back with step numbers, do NOT dictate "swap steps 2 and 3" (rule 1 applies even as a wrap-up), and NEVER claim "I can't tell you the answer" right after the student said something correct — confirming their words is allowed, so confirm them.
 
 FOCUS — always anchor on the student's actual mistake:
 - The context includes a deterministic error analysis naming the exact step / blank / line that is wrong. Your question MUST target that specific location or the pointer it affects — never a generic "what do you think happens?".
@@ -41,9 +42,12 @@ QUESTION STRATEGY — escalate concreteness, not difficulty:
 - After that, prefer the video (below) over more questions.
 
 WHEN TO USE lookup_resource (call it AT MOST ONCE per conversation):
-- You have already asked 2 questions in this conversation and the student still hasn't got it — STOP quizzing and call it. Do not interrogate a stuck student endlessly.
+- You have already asked 2 questions and the student is STILL STUCK — wrong or lost on both — then STOP quizzing and call it. Do not interrogate a stuck student endlessly.
 - The student explicitly asks for a video, example, or resource.
-- error_count >= 2 on their board.
+- error_count >= 2 on their board AND the conversation isn't already moving them forward.
+- NEVER send the video when the student is making progress: if your verdict on their
+  last answer was "Right/Exactly/Close", keep guiding with questions — a student who
+  just got something right needs momentum, not a detour to YouTube.
 
 TONE: warm, brief, honest. Praise no longer than two words ("Nice!", "Exactly!").
 
@@ -277,10 +281,12 @@ def build_context_block(
     error_diagnosis: dict | None = None,
     student_history: str = "",
     question_type: str | None = None,
+    board_note: str | None = None,
 ) -> str:
     """Injects question context + error analysis + cross-session history into the first user message."""
     error_analysis = analyze_error(your_answer, correct_answer)
     qt = question_type if question_type in _ACTIVITY else "ordering"
+    board_block = f"\nWhere the student is RIGHT NOW: {board_note}" if board_note else ""
 
     diagnosis_block = ""
     if error_diagnosis and error_diagnosis.get("error_type") not in (None, "correct"):
@@ -311,7 +317,7 @@ Operation: {question_title} ({operation})
 Exercise: This is {_ACTIVITY[qt]}.
 {_ATTEMPT_LABEL[qt]}: {' → '.join(your_answer) if your_answer else '(nothing yet)'}
 {_SOLUTION_LABEL[qt]}: {' → '.join(correct_answer) if correct_answer else '(not provided)'}
-Mistakes so far this session: {error_count}
+Mistakes so far this session: {error_count}{board_block}
 {history_block}
 Error analysis:
 {error_analysis}{diagnosis_block}
@@ -337,6 +343,7 @@ def build_api_messages(
     error_diagnosis: dict | None = None,
     student_history: str = "",
     question_type: str | None = None,
+    board_note: str | None = None,
 ) -> list[dict]:
     """Build the messages list for the Claude API call."""
     api_messages: list[dict] = []
@@ -344,7 +351,7 @@ def build_api_messages(
     if not messages:
         context_block = build_context_block(
             question_title, operation, your_answer, correct_answer,
-            error_count, error_diagnosis, student_history, question_type,
+            error_count, error_diagnosis, student_history, question_type, board_note,
         )
         api_messages.append({
             "role": "user",
@@ -361,11 +368,14 @@ def build_api_messages(
         tool_note = (
             "" if video_shared else
             f"\nQuestions you have asked so far: {questions_asked}. "
-            "If that is 2 or more and the student is still stuck, STOP quizzing — call lookup_resource now."
+            "If that is 2 or more AND the student's answers are still wrong or lost, stop "
+            "quizzing and call lookup_resource. But if their latest answer deserves a "
+            "Right/Exactly/Close verdict, they are progressing — keep guiding, NO video."
         )
+        board_line = f"\nWhere the student is RIGHT NOW: {board_note}" if board_note else ""
         context_refresh = (
             f"[Context refresh — errors: {error_count}, "
-            f"current attempt: {' → '.join(your_answer) if your_answer else 'nothing'}\n"
+            f"current attempt: {' → '.join(your_answer) if your_answer else 'nothing'}{board_line}\n"
             f"Updated error analysis:\n{fresh_analysis}{tool_note}]\n"
         )
         api_messages.append({"role": "user", "content": context_refresh + user_message})
@@ -387,6 +397,7 @@ def chat(
     error_diagnosis: dict | None = None,
     student_history: str = "",
     question_type: str | None = None,
+    board_note: str | None = None,
 ) -> str:
     """
     Send one turn to the tutor agent and return its reply.
@@ -396,7 +407,8 @@ def chat(
     """
     api_messages = build_api_messages(
         question_title, operation, your_answer, correct_answer,
-        error_count, messages, user_message, error_diagnosis, student_history, question_type,
+        error_count, messages, user_message, error_diagnosis, student_history,
+        question_type, board_note,
     )
 
     _model = model or "claude-haiku-4-5"
