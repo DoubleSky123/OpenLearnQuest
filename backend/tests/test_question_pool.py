@@ -53,7 +53,15 @@ def test_content_hash_ignores_build_randomness():
     a, b = _mk_q(), _mk_q()
     a["initialNodes"] = [{"id": 1, "value": 42}]
     b["initialNodes"] = [{"id": 1, "value": 7}]
-    assert question_pool.content_hash(a) == question_pool.content_hash(b)
+    assert question_pool.content_hash(a, 2) == question_pool.content_hash(b, 2)
+
+
+def test_same_content_at_different_intra_is_not_a_duplicate(db):
+    # Tiny ops reuse distractor sets across tiers; each tier keeps its own row.
+    q = _mk_q()
+    assert question_pool.insert_question(db, q, 1) is not None
+    assert question_pool.insert_question(db, dict(q), 2) is not None
+    assert question_pool.insert_question(db, dict(q), 2) is None
 
 
 def test_serve_excludes_questions_this_student_attempted(db):

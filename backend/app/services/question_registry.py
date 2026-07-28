@@ -533,15 +533,18 @@ def _find_bug_validate(raw: str, operation: str, meta: dict) -> dict:
     # Sanitize wrong_options instead of rejecting: models persistently include
     # the correct line as a "plausible fix" (it IS the most plausible one), and
     # burning retries on that starved removeAtHead. Drop copies of the correct
-    # line, copies of other template steps, and duplicates; the question is
-    # still sound with one fewer distractor as long as one real wrong survives.
+    # line (textual OR alias-equivalent — 'head = temp.next;' is a working fix
+    # when temp holds head, and a student picking it must not be marked wrong),
+    # copies of other template steps, and duplicates; the question is still
+    # sound with one fewer distractor as long as one real wrong survives.
     correct_key = correct_line.strip().rstrip(";")
     other_lines = {s.strip().rstrip(";") for i, s in enumerate(template_steps) if i != bug_line}
     seen: set[str] = set()
     wrong_opts: list[str] = []
     for opt in (_ascii_ops(o) for o in ai.get("wrong_options", [])):
         key = opt.strip().rstrip(";")
-        if key == correct_key or key in other_lines or key in seen:
+        if (key == correct_key or key in other_lines or key in seen
+                or _substitute(key) == c_norm or key == _substitute(c_norm)):
             continue
         seen.add(key)
         wrong_opts.append(opt)
@@ -550,8 +553,10 @@ def _find_bug_validate(raw: str, operation: str, meta: dict) -> dict:
             "no usable wrong_options: every option was the correct line, a copy of "
             "another step, or a duplicate — provide genuinely incorrect fixes")
 
-    # SLL constraint check
-    all_text = " ".join(template_steps + [buggy_line] + wrong_opts + [ai.get("bug_explanation", "")])
+    # SLL constraint check — CODE fields only. bug_explanation is English prose:
+    # "the tail of the list" is correct teaching language for insertAtTail and
+    # must not trip the no-'tail'-variable rule.
+    all_text = " ".join(template_steps + [buggy_line] + wrong_opts)
     reason = _sll_reject_reason(all_text, operation)
     if reason:
         raise ValueError(f"SLL violation in find_bug question: {reason}")

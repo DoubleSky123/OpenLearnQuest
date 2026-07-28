@@ -59,6 +59,14 @@ def test_wrong_option_equal_to_correct_line_is_dropped_not_rejected():
     assert q["options"] == ["temp = head;", "temp = NULL;"]   # fix + survivor
 
 
+def test_alias_equivalent_wrong_option_is_dropped():
+    # 'head = temp.next;' works as a fix at line 1 (temp holds head) — a student
+    # picking it must not be marked wrong, so it can't stand as a wrong option.
+    q = _validate("removeAtHead", 1, "head = head.next.next;",
+                  wrong=["head = temp.next;", "head = NULL;"])
+    assert q["options"] == ["head = head.next;", "head = NULL;"]
+
+
 def test_all_bogus_wrong_options_still_rejected():
     with pytest.raises(ValueError, match="no usable wrong_options"):
         _validate("removeAtHead", 0, "temp = head.next;",

@@ -35,15 +35,19 @@ _refill_last_attempt: dict[tuple, float] = {}
 _refill_in_flight: set[tuple] = set()
 
 
-def content_hash(q: dict) -> str:
+def content_hash(q: dict, intra_difficulty: int) -> str:
     """Hash of the pedagogical identity, not the whole payload: node values and
-    shuffle order vary per build and must not defeat dedup."""
+    shuffle order vary per build and must not defeat dedup. The intra tier IS
+    part of the identity: tiny ops (insertIntoEmpty has 3 steps) genuinely
+    reuse the same distractor set across tiers, and without the tier in the
+    key whichever tier pools first starves the others permanently (payloads
+    still differ per tier — node count etc. come from INTRA_KNOBS)."""
     qtype = q.get("question_type")
     if qtype == "find_bug":
         core = "\n".join(q.get("pseudocode", []))          # contains the buggy line
     else:  # ordering — correct steps are fixed; the distractor set is the identity
         core = "\n".join(sorted(q.get("distractors", [])))
-    key = f"{q.get('operation')}|{qtype}|{core}"
+    key = f"{q.get('operation')}|{qtype}|i{intra_difficulty}|{core}"
     return hashlib.sha256(key.encode("utf-8")).hexdigest()
 
 
@@ -87,9 +91,13 @@ def serve(db: Session, user_id: str, operation: str, qtype: str,
 
 
 def generate_validated(operation: str, qtype: str, intra_difficulty: int,
-                       variant_seed: int = 0) -> dict:
+                       variant_seed: int = 0, avoid: list[str] | None = None) -> dict:
     """gen_check-style loop: build_prompt -> Haiku -> validate, retried, and
-    RAISES on total failure (no static fallback — see module docstring)."""
+    RAISES on total failure (no static fallback — see module docstring).
+
+    `avoid` lists content already in the pool for this combo (buggy lines for
+    find_bug, distractors for ordering). Without it the model converges on the
+    same bug every call and the refill budget burns on content_hash dedup."""
     from .claude_service import OP_META, MAX_RETRIES, _call_model, _finalize
     from .question_registry import get_handler
     from .question_spec import select_spec
@@ -102,6 +110,11 @@ def generate_validated(operation: str, qtype: str, intra_difficulty: int,
     last_error = ""
     for _ in range(MAX_RETRIES):
         prompt = handler.build_prompt(operation, meta, spec)
+        if avoid:
+            noun = "buggy lines" if qtype == "find_bug" else "distractors"
+            listing = "\n".join(f"- {a}" for a in avoid[:12])
+            prompt += (f"\n\nAlready in the question pool for this operation ({noun}) — "
+                       f"produce something DIFFERENT from all of these:\n{listing}")
         if last_error:
             prompt += f"\n\nPrevious attempt failed: {last_error}\nReturn valid JSON only."
         raw = _call_model(prompt)
@@ -112,9 +125,23 @@ def generate_validated(operation: str, qtype: str, intra_difficulty: int,
     raise RuntimeError(f"generation failed after {MAX_RETRIES} attempts: {last_error}")
 
 
+def _existing_content(rows: list[QuestionPool], qtype: str) -> list[str]:
+    """Buggy lines / distractors already pooled, for the avoid-list."""
+    out: list[str] = []
+    for r in rows:
+        p = r.payload
+        if qtype == "find_bug":
+            steps, line = p.get("pseudocode", []), p.get("bug_line")
+            if isinstance(line, int) and 0 <= line < len(steps):
+                out.append(steps[line])
+        else:
+            out.extend(p.get("distractors", []))
+    return list(dict.fromkeys(out))
+
+
 def insert_question(db: Session, q: dict, intra_difficulty: int) -> QuestionPool | None:
     """Insert a validated question; returns None on a content-hash duplicate."""
-    h = content_hash(q)
+    h = content_hash(q, intra_difficulty)
     if db.query(QuestionPool.id).filter(QuestionPool.content_hash == h).first():
         return None
     row = QuestionPool(
@@ -131,15 +158,19 @@ def insert_question(db: Session, q: dict, intra_difficulty: int) -> QuestionPool
 def refill_combo(db: Session, operation: str, qtype: str, intra: int,
                  target: int = TARGET, max_calls: int | None = None) -> int:
     """Generate+insert until the combo holds `target` rows. Returns rows added.
-    Duplicates and failed generations count against max_calls (default 2x need)."""
-    have = db.query(QuestionPool).filter(
+    Duplicates and failed generations count against max_calls (default 2x need).
+    Existing pool content is fed back as an avoid-list so the model doesn't
+    regenerate the same bug/distractors (dedup exhaustion)."""
+    existing = db.query(QuestionPool).filter(
         QuestionPool.operation == operation,
         QuestionPool.question_type == qtype,
         QuestionPool.intra_difficulty == intra,
-    ).count()
+    ).all()
+    have = len(existing)
     need = target - have
     if need <= 0:
         return 0
+    avoid = _existing_content(existing, qtype)
     added, calls = 0, 0
     budget = max_calls if max_calls is not None else need * 2
     seed = have
@@ -147,13 +178,15 @@ def refill_combo(db: Session, operation: str, qtype: str, intra: int,
         calls += 1
         seed += 1
         try:
-            q = generate_validated(operation, qtype, intra, variant_seed=seed)
+            q = generate_validated(operation, qtype, intra, variant_seed=seed, avoid=avoid)
         except Exception as e:
             logger.warning("pool refill generation failed (%s/%s/i%s): %s",
                            operation, qtype, intra, e)
             continue
-        if insert_question(db, q, intra):
+        row = insert_question(db, q, intra)
+        if row:
             added += 1
+            avoid = list(dict.fromkeys(avoid + _existing_content([row], qtype)))
     return added
 
 
