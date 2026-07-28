@@ -20,7 +20,7 @@ Before editing anything, pin down with the user (or infer and state):
 
 ### 1a. `backend/app/services/static_questions.py` — FOUR dicts, all required
 
-1. **`TEMPLATES`** (top of file): full entry with `title`, `pseudocode`, `correctOrder`, `hint`, `distractors` (3 plausible-but-wrong lines), `needsValue`, `needsPosition`, `minNodes`. Add `validOrders` only if some steps genuinely commute (e.g. `createNode` before vs. after traversal — see `insertAtTail`).
+1. **`TEMPLATES`** (top of file): full entry with `title`, `pseudocode`, `correctOrder`, `hint`, **`step_hints` (one Socratic line per pseudocode step — parallel array, enforced by `tests/test_step_hints.py`)**, `distractors` (3 plausible-but-wrong lines), `needsValue`, `needsPosition`, `minNodes`. Add `validOrders` only if some steps genuinely commute (e.g. `createNode` before vs. after traversal — see `insertAtTail`).
 2. **`_BLANKS`**: 2 blank sets; each set has one `{"a": answer, "w": [wrong1, wrong2]}` per pseudocode step. **Constraint**: each `"a"` must be an exact substring of the same-index pseudocode step (`str.replace(a, "___", 1)` must hit).
 3. **`_BUGS`**: one entry `{line, buggy, fix, explanation, options}` — `line` is the 0-indexed pseudocode step to corrupt, `options` includes the fix plus 2 wrong candidates.
 4. **`CONSIDER`**: 1–2 post-question extension questions (shown on the analysis card; "Ask the tutor" seeds the chat with one). Falls back to a generic question if missing, but write real ones.

@@ -129,7 +129,9 @@ export default function FindBugBoard({ question, onComplete, onError, onStateCha
                 </div>
                 {isWrong && (
                   <p className="text-red-400 text-xs ml-6 mt-0.5">
-                    Look more carefully — think about what result each step produces.
+                    {question.step_hints?.[lineIdx]
+                      ? `This line is doing its job — ${question.step_hints[lineIdx]}`
+                      : 'Look more carefully — think about what result each step produces.'}
                   </p>
                 )}
               </div>
@@ -161,7 +163,8 @@ export default function FindBugBoard({ question, onComplete, onError, onStateCha
           </div>
           {wrongFix && (
             <p className="text-red-400 text-xs mt-2">
-              That's not right — think about what pointer gets lost with the buggy version.
+              That's not right — {question.step_hints?.[selectedLine]
+                ?? 'think about what pointer gets lost with the buggy version.'}
             </p>
           )}
         </div>

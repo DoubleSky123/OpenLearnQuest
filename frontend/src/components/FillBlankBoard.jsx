@@ -99,13 +99,15 @@ export default function FillBlankBoard({ question, onComplete, onError, onStateC
 
   // Lift board state for the tutor: clean attempt lines (resolved / still-blank)
   // + a one-line note saying exactly where the student is and what they last tried.
+  // NOTE: question.pseudocode arrives PRE-BLANKED ("___" already in the line) —
+  // resolved lines must substitute the filled answer back in.
   useEffect(() => {
     if (!onStateChange) return;
     const lines = question.pseudocode.map((line, i) => {
       const b = blankByLine[i];
-      if (!b) return line;                                   // pre-given line
-      if (filled[b.idx] !== null) return line;               // correctly resolved
-      return line.replace(b.answer, '___');                  // still blank
+      if (!b) return line;                                             // pre-given line
+      if (filled[b.idx] !== null) return line.replace('___', filled[b.idx]);  // resolved
+      return line;                                                     // still blank (has ___)
     });
     let note = null;
     if (!allFilled) {
@@ -188,7 +190,7 @@ export default function FillBlankBoard({ question, onComplete, onError, onStateC
 
                 {hasError && (
                   <p className="text-red-500 text-xs ml-6 mt-1">
-                    Not quite — think about what variable belongs here.
+                    Not quite — {question.step_hints?.[lineIdx] ?? 'give it another thought.'}
                   </p>
                 )}
               </div>

@@ -9,7 +9,7 @@ from anthropic import Anthropic
 from ..config import settings
 from .question_spec import select_spec
 from .question_registry import get_handler
-from .static_questions import consider_for
+from .static_questions import consider_for, step_hints_for
 
 logger = logging.getLogger(__name__)
 
@@ -110,4 +110,5 @@ def _finalize(q: dict, operation: str, spec) -> dict:
     q["difficulty"]    = spec.difficulty
     q["question_type"] = spec.type
     q["consider"]      = random.choice(consider_for(operation))  # analysis-card extension question
+    q["step_hints"]    = step_hints_for(operation)               # per-line hints (parallel to pseudocode)
     return q

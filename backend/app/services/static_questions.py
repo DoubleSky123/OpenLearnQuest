@@ -29,6 +29,11 @@ TEMPLATES: dict[str, dict] = {
         "pseudocode": ["newNode = createNode(value);", "newNode.next = head;", "head = newNode;"],
         "correctOrder": [0, 1, 2],
         "hint": "What happens to the old head if you overwrite it first?",
+        "step_hints": [
+            "This step brings a brand-new node into existence — nothing is linked yet.",
+            "The new node must grab the old list BEFORE the entry point moves — why?",
+            "Only after the new node is wired in can head safely move to it.",
+        ],
         "distractors": ["node.next = newNode;", "free(temp);", "while (node.next != NULL) node = node.next;"],
         "needsValue": True, "needsPosition": False, "minNodes": 1,
     },
@@ -38,6 +43,13 @@ TEMPLATES: dict[str, dict] = {
         "correctOrder": [0, 1, 2, 3, 4],
         "validOrders": [[0, 1, 2, 3, 4], [0, 2, 1, 3, 4], [2, 0, 1, 3, 4]],
         "hint": "Traverse to the last node before linking.",
+        "step_hints": [
+            "Traversal needs a starting point — which pointer marks the front?",
+            "Where exactly does this loop stop, and why is that the right node?",
+            "Creating the node touches nothing in the list — it just has to exist before linking.",
+            "This is the moment the list actually grows — who links to whom?",
+            "A tail must promise the list ends here — what marks the end?",
+        ],
         "distractors": ["head = newNode;", "newNode.next = head;", "free(temp);"],
         "needsValue": True, "needsPosition": False, "minNodes": 1,
     },
@@ -46,6 +58,11 @@ TEMPLATES: dict[str, dict] = {
         "pseudocode": ["temp = head;", "head = head.next;", "free(temp);"],
         "correctOrder": [0, 1, 2],
         "hint": "Save head before advancing the pointer.",
+        "step_hints": [
+            "Why keep a reference to the node you're about to abandon?",
+            "The entry point skips forward — what still remembers the old head?",
+            "Memory can only be freed when nothing depends on it — is that true yet?",
+        ],
         "distractors": ["node.next = newNode;", "newNode = createNode(value);", "newNode.next = NULL;"],
         "needsValue": False, "needsPosition": False, "minNodes": 2,
     },
@@ -54,6 +71,13 @@ TEMPLATES: dict[str, dict] = {
         "pseudocode": ["node = head;", "while (node.next.next != NULL) node = node.next;", "temp = node.next;", "node.next = NULL;", "free(temp);"],
         "correctOrder": [0, 1, 2, 3, 4],
         "hint": "Stop at the second-to-last node.",
+        "step_hints": [
+            "You can't walk backwards in a singly linked list — start at the front.",
+            "Why stop at the SECOND-to-last node instead of the last one?",
+            "Mark the doomed node — you still need a handle on it to free it.",
+            "The second-to-last node becomes the new tail — what must its next say?",
+            "Free the old tail only after the list no longer points to it.",
+        ],
         "distractors": ["head = head.next;", "newNode = createNode(value);", "node.next = newNode;"],
         "needsValue": False, "needsPosition": False, "minNodes": 2,
     },
@@ -62,6 +86,11 @@ TEMPLATES: dict[str, dict] = {
         "pseudocode": ["newNode = createNode(value);", "newNode.next = NULL;", "head = newNode;"],
         "correctOrder": [0, 1, 2],
         "hint": "The new node becomes the only element.",
+        "step_hints": [
+            "First the node must exist — creation always precedes connection.",
+            "The only node is also the LAST node — what ends a list?",
+            "An empty list's head is NULL — when does it finally point at something?",
+        ],
         "distractors": ["newNode.next = head;", "free(temp);", "node = head;"],
         "needsValue": True, "needsPosition": False, "minNodes": 0,
     },
@@ -70,6 +99,11 @@ TEMPLATES: dict[str, dict] = {
         "pseudocode": ["node = head;", "while (node != NULL) { temp = node.next; free(node); node = temp; }", "head = NULL;"],
         "correctOrder": [0, 1, 2],
         "hint": "Traverse and free each node, then null the head.",
+        "step_hints": [
+            "You need a walker to visit every node — where does it begin?",
+            "Inside the loop: why must temp save node.next BEFORE the free?",
+            "After every node is gone, what should the entry point say?",
+        ],
         "distractors": ["newNode = createNode(value);", "node.next = newNode;", "newNode.next = head;"],
         "needsValue": False, "needsPosition": False, "minNodes": 2,
     },
@@ -79,6 +113,13 @@ TEMPLATES: dict[str, dict] = {
         "correctOrder": [0, 1, 2, 3, 4],
         "validOrders": [[0, 1, 2, 3, 4], [0, 2, 1, 3, 4], [2, 0, 1, 3, 4]],
         "hint": "Walk to the predecessor, then splice in.",
+        "step_hints": [
+            "Walking to a position always starts at the front.",
+            "The walk stops at position-1 — which node do you need to be standing on, and why?",
+            "Creating the node doesn't touch the list — it just has to exist before linking.",
+            "The new node grabs its future neighbour BEFORE the chain is rewired — what would be lost otherwise?",
+            "Now the predecessor lets go of its old neighbour — is that neighbour already saved somewhere?",
+        ],
         "distractors": ["head = newNode;", "free(temp);", "while (node.next != NULL) node = node.next;"],
         "needsValue": True, "needsPosition": True, "minNodes": 2,
     },
@@ -87,6 +128,13 @@ TEMPLATES: dict[str, dict] = {
         "pseudocode": ["node = head;", "for (int i = 0; i < position-2; i++) node = node.next;", "temp = node.next;", "node.next = temp.next;", "free(temp);"],
         "correctOrder": [0, 1, 2, 3, 4],
         "hint": "Walk to the predecessor, bypass the target.",
+        "step_hints": [
+            "Start at the front — to remove a node you need the node BEFORE it.",
+            "This walk stops at the target's predecessor — why the predecessor and not the target?",
+            "temp marks the node being removed — keep a handle on it for the free.",
+            "The chain bypasses the doomed node here — trace exactly who now connects to whom.",
+            "Free the node only after the list no longer routes through it.",
+        ],
         "distractors": ["newNode = createNode(value);", "newNode.next = node.next;", "head = head.next;"],
         "needsValue": False, "needsPosition": True, "minNodes": 3,
     },
@@ -95,6 +143,12 @@ TEMPLATES: dict[str, dict] = {
         "pseudocode": ["prev = NULL;", "node = head;", "while (node != NULL) { temp = node.next; node.next = prev; prev = node; node = temp; }", "head = prev;"],
         "correctOrder": [0, 1, 2, 3],
         "hint": "Reverse each pointer one at a time.",
+        "step_hints": [
+            "The old first node will become the tail — what should it end up pointing to?",
+            "The walker starts at the old front of the list.",
+            "Three pointers rotate inside this loop — why must temp save node.next FIRST?",
+            "When the loop finishes, which variable is standing on the new front?",
+        ],
         "distractors": ["newNode = createNode(value);", "node.next = newNode;", "free(temp);"],
         "needsValue": False, "needsPosition": False, "minNodes": 2,
     },
@@ -103,6 +157,12 @@ TEMPLATES: dict[str, dict] = {
         "pseudocode": ["dummy = createNode(0); node = dummy;", "while (l1 != NULL && l2 != NULL) { if (l1.val <= l2.val) { node.next = l1; l1 = l1.next; } else { node.next = l2; l2 = l2.next; } node = node.next; }", "node.next = (l1 != NULL) ? l1 : l2;", "return dummy.next;"],
         "correctOrder": [0, 1, 2, 3],
         "hint": "Use a dummy node; always attach the smaller value.",
+        "step_hints": [
+            "The dummy gives the result list a fixed anchor — why does that simplify every later step?",
+            "Each round attaches the SMALLER front node — and then which list advances?",
+            "One list ran out — what happens to everything left in the other?",
+            "Why return dummy.next and not dummy itself?",
+        ],
         "distractors": ["head = prev;", "while (node.next != NULL) node = node.next;", "free(temp);"],
         "needsValue": False, "needsPosition": False, "minNodes": 0, "isMerge": True,
     },
@@ -111,6 +171,12 @@ TEMPLATES: dict[str, dict] = {
         "pseudocode": ["slow = head; fast = head;", "while (fast != NULL && fast.next != NULL) { slow = slow.next; fast = fast.next.next; }", "if (slow == fast) return true;", "return false;"],
         "correctOrder": [0, 1, 2, 3],
         "hint": "Floyd's algorithm: fast pointer moves twice as fast.",
+        "step_hints": [
+            "Two runners leave the same starting line — their speeds are what differ.",
+            "Why must FAST be the one checked against NULL, not slow?",
+            "If the two runners ever stand on the same node, what does that prove?",
+            "Fast reached the end of the list — could a cycle have existed?",
+        ],
         "distractors": ["newNode = createNode(value);", "node.next = newNode;", "head = prev;"],
         "needsValue": False, "needsPosition": False, "minNodes": 3,
     },
@@ -119,6 +185,13 @@ TEMPLATES: dict[str, dict] = {
         "pseudocode": ["if (head == NULL || head.next == NULL) return head;", "slow = head; fast = head.next;", "while (fast && fast.next) { slow = slow.next; fast = fast.next.next; }", "mid = slow.next; slow.next = NULL;", "return merge(sortList(head), sortList(mid));"],
         "correctOrder": [0, 1, 2, 3, 4],
         "hint": "Split at midpoint using slow/fast, then merge sort.",
+        "step_hints": [
+            "Recursion needs a base case — which lists are already sorted for free?",
+            "slow/fast again — but this time the goal is finding what?",
+            "When fast hits the end, where exactly is slow standing?",
+            "The split must truly CUT the list in two — why set slow.next to NULL?",
+            "Two sorted halves remain — which earlier operation joins them into one?",
+        ],
         "distractors": ["head = prev;", "newNode = createNode(value);", "node.next = newNode;"],
         "needsValue": False, "needsPosition": False, "minNodes": 3,
     },
@@ -458,6 +531,14 @@ CONSIDER: dict[str, list[str]] = {
 
 def consider_for(operation: str) -> list[str]:
     return CONSIDER.get(operation, ["What edge case could break this operation?"])
+
+
+def step_hints_for(operation: str) -> list[str]:
+    """Per-line Socratic hints, parallel to TEMPLATES[op]['pseudocode'].
+    One table serves all three question types (they render the same lines):
+    fill_blank keys by the blank's line, find_bug by the clicked/bug line,
+    ordering by the misplaced step (see frontend stepHints.js)."""
+    return TEMPLATES.get(operation, {}).get("step_hints") or []
 
 
 def generate_static_question(
