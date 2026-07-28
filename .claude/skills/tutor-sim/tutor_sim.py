@@ -46,13 +46,15 @@ SCENARIOS = {
         "expect_tool": True,
     },
     # fill_blank vocabulary — must not talk about "assembly" / placement order.
+    # Also exercises board_note (the lifted board state: where the student is).
     "fill_blank_vocab": {
         "kwargs": dict(
             question_title="Insert at Head", operation="insertAtHead",
-            your_answer=["newNode", "head.next", "newNode"],
-            correct_answer=["newNode", "head", "newNode"],
+            your_answer=["newNode = createNode(value);", "___.next = head;", "head = newNode;"],
+            correct_answer=["newNode = createNode(value);", "newNode.next = head;", "head = newNode;"],
             error_count=1, messages=[], user_message="Why is my second blank wrong?",
             question_type="fill_blank",
+            board_note="Student is on the blank in step 2; last tried 'head' there — wrong.",
         ),
         "expect_tool": False,
         "forbidden": ["assembly", "order you placed"],
@@ -111,6 +113,26 @@ SCENARIOS = {
             question_type="ordering",
         ),
         "expect_tool": True,
+    },
+    # Tutor already asked 2 questions BUT the student is progressing (their last
+    # answer is correct) — policy: momentum, NOT a video detour. Regression from
+    # live testing: the model sent the video right after a "Right —" verdict.
+    "no_video_when_progressing": {
+        "kwargs": dict(
+            question_title="Insert at Head", operation="insertAtHead",
+            your_answer=INSERT_AT_HEAD["wrong"], correct_answer=INSERT_AT_HEAD["correct"],
+            error_count=2,
+            messages=[
+                {"role": "user", "content": "I don't get why this is wrong."},
+                {"role": "assistant", "content": "What does head = newNode do to the old head in your first step?"},
+                {"role": "user", "content": "Hmm, it changes head to point at the new node?"},
+                {"role": "assistant", "content": "Right — and what happens to the node head used to point to?"},
+            ],
+            user_message="Oh! The old head gets lost because nothing points to it anymore.",
+            question_type="ordering",
+        ),
+        "expect_tool": False,
+        "required_any": ["right", "exactly", "yes"],
     },
     # Cross-session history injection — the tutor should be able to reference it.
     "history_recall": {
@@ -189,16 +211,59 @@ def run_scenario(name: str, show_context: bool) -> list[str]:
     return failures
 
 
-def auto_conversation(turns: int, persona: str) -> None:
+def _conversation_config(operation: str, qtype: str, errors: int) -> dict:
+    """Build chat() kwargs for ANY operation/type from the real backend templates."""
+    from app.services.static_questions import TEMPLATES, _BUGS
+    tmpl = TEMPLATES[operation]
+    correct = [tmpl["pseudocode"][i] for i in tmpl["correctOrder"]]
+
+    if qtype == "ordering":
+        # find a swap that is GENUINELY wrong — some templates accept multiple
+        # valid orders (validOrders), and a naive swap can land on one of them
+        valid_line_orders = [
+            [tmpl["pseudocode"][i] for i in order]
+            for order in (tmpl.get("validOrders") or [tmpl["correctOrder"]])
+        ]
+        wrong = None
+        for i in range(len(correct) - 2, -1, -1):
+            cand = list(correct)
+            cand[i], cand[i + 1] = cand[i + 1], cand[i]
+            if cand not in valid_line_orders:
+                wrong = cand
+                break
+        assert wrong is not None, f"no invalid swap found for {operation}"
+        your_answer, board_note = wrong, None
+    elif qtype == "fill_blank":
+        your_answer = list(correct)
+        # blank out a token in step 2 (or 1) — mirrors the reconstructed board lines
+        j = 1 if len(your_answer) > 1 else 0
+        your_answer[j] = "___" + your_answer[j][your_answer[j].find(" "):] if " " in your_answer[j] else "___"
+        board_note = f"Student is on the blank in step {j + 1}."
+    else:  # find_bug
+        bug = _BUGS[operation]
+        your_answer = list(correct)
+        your_answer[bug["line"]] = bug["buggy"]
+        board_note = "Student is looking for the buggy line."
+
+    return dict(
+        question_title=tmpl["title"], operation=operation,
+        your_answer=your_answer, correct_answer=correct,
+        error_count=errors, messages=[], question_type=qtype,
+        board_note=board_note,
+    )
+
+
+def auto_conversation(turns: int, persona: str, operation: str = "insertAtHead",
+                      qtype: str = "ordering", errors: int = 1) -> None:
     """Watch a full conversation unfold: Haiku plays the student for N turns.
     Costs ~2 calls per turn (student + tutor). Prints the transcript; no checks."""
     from anthropic import Anthropic
     from app.config import settings
     client = Anthropic(api_key=settings.anthropic_api_key)
 
-    base = SCENARIOS["fresh_error1"]["kwargs"]
+    base = _conversation_config(operation, qtype, errors)
     history: list[dict] = []
-    student_msg = "I don't get why my order is wrong."
+    student_msg = "I don't get why this is wrong."
     tool_calls: list = []
 
     orig = ta._execute_tool
@@ -208,7 +273,8 @@ def auto_conversation(turns: int, persona: str) -> None:
     ta._execute_tool = recording_execute
 
     print(f"=== auto conversation: {turns} turns, student persona: {persona} ===")
-    print(f"(operation: {base['operation']}, error_count: {base['error_count']})\n")
+    print(f"(operation: {base['operation']}, type: {base['question_type']}, "
+          f"error_count: {base['error_count']}, board_note: {base.get('board_note')})\n")
     try:
         for i in range(turns):
             print(f"  student: {student_msg}")
@@ -248,10 +314,14 @@ def main() -> int:
                         help="watch a live N-turn conversation (Haiku plays the student)")
     parser.add_argument("--persona", default="a confused beginner who understands slowly and sometimes guesses wrong",
                         help="student persona for --auto-student")
+    parser.add_argument("--op", default="insertAtHead", help="operation for --auto-student")
+    parser.add_argument("--qtype", default="ordering", choices=["ordering", "fill_blank", "find_bug"],
+                        help="question type for --auto-student")
+    parser.add_argument("--errors", type=int, default=1, help="board error_count for --auto-student")
     args = parser.parse_args()
 
     if args.auto_student > 0:
-        auto_conversation(args.auto_student, args.persona)
+        auto_conversation(args.auto_student, args.persona, args.op, args.qtype, args.errors)
         return 0
 
     names = list(SCENARIOS) if args.scenario == "all" else [args.scenario]

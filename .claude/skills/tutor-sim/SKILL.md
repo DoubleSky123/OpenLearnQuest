@@ -34,6 +34,7 @@ d:/openLearnquest/venv/Scripts/python.exe ../.claude/skills/tutor-sim/tutor_sim.
 | `verdict_wrong_claim` | student states a wrong claim | reply lacks a verdict ("not quite"/"close") or leaks answer | — |
 | `verdict_correct_claim` | student states a correct insight | reply lacks confirmation ("right"/"exactly"/"yes") | — |
 | `third_turn_video` | tutor already asked 2 questions, student still stuck | empty reply | tool NOT called (2-questions-then-video policy) |
+| `no_video_when_progressing` | 2 questions asked but student's last answer is CORRECT | reply lacks positive verdict | tool called (video must not interrupt momentum) |
 | `history_recall` | `[STUDENT HISTORY]` injected | empty reply | — |
 
 Tool-timing expectations are WARN not FAIL by design: *when* to call `lookup_resource` is the model's agentic decision. A one-off WARN is fine; **the same WARN on repeated runs means the system prompt drifted** — fix the prompt.
