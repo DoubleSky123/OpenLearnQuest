@@ -414,6 +414,9 @@ Return ONLY this JSON:
 
 Rules:
 - buggy_line must differ from "{correct_line}" and produce WRONG output when run
+- RENAMING a variable is NOT a bug: if your buggy_line is just "{correct_line}" with a
+  variable renamed consistently (e.g. temp -> node), it behaves identically and will be
+  REJECTED. The bug must change which pointer/value is read or written.
 - provide exactly {n_wrong} wrong_option(s): incorrect variants of line {bug_line} (not copies of other steps)
 - match the requested subtlety: {subtlety}
 {_SLL_CONSTRAINT}
@@ -441,11 +444,16 @@ def _find_bug_validate(raw: str, operation: str, meta: dict) -> dict:
     if buggy_line.strip().rstrip(";") == correct_line.strip().rstrip(";"):
         raise ValueError(f"buggy_line is identical to the correct line '{correct_line}'")
 
-    # Semantic equivalence check (alias substitution)
+    # Semantic equivalence check (alias substitution).
+    # Only assignments BEFORE the bug line count as aliases: when the buggy line
+    # runs, later assignments haven't executed yet. (Order-insensitive aliasing
+    # wrongly rejected real bugs on short ops — e.g. removeAtHead's
+    # 'temp = head.next;' was treated as equivalent because the LATER
+    # 'head = head.next;' was in the alias map.)
     alias: dict[str, str] = {}
     for i, step in enumerate(template_steps):
-        if i == bug_line:
-            continue
+        if i >= bug_line:
+            break
         m = re.match(r'^(\w[\w.]*)\s*=\s*(.+)$', step.strip().rstrip(";"))
         if m:
             alias[m.group(1).strip()] = m.group(2).strip()

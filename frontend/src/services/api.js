@@ -97,12 +97,6 @@ export const gameMasterApi = {
   levelUp: (sessionId, operation, emotion = "engaged") =>
     request("POST", "/api/gm/session/level-up", { session_id: sessionId, operation, emotion }),
 
-  getHint: (operation, pseudocode, correctAnswer, wrongAssembly, distractors, errorCount, emotion) =>
-    request("POST", "/api/gm/session/hint", {
-      operation, pseudocode, correct_answer: correctAnswer,
-      wrong_assembly: wrongAssembly, distractors, error_count: errorCount, emotion,
-    }),
-
   getMastery: (moduleId = "singly") =>
     request("GET", `/api/gm/mastery?module_id=${moduleId}`),
 

@@ -3,7 +3,6 @@ Game Master API — AI-driven adaptive question generation.
 
 POST /api/gm/session/start    — start session, get first question
 POST /api/gm/session/next     — record result, get next question
-POST /api/gm/session/hint     — get inline hint from Hint Agent
 GET  /api/gm/mastery          — current user's mastery profile
 POST /api/gm/test-generation  — Sprint-1 quality test
 GET  /api/gm/operations       — list all supported operations
@@ -72,16 +71,6 @@ class PrefetchRequest(BaseModel):
 class LevelUpRequest(BaseModel):
     session_id: str
     operation: str
-    emotion: str = "engaged"
-
-
-class HintRequest(BaseModel):
-    operation: str
-    pseudocode: list[str]
-    correct_answer: list[str] = []   # correct steps in order (as text)
-    wrong_assembly: list[str]
-    distractors: list[str] = []      # distractor step texts
-    error_count: int
     emotion: str = "engaged"
 
 
@@ -236,26 +225,6 @@ def level_up(
         )
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))
-
-
-@router.post("/session/hint")
-def get_hint(
-    body: HintRequest,
-    current_user: User = Depends(get_current_user),
-):
-    """
-    Hint Agent: generates an inline contextual hint when student is stuck.
-    Called after >= 2 errors on the same question.
-    """
-    return gm.get_hint(
-        operation=body.operation,
-        pseudocode=body.pseudocode,
-        correct_answer=body.correct_answer,
-        wrong_assembly=body.wrong_assembly,
-        distractors=body.distractors,
-        error_count=body.error_count,
-        emotion=body.emotion,
-    )
 
 
 @router.get("/mastery")

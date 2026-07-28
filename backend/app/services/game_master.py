@@ -42,7 +42,7 @@ from ..models.emotion_log import EmotionLog
 from ..models.game_session import GameSession
 from ..models.question_attempt import QuestionAttempt
 from .claude_service import generate_question, OP_META
-from .static_questions import generate_static_question, CONCEPT_HINTS
+from .static_questions import generate_static_question
 from .error_analyzer import analyze_error
 from .concept_graph import concepts_for_op, op_prereqs_met, weakest_concept_score, CONCEPTS
 
@@ -542,51 +542,6 @@ def next_question(
         "type_unlocked":      ceiling,
         "active_type_level":  active,
     }
-
-
-# ── Hint request (deterministic error analysis) ───────────────────────────────
-
-def get_hint(
-    operation: str,
-    pseudocode: list[str],
-    correct_answer: list[str],
-    wrong_assembly: list[str],
-    distractors: list[str],
-    error_count: int,
-    emotion: str = "engaged",
-) -> dict:
-    """
-    Instant concept-targeted hint via deterministic error diagnosis.
-    No LLM call — returns immediately with structured diagnosis.
-
-    Returns {hint, diagnosis} where:
-      hint:      concept-specific guidance sentence for inline display
-      diagnosis: structured error dict for Tutor context injection
-    """
-    diagnosis     = analyze_error(operation, wrong_assembly, correct_answer, distractors)
-    error_type    = diagnosis.get("error_type")
-    misplaced     = diagnosis.get("misplaced_step")
-    pos           = diagnosis.get("first_wrong_pos")
-    error_concept = diagnosis.get("error_concept")
-
-    if error_type == "distractor_used" and misplaced:
-        hint = (
-            f'"{misplaced}" is a distractor — it doesn\'t belong in this operation. '
-            f"Remove it and focus on the steps that actually change the list."
-        )
-    elif error_type == "wrong_order" and misplaced and pos is not None and pos < len(correct_answer):
-        expected = correct_answer[pos]
-        hint = (
-            f'Step {pos + 1}: you placed "{misplaced}", '
-            f'but "{expected}" should come here. '
-            f'Ask yourself: can you do "{misplaced}" before "{expected}" has run?'
-        )
-    elif error_type == "missing_steps":
-        hint = "You haven't placed all the steps yet — keep going."
-    else:
-        hint = CONCEPT_HINTS.get(error_concept, "Think about which pointer would be lost if you ran this step first.")
-
-    return {"hint": hint, "diagnosis": diagnosis}
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────

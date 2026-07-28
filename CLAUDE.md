@@ -74,7 +74,6 @@ backend/
       question_spec.py        # maps type_unlocked + emotion → QuestionSpec
       static_questions.py     # TEMPLATES dict: correct pseudocode for all 12 ops
       emotion_agent.py        # behavioral signal → emotion label
-      hint_agent.py           # generates hints on error_count ≥ 2
       tutor_agent.py          # ReAct Socratic tutor (see Tutor Agent section)
       tutor_memory.py         # tutor memory: persistence + view compaction + episodic recall
       error_analyzer.py       # structured error diagnosis
