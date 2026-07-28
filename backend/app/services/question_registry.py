@@ -397,11 +397,24 @@ def _find_bug_prompt(operation: str, meta: dict, spec: QuestionSpec) -> str:
     subtlety = _BUG_SUBTLETY.get(intra, _BUG_SUBTLETY[2])
     n_wrong  = 1 if intra == 1 else 2
 
+    # Few-shot anchor: show a real authored bug of the requested subtlety so the
+    # model calibrates "how hidden" instead of interpreting adjectives freely.
+    from .static_questions import _BUGS, _pick_bug_variant
+    example = ""
+    variants = _BUGS.get(operation)
+    if variants:
+        ref = _pick_bug_variant(variants, intra, 0)
+        example = (
+            f'\nReference example of this subtlety level for this operation:\n'
+            f'  correct: "{ref["fix"]}"  ->  buggy: "{ref["buggy"]}"\n'
+            f'Produce a DIFFERENT bug (different line or different mutation), at a similar subtlety.\n'
+        )
+
     return f"""The correct pseudocode for "{meta['title']}" ({operation}) is:
 {json.dumps(correct_steps, ensure_ascii=False)}
 
 Line {bug_line} (0-based) is: "{correct_line}"
-
+{example}
 Introduce a bug into line {bug_line} only, at this difficulty: {subtlety}.
 Return ONLY this JSON:
 {{

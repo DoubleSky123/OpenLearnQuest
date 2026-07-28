@@ -405,66 +405,101 @@ _BLANKS: dict[str, list[list[dict]]] = {
 }
 
 # ── Bug definitions (one predefined bug per operation) ─────────────────────────
-_BUGS: dict[str, dict] = {
-    "insertAtHead":     {"line": 1, "buggy": "newNode.next = head.next;",
-                         "fix": "newNode.next = head;",
-                         "explanation": "head.next skips the original head, losing it from the list",
-                         "options": ["newNode.next = head;", "newNode.next = NULL;", "head.next = newNode;"]},
-    "insertAtTail":     {"line": 3, "buggy": "node.next = node.next;",
-                         "fix": "node.next = newNode;",
-                         "explanation": "node.next = node.next creates a self-loop instead of linking the new node",
-                         "options": ["node.next = newNode;", "node.next = NULL;", "newNode.next = node;"]},
-    "removeAtHead":     {"line": 1, "buggy": "head = head;",
-                         "fix": "head = head.next;",
-                         "explanation": "head = head doesn't advance the pointer — the old head is never removed",
-                         "options": ["head = head.next;", "head = NULL;", "head = temp.next;"]},
-    "removeAtTail":     {"line": 1, "buggy": "while (node.next != NULL) node = node.next;",
-                         "fix": "while (node.next.next != NULL) node = node.next;",
-                         "explanation": "Stopping at node.next == NULL lands on the last node, not its predecessor",
-                         "options": ["while (node.next.next != NULL) node = node.next;",
-                                     "while (node != NULL) node = node.next;",
-                                     "while (node.next != NULL) node = node.next.next;"]},
-    "insertIntoEmpty":  {"line": 2, "buggy": "head = NULL;",
-                         "fix": "head = newNode;",
-                         "explanation": "Setting head = NULL discards the new node; head must point to newNode",
-                         "options": ["head = newNode;", "head = head.next;", "head = temp;"]},
-    "deleteEntireList": {"line": 0, "buggy": "node = head.next;",
-                         "fix": "node = head;",
-                         "explanation": "Starting at head.next skips the first node, causing a memory leak",
-                         "options": ["node = head;", "node = NULL;", "node = head.next.next;"]},
-    "insertAtPosition": {"line": 3, "buggy": "newNode.next = node;",
-                         "fix": "newNode.next = node.next;",
-                         "explanation": "Pointing to node (predecessor) instead of node.next (successor) corrupts the list",
-                         "options": ["newNode.next = node.next;", "newNode.next = NULL;", "newNode.next = node.next.next;"]},
-    "removeAtPosition": {"line": 3, "buggy": "node.next = temp;",
-                         "fix": "node.next = temp.next;",
-                         "explanation": "node.next = temp creates a cycle; it must skip temp by pointing to temp.next",
-                         "options": ["node.next = temp.next;", "node.next = NULL;", "node.next = temp.next.next;"]},
-    "reverseList":      {"line": 2,
-                         "buggy": "while (node != NULL) { temp = node.next; node.next = prev; prev = node; node = node.next; }",
-                         "fix":   "while (node != NULL) { temp = node.next; node.next = prev; prev = node; node = temp; }",
-                         "explanation": "After node.next = prev, node.next has been overwritten — using node.next instead of temp loses the rest of the list",
-                         "options": ["while (node != NULL) { temp = node.next; node.next = prev; prev = node; node = temp; }",
-                                     "while (node != NULL) { node.next = prev; prev = node; node = node.next; }",
-                                     "while (node != NULL) { temp = node.next; prev = node; node.next = prev; node = temp; }"]},
-    "mergeSortedLists": {"line": 2, "buggy": "node.next = (l1 != NULL) ? l2 : l1;",
-                         "fix": "node.next = (l1 != NULL) ? l1 : l2;",
-                         "explanation": "Conditions are swapped: attaches l2 when l1 remains and vice versa",
-                         "options": ["node.next = (l1 != NULL) ? l1 : l2;", "node.next = l1;", "node.next = l2;"]},
-    "detectCycle":      {"line": 1,
-                         "buggy": "while (fast != NULL && fast.next != NULL) { slow = slow.next; fast = fast.next; }",
-                         "fix":   "while (fast != NULL && fast.next != NULL) { slow = slow.next; fast = fast.next.next; }",
-                         "explanation": "fast = fast.next moves at the same speed as slow — they never meet in an acyclic list and loop forever in a cycle",
-                         "options": ["while (fast != NULL && fast.next != NULL) { slow = slow.next; fast = fast.next.next; }",
-                                     "while (fast != NULL) { slow = slow.next; fast = fast.next.next; }",
-                                     "while (fast != NULL && fast.next != NULL) { slow = slow.next.next; fast = fast.next.next; }"]},
-    "sortList":         {"line": 3, "buggy": "mid = slow; slow.next = NULL;",
-                         "fix": "mid = slow.next; slow.next = NULL;",
-                         "explanation": "mid = slow splits at slow (predecessor of midpoint) instead of slow.next",
-                         "options": ["mid = slow.next; slow.next = NULL;",
-                                     "mid = slow; slow = NULL;",
-                                     "mid = fast; slow.next = NULL;"]},
+_BUGS: dict[str, list[dict]] = {
+    # Each op holds a LIST of bug variants tagged with subtlety
+    # (1 = careless / 2 = conceptual / 3 = one-token). Selection picks the
+    # nearest subtlety to intra_difficulty and rotates by variant_seed.
+    "insertAtHead": [
+        {"subtlety": 3, "line": 1, "buggy": "newNode.next = head.next;",
+         "fix": "newNode.next = head;",
+         "explanation": "head.next skips the original head, losing it from the list",
+         "options": ["newNode.next = head;", "newNode.next = NULL;", "head.next = newNode;"]},
+    ],
+    "insertAtTail": [
+        {"subtlety": 1, "line": 3, "buggy": "node.next = node.next;",
+         "fix": "node.next = newNode;",
+         "explanation": "node.next = node.next creates a self-loop instead of linking the new node",
+         "options": ["node.next = newNode;", "node.next = NULL;", "newNode.next = node;"]},
+    ],
+    "removeAtHead": [
+        {"subtlety": 1, "line": 1, "buggy": "head = head;",
+         "fix": "head = head.next;",
+         "explanation": "head = head doesn't advance the pointer — the old head is never removed",
+         "options": ["head = head.next;", "head = NULL;", "head = temp.next;"]},
+    ],
+    "removeAtTail": [
+        {"subtlety": 2, "line": 1, "buggy": "while (node.next != NULL) node = node.next;",
+         "fix": "while (node.next.next != NULL) node = node.next;",
+         "explanation": "Stopping at node.next == NULL lands on the last node, not its predecessor",
+         "options": ["while (node.next.next != NULL) node = node.next;",
+                     "while (node != NULL) node = node.next;",
+                     "while (node.next != NULL) node = node.next.next;"]},
+    ],
+    "insertIntoEmpty": [
+        {"subtlety": 1, "line": 2, "buggy": "head = NULL;",
+         "fix": "head = newNode;",
+         "explanation": "Setting head = NULL discards the new node; head must point to newNode",
+         "options": ["head = newNode;", "head = head.next;", "head = temp;"]},
+    ],
+    "deleteEntireList": [
+        {"subtlety": 2, "line": 0, "buggy": "node = head.next;",
+         "fix": "node = head;",
+         "explanation": "Starting at head.next skips the first node, causing a memory leak",
+         "options": ["node = head;", "node = NULL;", "node = head.next.next;"]},
+    ],
+    "insertAtPosition": [
+        {"subtlety": 3, "line": 3, "buggy": "newNode.next = node;",
+         "fix": "newNode.next = node.next;",
+         "explanation": "Pointing to node (predecessor) instead of node.next (successor) corrupts the list",
+         "options": ["newNode.next = node.next;", "newNode.next = NULL;", "newNode.next = node.next.next;"]},
+    ],
+    "removeAtPosition": [
+        {"subtlety": 3, "line": 3, "buggy": "node.next = temp;",
+         "fix": "node.next = temp.next;",
+         "explanation": "node.next = temp creates a cycle; it must skip temp by pointing to temp.next",
+         "options": ["node.next = temp.next;", "node.next = NULL;", "node.next = temp.next.next;"]},
+    ],
+    "reverseList": [
+        {"subtlety": 3, "line": 2,
+         "buggy": "while (node != NULL) { temp = node.next; node.next = prev; prev = node; node = node.next; }",
+         "fix":   "while (node != NULL) { temp = node.next; node.next = prev; prev = node; node = temp; }",
+         "explanation": "After node.next = prev, node.next has been overwritten — using node.next instead of temp loses the rest of the list",
+         "options": ["while (node != NULL) { temp = node.next; node.next = prev; prev = node; node = temp; }",
+                     "while (node != NULL) { node.next = prev; prev = node; node = node.next; }",
+                     "while (node != NULL) { temp = node.next; prev = node; node.next = prev; node = temp; }"]},
+    ],
+    "mergeSortedLists": [
+        {"subtlety": 2, "line": 2, "buggy": "node.next = (l1 != NULL) ? l2 : l1;",
+         "fix": "node.next = (l1 != NULL) ? l1 : l2;",
+         "explanation": "Conditions are swapped: attaches l2 when l1 remains and vice versa",
+         "options": ["node.next = (l1 != NULL) ? l1 : l2;", "node.next = l1;", "node.next = l2;"]},
+    ],
+    "detectCycle": [
+        {"subtlety": 2, "line": 1,
+         "buggy": "while (fast != NULL && fast.next != NULL) { slow = slow.next; fast = fast.next; }",
+         "fix":   "while (fast != NULL && fast.next != NULL) { slow = slow.next; fast = fast.next.next; }",
+         "explanation": "fast = fast.next moves at the same speed as slow — they never meet in an acyclic list and loop forever in a cycle",
+         "options": ["while (fast != NULL && fast.next != NULL) { slow = slow.next; fast = fast.next.next; }",
+                     "while (fast != NULL) { slow = slow.next; fast = fast.next.next; }",
+                     "while (fast != NULL && fast.next != NULL) { slow = slow.next.next; fast = fast.next.next; }"]},
+    ],
+    "sortList": [
+        {"subtlety": 3, "line": 3, "buggy": "mid = slow; slow.next = NULL;",
+         "fix": "mid = slow.next; slow.next = NULL;",
+         "explanation": "mid = slow splits at slow (predecessor of midpoint) instead of slow.next",
+         "options": ["mid = slow.next; slow.next = NULL;",
+                     "mid = slow; slow = NULL;",
+                     "mid = fast; slow.next = NULL;"]},
+    ],
 }
+
+
+def _pick_bug_variant(variants: list[dict], intra: int | None, seed: int) -> dict:
+    """Nearest-subtlety selection with deterministic rotation among ties."""
+    target = intra if intra in (1, 2, 3) else 2
+    best_dist = min(abs(v.get("subtlety", 2) - target) for v in variants)
+    pool = [v for v in variants if abs(v.get("subtlety", 2) - target) == best_dist]
+    return pool[seed % len(pool)]
 
 
 CONCEPT_HINTS: dict[str, str] = {
@@ -678,7 +713,10 @@ def generate_fill_blank_question(operation: str, spec) -> dict:
 
     nodes, op_value, op_pos, goal = _build_nodes_and_goal(operation, tmpl, node_count)
 
-    blanks_d = random.choice(blank_sets)   # pick one set at random
+    # deterministic rotation: attempt N gets set N % n — consecutive plays of the
+    # same operation never repeat the same blank set
+    set_idx  = getattr(spec, "variant_seed", 0) % len(blank_sets)
+    blanks_d = blank_sets[set_idx]
     pseudocode = tmpl["pseudocode"]
     total = len(pseudocode)
     # Which steps to blank: a subset (easier) or all. Non-blanked steps show the
@@ -704,6 +742,7 @@ def generate_fill_blank_question(operation: str, spec) -> dict:
     return {
         "id":              str(uuid.uuid4()),
         "question_type":   "fill_blank",
+        "variant":         f"blanks{set_idx}",
         "operation":       operation,
         "title":           tmpl["title"],
         "difficulty":      spec.difficulty,
@@ -719,13 +758,18 @@ def generate_fill_blank_question(operation: str, spec) -> dict:
 
 
 def generate_find_bug_question(operation: str, spec) -> dict:
-    """Static find-the-bug fallback using predefined bug definitions."""
-    tmpl   = TEMPLATES.get(operation)
-    bug_d  = _BUGS.get(operation)
-    if not tmpl or not bug_d:
+    """Static find-the-bug fallback using predefined bug variants (selected by
+    subtlety ≈ intra_difficulty, rotated deterministically by variant_seed)."""
+    tmpl     = TEMPLATES.get(operation)
+    variants = _BUGS.get(operation)
+    if not tmpl or not variants:
         return generate_static_question(operation, spec.emotion)
 
-    knobs = resolve_intra("find_bug", getattr(spec, "intra_difficulty", None))
+    intra = getattr(spec, "intra_difficulty", None)
+    seed  = getattr(spec, "variant_seed", 0)
+    bug_d = _pick_bug_variant(variants, intra, seed)
+
+    knobs = resolve_intra("find_bug", intra)
     if knobs:
         node_count = max(knobs["node_count"], tmpl["minNodes"])
         n_opts     = knobs["options"]
@@ -734,9 +778,7 @@ def generate_find_bug_question(operation: str, spec) -> dict:
         n_opts     = None
     nodes, op_value, op_pos, goal = _build_nodes_and_goal(operation, tmpl, node_count)
 
-    # Inject bug into pseudocode
-    # TODO(intra): bug subtlety is fixed (one predefined bug per op). To make
-    # find_bug truly easier/harder we need multiple bug variants per op or AI.
+    # Inject the selected bug into the pseudocode
     pseudocode = list(tmpl["pseudocode"])
     bug_line   = bug_d["line"]
     pseudocode[bug_line] = bug_d["buggy"]
@@ -754,6 +796,7 @@ def generate_find_bug_question(operation: str, spec) -> dict:
         "operation":       operation,
         "title":           tmpl["title"],
         "difficulty":      spec.difficulty,
+        "variant":         f"bug{variants.index(bug_d)}-s{bug_d.get('subtlety', 2)}",
         "pseudocode":      pseudocode,
         "bug_line":        bug_line,
         "bug_explanation": bug_d["explanation"],

@@ -69,17 +69,18 @@ def generate_question(
     emotion: str = "engaged",
     type_unlocked: int = 1,
     intra_difficulty: int | None = None,
+    variant_seed: int = 0,
 ) -> dict:
     """
     Generate a question whose type is chosen based on the student's unlocked level.
     intra_difficulty (state axis) sets the within-type difficulty. Falls back to
-    static on repeated failures.
+    static on repeated failures. variant_seed rotates static content variants.
     """
     meta = OP_META.get(operation)
     if not meta:
         raise ValueError(f"Unknown operation: {operation}")
 
-    spec    = select_spec(operation, emotion, type_unlocked, intra_difficulty)
+    spec    = select_spec(operation, emotion, type_unlocked, intra_difficulty, variant_seed)
     handler = get_handler(spec.type)
 
     # fill_blank is a structured beginner exercise — static is more reliable than AI here

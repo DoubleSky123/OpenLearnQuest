@@ -656,7 +656,9 @@ def _generate_with_fallback(
     # not the ceiling itself — so unlocking a harder type does not force them into it.
     active_level  = min(op_m.get("active_type_level", type_unlocked), type_unlocked)
     try:
-        q = generate_question(operation, emotion, active_level, intra_difficulty)
+        # attempts count drives deterministic variant rotation (blank sets / static bugs)
+        q = generate_question(operation, emotion, active_level, intra_difficulty,
+                              variant_seed=op_m.get("attempts", 0))
         if q.get("question_type") == "ordering" and q.get("pseudocode") and any(
             str(step).lower().startswith("step") or str(step).strip() == ""
             for step in q["pseudocode"]
