@@ -397,6 +397,23 @@ def _find_bug_prompt(operation: str, meta: dict, spec: QuestionSpec) -> str:
     subtlety = _BUG_SUBTLETY.get(intra, _BUG_SUBTLETY[2])
     n_wrong  = 1 if intra == 1 else 2
 
+    # Alias warning: assignments BEFORE the bug line make some rewrites of the
+    # correct line behave identically (the validator rejects those). Spell the
+    # equivalences out so the model doesn't burn retries on renames — on 3-line
+    # ops like removeAtHead the mutation space is tiny and this dominates.
+    alias_note = ""
+    alias_facts = []
+    for s in correct_steps[:bug_line]:
+        m = re.match(r'^(\w[\w.]*)\s*=\s*(.+?)\s*;?$', s.strip())
+        if m:
+            alias_facts.append(f'"{m.group(1)}" holds "{m.group(2)}"')
+    if alias_facts:
+        alias_note = (
+            f"\n- When line {bug_line} runs, {'; '.join(alias_facts)}. A buggy_line that "
+            f"only swaps such equivalent names behaves identically and will be REJECTED — "
+            f"the bug must change WHICH node is read or written."
+        )
+
     # Few-shot anchor: show a real authored bug of the requested subtlety so the
     # model calibrates "how hidden" instead of interpreting adjectives freely.
     from .static_questions import _BUGS, _pick_bug_variant
@@ -431,7 +448,7 @@ Rules:
   variable renamed consistently (e.g. temp -> node), it behaves identically and will be
   REJECTED. The bug must change which pointer/value is read or written.
 - provide exactly {n_wrong} wrong_option(s): incorrect variants of line {bug_line} (not copies of other steps)
-- match the requested subtlety: {subtlety}
+- match the requested subtlety: {subtlety}{alias_note}
 {_SLL_CONSTRAINT}
 Return ONLY the JSON."""
 
@@ -459,21 +476,33 @@ def _find_bug_validate(raw: str, operation: str, meta: dict) -> dict:
 
     # Semantic equivalence check (alias substitution).
     # Only assignments BEFORE the bug line count as aliases: when the buggy line
-    # runs, later assignments haven't executed yet. (Order-insensitive aliasing
-    # wrongly rejected real bugs on short ops — e.g. removeAtHead's
-    # 'temp = head.next;' was treated as equivalent because the LATER
-    # 'head = head.next;' was in the alias map.)
+    # runs, later assignments haven't executed yet. Additionally, a reassignment
+    # KILLS stale aliases: after 'temp = head; head = head.next;' the alias
+    # temp->head no longer holds (temp names the OLD head), and a self-referential
+    # assignment like 'head = head.next' yields no textual alias at all. Without
+    # the kill rule, sequential substitution chained temp->head->head.next and
+    # wrongly rejected real bugs (e.g. removeAtHead's 'free(head.next);').
     alias: dict[str, str] = {}
     for i, step in enumerate(template_steps):
         if i >= bug_line:
             break
         m = re.match(r'^(\w[\w.]*)\s*=\s*(.+)$', step.strip().rstrip(";"))
-        if m:
-            alias[m.group(1).strip()] = m.group(2).strip()
+        if not m:
+            continue
+        target, rhs = m.group(1).strip(), m.group(2).strip()
+        alias = {t: r for t, r in alias.items()
+                 if not re.search(rf'\b{re.escape(target)}\b', r)}
+        alias.pop(target, None)
+        if not re.search(rf'\b{re.escape(target)}\b', rhs):
+            alias[target] = rhs
     def _substitute(expr: str) -> str:
-        for var, val in alias.items():
-            expr = re.sub(rf'\b{re.escape(var)}\b', val, expr)
-        return expr
+        # Single simultaneous pass (longest names first) — no re-substitution of
+        # produced text, so aliases never chain.
+        if not alias:
+            return expr
+        pattern = re.compile("|".join(
+            rf'\b{re.escape(v)}\b' for v in sorted(alias, key=len, reverse=True)))
+        return pattern.sub(lambda mo: alias[mo.group(0)], expr)
     b_norm = buggy_line.strip().rstrip(";")
     c_norm = correct_line.strip().rstrip(";")
     if _substitute(b_norm) == c_norm or b_norm == _substitute(c_norm):

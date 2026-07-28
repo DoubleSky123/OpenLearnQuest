@@ -20,6 +20,28 @@ def test_every_bug_variant_is_wellformed(op):
         assert len(set(v["options"])) == len(v["options"]), f"{op}: duplicate options"
 
 
+@pytest.mark.parametrize("op", ALL_OPS)
+def test_bug_subtlety_full_coverage(op):
+    """Ammo requirement: every operation covers all three subtlety tiers."""
+    assert {v["subtlety"] for v in _BUGS[op]} >= {1, 2, 3}, \
+        f"{op}: bugs must cover subtlety 1/2/3"
+
+
+@pytest.mark.parametrize("op", ALL_OPS)
+def test_blank_sets_wellformed(op):
+    """Ammo requirement: >=4 blank sets per op, each parallel to the pseudocode,
+    with the answer findable in its step (str.replace contract) and no dup options."""
+    steps = TEMPLATES[op]["pseudocode"]
+    sets = _BLANKS[op]
+    assert len(sets) >= 4, f"{op}: needs >=4 blank sets, has {len(sets)}"
+    for si, bset in enumerate(sets):
+        assert len(bset) == len(steps), f"{op} set {si}: not parallel to pseudocode"
+        for bd, step in zip(bset, steps):
+            assert bd["a"] in step, f"{op} set {si}: answer {bd['a']!r} not in {step!r}"
+            opts = [bd["a"], *bd["w"]]
+            assert len(set(opts)) == len(opts), f"{op} set {si}: duplicate options {opts}"
+
+
 def test_pick_bug_variant_prefers_matching_subtlety():
     variants = [{"subtlety": 1, "id": "a"}, {"subtlety": 2, "id": "b"}, {"subtlety": 3, "id": "c"}]
     assert _pick_bug_variant(variants, 1, 0)["id"] == "a"
