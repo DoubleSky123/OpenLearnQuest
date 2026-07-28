@@ -16,9 +16,10 @@ import { AnimNode, Arrow } from './LinkedListHintAnimation';
  *   onComplete(errorCount) – called when all blanks are correctly filled
  *   onError()      – called each time a wrong option is chosen
  */
-export default function FillBlankBoard({ question, onComplete, onError }) {
+export default function FillBlankBoard({ question, onComplete, onError, onStateChange }) {
   const [filled,   setFilled]   = useState(() => question.blanks.map(() => null));
   const [errorIdx, setErrorIdx] = useState(null);   // line index with current error
+  const [lastWrong, setLastWrong] = useState(null); // { lineIdx, word } — last wrong pick
   const [nodes,    setNodes]    = useState(question.initialNodes ?? []);   // fallback path only
   const [executed, setExecuted] = useState(false);
   const [errors,   setErrors]   = useState(0);
@@ -27,6 +28,7 @@ export default function FillBlankBoard({ question, onComplete, onError }) {
   useEffect(() => {
     setFilled(question.blanks.map(() => null));
     setErrorIdx(null);
+    setLastWrong(null);
     setNodes(question.initialNodes ?? []);
     setExecuted(false);
     setErrors(0);
@@ -81,6 +83,7 @@ export default function FillBlankBoard({ question, onComplete, onError }) {
     if (!blank) return;
     if (word === blank.answer) {
       setErrorIdx(null);
+      setLastWrong(null);
       setFilled(prev => {
         const next = [...prev];
         next[blank.idx] = word;
@@ -88,10 +91,31 @@ export default function FillBlankBoard({ question, onComplete, onError }) {
       });
     } else {
       setErrorIdx(lineIdx);
+      setLastWrong({ lineIdx, word });
       setErrors(errors + 1);
       onError();
     }
   };
+
+  // Lift board state for the tutor: clean attempt lines (resolved / still-blank)
+  // + a one-line note saying exactly where the student is and what they last tried.
+  useEffect(() => {
+    if (!onStateChange) return;
+    const lines = question.pseudocode.map((line, i) => {
+      const b = blankByLine[i];
+      if (!b) return line;                                   // pre-given line
+      if (filled[b.idx] !== null) return line;               // correctly resolved
+      return line.replace(b.answer, '___');                  // still blank
+    });
+    let note = null;
+    if (!allFilled) {
+      const activeLine = question.blanks[activeIdx]?.line ?? activeIdx;
+      note = `Student is on the blank in step ${activeLine + 1}`;
+      if (lastWrong) note += `; last tried '${lastWrong.word}' there — wrong`;
+      note += '.';
+    }
+    onStateChange({ lines, note });
+  }, [filled, lastWrong]); // eslint-disable-line
 
   const isCorrect = allFilled && executed;
 

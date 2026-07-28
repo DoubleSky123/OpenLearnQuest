@@ -9,13 +9,29 @@ import { executeLinkedListOperation } from '../services/linkedListOperations';
  * Phase 2: Student selects the correct fix from options.
  * Props same as FillBlankBoard.
  */
-export default function FindBugBoard({ question, onComplete, onError }) {
+export default function FindBugBoard({ question, onComplete, onError, onStateChange }) {
   const [phase,       setPhase]       = useState('identify');  // 'identify' | 'fix' | 'done'
   const [selectedLine, setSelectedLine] = useState(null);
   const [wrongLine,   setWrongLine]   = useState(null);
   const [wrongFix,    setWrongFix]    = useState(null);
   const [nodes,       setNodes]       = useState(question.initialNodes ?? []);
   const [errors,      setErrors]      = useState(0);
+
+  // Lift board state for the tutor: the buggy code as shown + where the student is.
+  useEffect(() => {
+    if (!onStateChange) return;
+    let note = null;
+    if (phase === 'identify') {
+      note = 'Student is looking for the buggy line'
+        + (wrongLine != null ? `; last guessed step ${wrongLine + 1} — that line is fine` : '')
+        + '.';
+    } else if (phase === 'fix') {
+      note = `Student found the buggy line (step ${(selectedLine ?? 0) + 1}) and is choosing a fix`
+        + (wrongFix != null ? `; last tried '${wrongFix}' — wrong` : '')
+        + '.';
+    }
+    onStateChange({ lines: question.pseudocode, note });
+  }, [phase, wrongLine, wrongFix]); // eslint-disable-line
 
   useEffect(() => {
     setPhase('identify');

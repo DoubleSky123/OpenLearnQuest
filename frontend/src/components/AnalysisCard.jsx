@@ -63,8 +63,12 @@ export default function AnalysisCard({
   const peer = analysis?.peer;
 
   return (
-    <div className="fixed bottom-6 left-6 w-96 max-h-[80vh] overflow-y-auto z-40">
-      <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
+    // full-width fixed strip + mirrored content container (max-w-7xl mx-auto px-5)
+    // so the panel's left edge aligns with the question board at any viewport
+    // width; pointer-events pass through the empty part of the strip
+    <div className="fixed bottom-6 inset-x-0 z-40 pointer-events-none">
+      <div className="max-w-7xl mx-auto px-5">
+        <div className="w-96 max-h-[80vh] overflow-y-auto pointer-events-auto bg-white rounded-2xl shadow-2xl border border-gray-200">
 
         {/* Verdict banner */}
         <div className="px-6 pt-5 pb-4">
@@ -138,7 +142,8 @@ export default function AnalysisCard({
           </Section>
         )}
 
-        <div className="pb-2" />
+          <div className="pb-2" />
+        </div>
       </div>
     </div>
   );

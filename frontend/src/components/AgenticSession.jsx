@@ -40,6 +40,12 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
   const [masteryDelta,  setMasteryDelta]  = useState(null);  // [{concept, before, after}]
   const [tutorSeed,     setTutorSeed]     = useState(null);  // "consider" question pre-typed into tutor
   const [showAnalysis,  setShowAnalysis]  = useState(false); // non-blocking analysis panel toggle
+  // fill_blank / find_bug board state lifted for the tutor ({lines, note}) —
+  // without it the tutor only saw the ordering board's assembly
+  const [boardState,    setBoardState]    = useState(null);
+  const boardStateRef   = useRef(null);      // ref mirrors for effects with stale closures
+  const assemblyAreaRef = useRef([]);
+  useEffect(() => { boardStateRef.current = boardState; }, [boardState]);
   const conceptMasteryRef = useRef({});
   const answerTimeMsRef   = useRef(0);
   useEffect(() => { conceptMasteryRef.current = conceptMastery; }, [conceptMastery]);
@@ -58,6 +64,8 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
   const [nodes,        setNodes]        = useState([]);
   const [codePool,     setCodePool]     = useState([]);
   const [assemblyArea, setAssemblyArea] = useState([]);
+  // must live BELOW the declaration — deps arrays are evaluated at render time (TDZ)
+  useEffect(() => { assemblyAreaRef.current = assemblyArea; }, [assemblyArea]);
   const [isCorrect,    setIsCorrect]    = useState(false);
   const [opExecuted,   setOpExecuted]   = useState(false);
   const [errorDetails, setErrorDetails] = useState(null);
@@ -125,7 +133,12 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
 
     const qType = q.question_type || 'ordering';
     const proactiveInit = PROACTIVE_INIT_BY_TYPE[qType] || PROACTIVE_INIT_BY_TYPE.ordering;
-    const correctAnswer = (q.correctOrder ?? []).map(i => q.pseudocode[i]);
+    const attemptNow = qType === 'ordering'
+      ? assemblyToText(assemblyAreaRef.current ?? [], q.pseudocode, q.distractors)
+      : (boardStateRef.current?.lines ?? []);
+    const correctAnswer = qType === 'ordering'
+      ? closestCorrectLines(q, attemptNow)
+      : (q.correctOrder ?? []).map(i => q.pseudocode[i]);
     let accumulated = "";
     streamTutorChat(
       {
@@ -133,7 +146,10 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
         question_title:  q.title,
         operation:       q.operation,
         question_type:   qType,
-        your_answer:     [],
+        your_answer:     qType === 'ordering'
+          ? assemblyToText(assemblyAreaRef.current ?? [], q.pseudocode, q.distractors)
+          : (boardStateRef.current?.lines ?? []),
+        board_note:      boardStateRef.current?.note ?? null,
         correct_answer:  correctAnswer,
         error_count:     errorCountRef.current,
         messages:        [],
@@ -227,6 +243,7 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
     resultRecordedRef.current = false;
     attemptStartRef.current = Date.now();
     timerRef.current?.reset?.();
+    setBoardState(null);
     setQuestion(q);
   }, []);
 
@@ -616,7 +633,12 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
             {/* Col 1: Info panel */}
             <div className="flex flex-col gap-4">
               <div className="bg-white rounded-xl border border-gray-200 p-4">
-                <h2 className="text-base font-semibold text-gray-900 mb-2">{q.title}</h2>
+                <h2 className="text-base font-semibold text-gray-900 mb-1">{q.title}</h2>
+                {questionInstruction(q) && (
+                  <p className="text-sm text-indigo-600 font-medium mb-2">
+                    🎯 {questionInstruction(q)}
+                  </p>
+                )}
 
                 <div className="bg-gray-50 rounded-lg p-2.5 mb-2">
                   <p className="text-gray-400 text-xs font-medium mb-1">Current state</p>
@@ -700,6 +722,7 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
                   question={q}
                   onComplete={handleBoardComplete}
                   onError={handleBoardError}
+                  onStateChange={setBoardState}
                 />
               )}
               {q.question_type === 'find_bug' && (
@@ -707,6 +730,7 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
                   question={q}
                   onComplete={handleBoardComplete}
                   onError={handleBoardError}
+                  onStateChange={setBoardState}
                 />
               )}
             </div>
@@ -727,8 +751,17 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
                   questionTitle={q.title ?? ''}
                   operation={q.operation ?? ''}
                   questionType={q.question_type ?? 'ordering'}
-                  yourAnswer={assemblyToText(assemblyArea, q.pseudocode, q.distractors)}
-                  correctAnswer={(q.correctOrder ?? []).map(i => q.pseudocode[i])}
+                  yourAnswer={
+                    (!q.question_type || q.question_type === 'ordering')
+                      ? assemblyToText(assemblyArea, q.pseudocode, q.distractors)
+                      : (boardState?.lines ?? [])
+                  }
+                  boardNote={boardState?.note ?? null}
+                  correctAnswer={
+                    (!q.question_type || q.question_type === 'ordering')
+                      ? closestCorrectLines(q, assemblyToText(assemblyArea, q.pseudocode, q.distractors))
+                      : (q.correctOrder ?? []).map(i => q.pseudocode[i])
+                  }
                   errorCount={errorCount}
                   errorDiagnosis={null}
                   initialMessages={proactiveHistory}
@@ -811,6 +844,40 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
       )}
     </div>
   );
+}
+
+// Some operations accept multiple valid step orders (q.validOrders — e.g.
+// createNode before vs. after traversal). The tutor's error analysis compares
+// positionally, so give it the valid order CLOSEST to the student's attempt —
+// otherwise it confidently "corrects" a legal alternative (found by tutor-sim
+// sweep on insertAtPosition).
+function closestCorrectLines(q, attemptLines) {
+  const orders = (q.validOrders?.length ? q.validOrders : null) ?? (q.correctOrder ? [q.correctOrder] : []);
+  let best = null, bestScore = -1;
+  for (const ord of orders) {
+    const lines = ord.map(i => q.pseudocode[i]);
+    const score = lines.reduce((s, l, i) => s + ((attemptLines[i] ?? null) === l ? 1 : 0), 0);
+    if (score > bestScore) { bestScore = score; best = lines; }
+  }
+  return best ?? [];
+}
+
+// Human-readable task line — professor feedback: "Insert at Position" alone
+// doesn't tell the student WHICH position/value. Indices match the 0-based
+// labels shown under the nodes.
+function questionInstruction(q) {
+  const v = q.operationValue, p = q.operationPosition;
+  switch (q.operation) {
+    case 'insertAtHead':     return v != null ? `Insert ${v} at the head` : null;
+    case 'insertAtTail':     return v != null ? `Insert ${v} at the tail` : null;
+    case 'insertIntoEmpty':  return v != null ? `Insert ${v} into the empty list` : null;
+    case 'insertAtPosition': return `Insert ${v ?? '?'} at position ${p ?? '?'}`;
+    case 'removeAtPosition': return `Remove the node at position ${p ?? '?'}`;
+    case 'removeAtHead':     return 'Remove the head node';
+    case 'removeAtTail':     return 'Remove the last node';
+    case 'deleteEntireList': return 'Delete every node in the list';
+    default:                 return null;   // reverse/merge/cycle/sort — title + goal state suffice
+  }
 }
 
 function _opLevel(operation) {

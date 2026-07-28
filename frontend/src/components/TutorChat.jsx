@@ -22,16 +22,21 @@ export default function TutorChat({
   correctAnswer = [],
   errorCount = 0,
   errorDiagnosis = null,
+  boardNote = null,      // one-line "where the student is right now" from the board
   initialMessages = null,
   initialInput = null,   // pre-typed question (e.g. the analysis card's "Consider")
   onClose,
 }) {
   const { setEmotion } = useEmotion();
+  // Type-aware, focused greeting (client-side, no AI call) — professor feedback:
+  // the tutor should anchor on the current blank/line/step, never open generic.
+  const greeting = {
+    fill_blank: `Hi! I'm your tutor for "${questionTitle}". Which blank are you unsure about — and what do you think belongs there?`,
+    find_bug:   `Hi! I'm your tutor for "${questionTitle}". Which line looks suspicious to you so far?`,
+    ordering:   `Hi! I'm your tutor for "${questionTitle}". Which step are you stuck on — or tell me the order you're considering?`,
+  }[questionType] ?? `Hi! I'm your tutor for "${questionTitle}". Which step are you stuck on?`;
   const [messages, setMessages] = useState(
-    initialMessages ?? [{
-      role: "assistant",
-      content: `Hi! I'm here to help you with "${questionTitle}". What part are you confused about? Try describing what you think each code block does.`,
-    }]
+    initialMessages ?? [{ role: "assistant", content: greeting }]
   );
   const [input, setInput] = useState(initialInput ?? "");
   const [streaming, setStreaming] = useState(false);
@@ -76,6 +81,7 @@ export default function TutorChat({
         operation,
         question_type:   questionType,
         your_answer:     yourAnswer,
+        board_note:      boardNote,
         correct_answer:  correctAnswer,
         error_count:     errorCount,
         messages:        messages,   // legacy fallback; DB history is authoritative
