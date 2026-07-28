@@ -26,6 +26,8 @@ class QuestionAttempt(Base):
     intra_difficulty: Mapped[int | None] = mapped_column(Integer, nullable=True)   # within-type difficulty used (1/2/3)
     scaffold_level: Mapped[int | None] = mapped_column(Integer, nullable=True)     # max scaffold level reached (0-4)
     emotion: Mapped[str | None] = mapped_column(String, nullable=True)             # emotion when answering
+    # Content-variant tag ("blanks2", "bug1-s3"); null for AI-generated questions
+    variant: Mapped[str | None] = mapped_column(String, nullable=True)
     completed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     session: Mapped["GameSession"] = relationship("GameSession", back_populates="attempts")

@@ -42,6 +42,7 @@ class RecordResultRequest(BaseModel):
     intra_difficulty: int | None = None
     scaffold_level: int | None = None
     emotion: str | None = None
+    variant: str | None = None
 
 
 class NextQuestionRequest(BaseModel):
@@ -59,6 +60,7 @@ class NextQuestionRequest(BaseModel):
     intra_difficulty: int | None = None
     scaffold_level: int | None = None
     question_type: str | None = None
+    variant: str | None = None
 
 
 class PrefetchRequest(BaseModel):
@@ -135,6 +137,7 @@ def record_result(
         intra_difficulty=body.intra_difficulty,
         scaffold_level=body.scaffold_level,
         emotion=body.emotion,
+        variant=body.variant,
     )
 
 
@@ -172,6 +175,7 @@ def next_question(
             intra_difficulty=body.intra_difficulty,
             scaffold_level=body.scaffold_level,
             question_type=body.question_type,
+            variant=body.variant,
         )
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))

@@ -358,6 +358,7 @@ def record_result(
     intra_difficulty: int | None = None,
     scaffold_level: int | None = None,
     emotion: str | None = None,
+    variant: str | None = None,
 ) -> dict:
     """
     Save QuestionAttempt + update mastery immediately when the student answers.
@@ -378,6 +379,7 @@ def record_result(
         intra_difficulty=intra_difficulty,
         scaffold_level=scaffold_level,
         emotion=emotion,
+        variant=variant,
     )
     db.add(attempt)
     db.commit()
@@ -471,6 +473,7 @@ def next_question(
     intra_difficulty: int | None = None,
     scaffold_level: int | None = None,
     question_type: str | None = None,   # type of the question just answered (for unlock detection)
+    variant: str | None = None,         # content-variant tag of the answered question
 ) -> dict:
     """
     Decide if session is complete, generate next question.
@@ -493,6 +496,7 @@ def next_question(
             intra_difficulty=intra_difficulty,
             scaffold_level=clamp_scaffold(scaffold_level, error_count),
             emotion=emotion,
+            variant=variant,
         )
         db.add(attempt)
         db.commit()

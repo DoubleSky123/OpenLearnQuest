@@ -78,6 +78,7 @@ export const gameMasterApi = {
       intra_difficulty: telemetry.intraDifficulty ?? null,
       scaffold_level: telemetry.scaffoldLevel ?? null,
       emotion: telemetry.emotion ?? null,
+      variant: telemetry.variant ?? null,
     }),
 
   nextQuestion: (sessionId, operation, questionId, questionNumber, passed, errorCount, timeMs, emotion, skipRecord = false, plannedQuestions = 3, pinnedOperation = null, telemetry = {}) =>
@@ -89,6 +90,7 @@ export const gameMasterApi = {
       intra_difficulty: telemetry.intraDifficulty ?? null,
       scaffold_level: telemetry.scaffoldLevel ?? null,
       question_type: telemetry.questionType ?? null,
+      variant: telemetry.variant ?? null,
     }),
 
   prefetchNext: (sessionId, lastOperation, emotion, pinnedOperation = null) =>

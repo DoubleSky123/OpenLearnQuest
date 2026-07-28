@@ -317,7 +317,7 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
     gameMasterApi.recordResult(
       sessionId, q.operation, q.id, questionNumber,
       true, boardErrors, timeMs,
-      { intraDifficulty: q.intra_difficulty ?? null, scaffoldLevel: maxScaffoldRef.current, emotion },
+      { intraDifficulty: q.intra_difficulty ?? null, scaffoldLevel: maxScaffoldRef.current, emotion, variant: q.variant ?? null },
     ).then(data => {
       resultRecordedRef.current = true;
       // Mastery delta for the analysis card: before (ref) vs after (response)
@@ -449,7 +449,7 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
     gameMasterApi.recordResult(
       sessionId, q.operation, q.id, questionNumber,
       true, errorCountRef.current, timeMs,
-      { intraDifficulty: q.intra_difficulty ?? null, scaffoldLevel: maxScaffoldRef.current, emotion },
+      { intraDifficulty: q.intra_difficulty ?? null, scaffoldLevel: maxScaffoldRef.current, emotion, variant: q.variant ?? null },
     ).then(data => {
       resultRecordedRef.current = true;
       // Mastery delta for the analysis card: before (ref) vs after (response)
@@ -493,7 +493,7 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
       prefetchRef.current = null;
       // Capture the just-finished question's telemetry BEFORE initBoard swaps it out
       const recordedId        = qRef.current.id;
-      const recordedTelemetry = { intraDifficulty: qRef.current.intra_difficulty ?? null, scaffoldLevel: maxScaffoldRef.current, questionType: qRef.current.question_type ?? 'ordering' };
+      const recordedTelemetry = { intraDifficulty: qRef.current.intra_difficulty ?? null, scaffoldLevel: maxScaffoldRef.current, questionType: qRef.current.question_type ?? 'ordering', variant: qRef.current.variant ?? null };
       setQuestionNumber(nextNum);
       setOperation(pre.operation);
       initBoard(pre.question);
@@ -517,7 +517,7 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
       const data = await gameMasterApi.nextQuestion(
         sessionId, operation, qRef.current.id,
         questionNumber, true, errorCountRef.current, timeMs, emotion, skipRecord, planned, chosenOperation,
-        { intraDifficulty: qRef.current.intra_difficulty ?? null, scaffoldLevel: maxScaffoldRef.current, questionType: qRef.current.question_type ?? 'ordering' },
+        { intraDifficulty: qRef.current.intra_difficulty ?? null, scaffoldLevel: maxScaffoldRef.current, questionType: qRef.current.question_type ?? 'ordering', variant: qRef.current.variant ?? null },
       );
       if (data.mastery_summary) setMasteryData(data.mastery_summary);
       if (data.concept_mastery) setConceptMastery(data.concept_mastery);
