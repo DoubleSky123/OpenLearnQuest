@@ -7,6 +7,11 @@ prompt fails loudly instead of poisoning the pool.
 Usage (from backend/, needs backend/.env for the Anthropic key):
   d:/openLearnquest/venv/Scripts/python.exe refill_pool.py --ops all
   d:/openLearnquest/venv/Scripts/python.exe refill_pool.py --ops reverseList,sortList --types find_bug --intra 2,3 --target 5
+  d:/openLearnquest/venv/Scripts/python.exe refill_pool.py --ops reverseList --purge   # after editing TEMPLATES
+
+--purge deletes the scoped rows first: pool payloads embed TEMPLATES content
+(pseudocode, step_hints) at generation time, so editing an operation's template
+leaves its pooled questions stale — purge + refill regenerates them.
 
 Full run costs up to 12 ops x 2 types x 3 intras x target Haiku calls — scope it.
 """
@@ -25,6 +30,8 @@ def main() -> int:
     ap.add_argument("--types", default=",".join(POOLED_TYPES))
     ap.add_argument("--intra", default="1,2,3")
     ap.add_argument("--target", type=int, default=TARGET)
+    ap.add_argument("--purge", action="store_true",
+                    help="delete the scoped rows before refilling (use after TEMPLATES edits)")
     args = ap.parse_args()
 
     ops = list(OP_META) if args.ops == "all" else args.ops.split(",")
@@ -42,6 +49,14 @@ def main() -> int:
     db = SessionLocal()
     failures = []
     try:
+        if args.purge:
+            purged = (db.query(QuestionPool)
+                      .filter(QuestionPool.operation.in_(ops),
+                              QuestionPool.question_type.in_(types),
+                              QuestionPool.intra_difficulty.in_(intras))
+                      .delete(synchronize_session=False))
+            db.commit()
+            print(f"purged {purged} stale row(s)")
         print(f"refill: {len(ops)} op(s) x {types} x intra {intras}, target {args.target}/combo")
         print(f"{'operation':<18} {'type':<10} {'intra':<6} result")
         print("-" * 56)

@@ -179,14 +179,15 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
   }, [scaffold.level]); // eslint-disable-line
 
   // ── Pre-fetch next AI question in background ─────────────────────────────────
-  const startPrefetch = useCallback((sid, lastOp, currentEmotion) => {
+  const startPrefetch = useCallback((sid, lastOp, currentEmotion, currentQid = null) => {
     // Cancel any in-flight prefetch before starting a new one
     prefetchAbortRef.current?.abort();
     const ctrl = new AbortController();
     prefetchAbortRef.current = ctrl;
     prefetchRef.current = null;
 
-    gameMasterApi.prefetchNext(sid, lastOp, currentEmotion, chosenOperation)
+    // currentQid = the question on screen — the pool must not serve it again as "next"
+    gameMasterApi.prefetchNext(sid, lastOp, currentEmotion, chosenOperation, currentQid ?? qRef.current?.id ?? null)
       .then(data => {
         if (!ctrl.signal.aborted) prefetchRef.current = data;
       })
@@ -262,7 +263,7 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
         if (data.type_unlocked != null) { setTypeUnlocked(data.type_unlocked); setActiveLevel(data.active_type_level); }
         initSession(data.session_id, emotion);
         initBoard(data.question);
-        startPrefetch(data.session_id, data.operation, emotion);
+        startPrefetch(data.session_id, data.operation, emotion, data.question?.id);
       })
       .catch(e => setLoadError(e.message ?? 'Failed to start session'))
       .finally(() => setLoading(false));
@@ -287,7 +288,7 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
       .then(data => {
         if (data.type_unlocked != null) { setTypeUnlocked(data.type_unlocked); setActiveLevel(data.active_type_level); }
         initBoard(data.question);
-        startPrefetch(sessionId, operation, emotion);
+        startPrefetch(sessionId, operation, emotion, data.question?.id);
       })
       .catch(e => console.warn('[levelUp failed]', e));
   }, [sessionId, operation, emotion, initBoard, startPrefetch]);
@@ -506,7 +507,7 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
         if (data.concept_mastery) setConceptMastery(data.concept_mastery);
         if (data.type_unlocked != null) { setTypeUnlocked(data.type_unlocked); setActiveLevel(data.active_type_level); }
         if (data.session_complete) { onSessionComplete(); return; }
-        startPrefetch(sessionId, pre.operation, emotion);
+        startPrefetch(sessionId, pre.operation, emotion, pre.question?.id);
       }).catch(e => console.warn('[nextQuestion (bg) failed]', e));
       return;
     }
@@ -530,7 +531,7 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
         setPlannedQuestions(data.planned_questions);
       }
       initBoard(data.question);
-      startPrefetch(sessionId, data.operation, emotion);
+      startPrefetch(sessionId, data.operation, emotion, data.question?.id);
     } catch (e) {
       console.error('[nextQuestion failed]', e);
       setLoadError('Failed to load next question. Please try again.');

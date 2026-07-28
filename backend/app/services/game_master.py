@@ -556,6 +556,7 @@ def prefetch_question(
     last_op: str | None, emotion: str,
     pinned_operation: str | None = None,
     session_id: str | None = None,
+    current_question_id: str | None = None,
 ) -> dict:
     """
     Pre-generate the next AI question in the background while the student
@@ -564,7 +565,9 @@ def prefetch_question(
     'Next' click.
 
     Uses current mastery to predict the next operation (without recording
-    the in-progress question result yet).
+    the in-progress question result yet). current_question_id keeps the pool
+    from re-serving the question that is still on screen (it is unanswered,
+    so the attempted-filter alone cannot exclude it).
     """
     mastery_map     = get_mastery_map(db, user_id, module_id)
     concept_mastery = get_concept_mastery_map(db, user_id)
@@ -573,7 +576,8 @@ def prefetch_question(
     else:
         next_op = select_next_operation(mastery_map, emotion, last_op, concept_mastery=concept_mastery)
     intra_difficulty = compute_intra_difficulty(db, session_id, emotion) if session_id else None
-    question        = _generate_with_fallback(next_op, emotion, mastery_map, concept_mastery, intra_difficulty, db=db, user_id=user_id)
+    question        = _generate_with_fallback(next_op, emotion, mastery_map, concept_mastery, intra_difficulty,
+                                              db=db, user_id=user_id, exclude_qid=current_question_id)
     return {"operation": next_op, "question": question}
 
 
@@ -651,6 +655,7 @@ def _generate_with_fallback(
     intra_difficulty: int | None = None,
     db: Session | None = None,
     user_id: str | None = None,
+    exclude_qid: str | None = None,
 ) -> dict:
     """
     Generate question with type determined by mastery level (competence axis) and
@@ -667,7 +672,7 @@ def _generate_with_fallback(
 
     qtype = _TYPE_BY_LEVEL.get(active_level, "fill_blank")
     if db is not None and user_id is not None and qtype in question_pool.POOLED_TYPES:
-        q = question_pool.serve(db, user_id, operation, qtype, intra_difficulty)
+        q = question_pool.serve(db, user_id, operation, qtype, intra_difficulty, exclude_qid=exclude_qid)
         if q is not None:
             q["intra_difficulty"] = intra_difficulty
             return q

@@ -52,10 +52,14 @@ def content_hash(q: dict, intra_difficulty: int) -> str:
 
 
 def serve(db: Session, user_id: str, operation: str, qtype: str,
-          intra_difficulty: int | None) -> dict | None:
+          intra_difficulty: int | None, exclude_qid: str | None = None) -> dict | None:
     """Return the least-served pool question this student hasn't attempted,
     or None (caller falls back to live generation). Triggers self-heal when
-    the combo is at/below the low-water mark."""
+    the combo is at/below the low-water mark.
+
+    exclude_qid: the question currently ON SCREEN — prefetch fires before it
+    is answered, so the attempted-filter alone can hand back the very same
+    pool row as the "next" question."""
     if qtype not in POOLED_TYPES:
         return None
     intra = intra_difficulty if intra_difficulty in (1, 2, 3) else 2
@@ -70,9 +74,11 @@ def serve(db: Session, user_id: str, operation: str, qtype: str,
         QuestionPool.question_type == qtype,
         QuestionPool.intra_difficulty == intra,
     )
+    pick = base.filter(~QuestionPool.id.in_(attempted.scalar_subquery()))
+    if exclude_qid:
+        pick = pick.filter(QuestionPool.id != exclude_qid)
     candidates = (
-        base.filter(~QuestionPool.id.in_(attempted.scalar_subquery()))
-        .order_by(QuestionPool.times_served.asc(), QuestionPool.created_at.asc())
+        pick.order_by(QuestionPool.times_served.asc(), QuestionPool.created_at.asc())
         .limit(1).all()
     )
 

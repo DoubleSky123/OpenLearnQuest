@@ -93,8 +93,8 @@ export const gameMasterApi = {
       variant: telemetry.variant ?? null,
     }),
 
-  prefetchNext: (sessionId, lastOperation, emotion, pinnedOperation = null) =>
-    request("POST", "/api/gm/session/prefetch", { session_id: sessionId, last_operation: lastOperation, emotion, pinned_operation: pinnedOperation }),
+  prefetchNext: (sessionId, lastOperation, emotion, pinnedOperation = null, currentQuestionId = null) =>
+    request("POST", "/api/gm/session/prefetch", { session_id: sessionId, last_operation: lastOperation, emotion, pinned_operation: pinnedOperation, current_question_id: currentQuestionId }),
 
   levelUp: (sessionId, operation, emotion = "engaged") =>
     request("POST", "/api/gm/session/level-up", { session_id: sessionId, operation, emotion }),

@@ -47,6 +47,8 @@ d:/openLearnquest/venv/Scripts/python.exe refill_pool.py --ops all   # scope wit
 ```
 Serving also self-heals: when a (operation, type, intra) combo drops to the low-water mark, a background thread tops it up. Pool-empty serving falls back to live generation (warning logged). `fill_blank` is never pooled (static, instant).
 
+**Pool staleness rule**: pool payloads embed TEMPLATES content (pseudocode, step_hints) at generation time. After editing an operation's TEMPLATES entry, regenerate its pool rows: `refill_pool.py --ops <op> --purge`.
+
 ### Run Migrations
 ```bash
 cd backend

@@ -68,6 +68,8 @@ class PrefetchRequest(BaseModel):
     last_operation: str | None = None
     emotion: str = "engaged"
     pinned_operation: str | None = None
+    # question currently on screen — pool serving must not hand it back as "next"
+    current_question_id: str | None = None
 
 
 class LevelUpRequest(BaseModel):
@@ -201,6 +203,7 @@ def prefetch_next(
             emotion=body.emotion,
             pinned_operation=body.pinned_operation,
             session_id=body.session_id,
+            current_question_id=body.current_question_id,
         )
     except Exception as e:
         raise HTTPException(status_code=503, detail=str(e))

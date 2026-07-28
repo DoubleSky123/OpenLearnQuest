@@ -86,6 +86,20 @@ def test_serve_is_class_shared_not_consumed(db):
     assert db.query(QuestionPool).one().times_served == 2
 
 
+def test_serve_excludes_on_screen_question(db):
+    # Prefetch fires before the current question is answered — without the
+    # explicit exclusion the same pool row can come back as "next".
+    rows = _seed_pool(db, n=2)
+    user = _mk_user(db)
+    q = question_pool.serve(db, user.id, "reverseList", "find_bug", 2,
+                            exclude_qid=rows[0].id)
+    assert q["id"] == rows[1].id
+    # sole candidate is the on-screen question -> pool declines (live gen instead)
+    only = _seed_pool(db, n=1, op="detectCycle")[0]
+    assert question_pool.serve(db, user.id, "detectCycle", "find_bug", 2,
+                               exclude_qid=only.id) is None
+
+
 def test_serve_prefers_least_served(db):
     rows = _seed_pool(db, n=2)
     rows[0].times_served = 5

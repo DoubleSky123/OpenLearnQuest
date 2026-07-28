@@ -80,6 +80,7 @@ Add the one-line per-op explanation string to the dict near the top if the op be
 1. **Consistency sweep**: `grep -rn "<op>"` across `backend/` and `frontend/src/` — confirm it appears in every location from Steps 1–2 (minus justified skips).
 2. **Executor sanity** (from `backend/`): run the venv python and call `ll_executor.execute_operation("<op>", nodes, ...)` on a small list; check the result by hand.
 3. **Generation check**: run `/gen-check` scoped to the new op (`--ops <op>`) — verifies the AI pipeline (find_bug + ordering prompts/validators) works for it.
-4. **Play it**: start the dev environment (`/dev`), set a test user's mastery or start a session that serves `<op>`, and confirm: fill_blank blanks render, the hint animation plays, and the goal pattern matches the executor output.
+4. **Stock the question pool** (from `backend/`): `venv/Scripts/python.exe refill_pool.py --ops <op>` — a new op has an empty pool, so students would hit live generation (slower, no class-shared reuse) until serving self-heals. If you later EDIT the op's TEMPLATES entry, re-run with `--purge` (pool payloads embed the template's pseudocode/step_hints at generation time and go stale).
+5. **Play it**: start the dev environment (`/dev`), set a test user's mastery or start a session that serves `<op>`, and confirm: fill_blank blanks render, the hint animation plays, and the goal pattern matches the executor output.
 
 No DB migration is needed — operations are plain strings in `mastery.operation`, not an enum.
