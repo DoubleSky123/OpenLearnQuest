@@ -27,7 +27,7 @@ def _validate(op: str, bug_line: int, buggy: str, wrong=None) -> dict:
 
 def test_rename_via_live_alias_is_rejected():
     # At line 1 the alias temp == head is live: 'head = temp.next' is a rename.
-    with pytest.raises(ValueError, match="equivalent"):
+    with pytest.raises(ValueError, match="behaves identically"):
         _validate("removeAtHead", 1, "head = temp.next;")
 
 
@@ -49,3 +49,17 @@ def test_self_referential_assignment_yields_no_alias():
 def test_identical_line_still_rejected():
     with pytest.raises(ValueError, match="identical"):
         _validate("removeAtHead", 1, "head = head.next;")
+
+
+def test_wrong_option_equal_to_correct_line_is_dropped_not_rejected():
+    # Models persistently offer the true fix as a "plausible wrong fix" —
+    # the validator sanitizes it away instead of burning a retry.
+    q = _validate("removeAtHead", 0, "temp = head.next;",
+                  wrong=["temp = head;", "temp = NULL;"])
+    assert q["options"] == ["temp = head;", "temp = NULL;"]   # fix + survivor
+
+
+def test_all_bogus_wrong_options_still_rejected():
+    with pytest.raises(ValueError, match="no usable wrong_options"):
+        _validate("removeAtHead", 0, "temp = head.next;",
+                  wrong=["temp = head;", "temp = head"])

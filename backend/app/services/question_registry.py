@@ -377,6 +377,31 @@ def _fill_blank_static(operation: str, spec: QuestionSpec) -> dict:
 
 # find_bug bug subtlety per within-type difficulty (state axis). Level 1 also
 # uses fewer fix options (2 total = fix + 1 wrong) so it is genuinely easier.
+def _aliases_before(steps: list[str], bug_line: int) -> dict[str, str]:
+    """Textual aliases still live when `bug_line` runs: only assignments BEFORE
+    it count (later ones haven't executed), and a reassignment KILLS stale
+    aliases — after 'temp = head; head = head.next;' the alias temp->head no
+    longer holds (temp names the OLD head). A self-referential assignment like
+    'head = head.next' yields no textual alias at all. Without the kill rule,
+    sequential substitution chained temp->head->head.next and wrongly rejected
+    real bugs (e.g. removeAtHead's 'free(head.next);'). Shared by the find_bug
+    prompt (concrete forbidden-rewrite list) and validator (equivalence check)."""
+    alias: dict[str, str] = {}
+    for i, step in enumerate(steps):
+        if i >= bug_line:
+            break
+        m = re.match(r'^(\w[\w.]*)\s*=\s*(.+)$', step.strip().rstrip(";"))
+        if not m:
+            continue
+        target, rhs = m.group(1).strip(), m.group(2).strip()
+        alias = {t: r for t, r in alias.items()
+                 if not re.search(rf'\b{re.escape(target)}\b', r)}
+        alias.pop(target, None)
+        if not re.search(rf'\b{re.escape(target)}\b', rhs):
+            alias[target] = rhs
+    return alias
+
+
 _BUG_SUBTLETY = {
     1: "OBVIOUS — use a clearly wrong variable or drop the assignment target; a beginner can spot it",
     2: "PLAUSIBLE — right idea but wrong target or wrong order (a mistake a learner would actually make)",
@@ -398,21 +423,29 @@ def _find_bug_prompt(operation: str, meta: dict, spec: QuestionSpec) -> str:
     n_wrong  = 1 if intra == 1 else 2
 
     # Alias warning: assignments BEFORE the bug line make some rewrites of the
-    # correct line behave identically (the validator rejects those). Spell the
-    # equivalences out so the model doesn't burn retries on renames — on 3-line
-    # ops like removeAtHead the mutation space is tiny and this dominates.
+    # correct line behave identically (the validator rejects those). List the
+    # forbidden rewrites CONCRETELY — the abstract "don't swap aliased names"
+    # version still produced 'head = temp.next;' every attempt; on 3-line ops
+    # like removeAtHead the mutation space is tiny and this dominates retries.
     alias_note = ""
-    alias_facts = []
-    for s in correct_steps[:bug_line]:
-        m = re.match(r'^(\w[\w.]*)\s*=\s*(.+?)\s*;?$', s.strip())
-        if m:
-            alias_facts.append(f'"{m.group(1)}" holds "{m.group(2)}"')
-    if alias_facts:
-        alias_note = (
-            f"\n- When line {bug_line} runs, {'; '.join(alias_facts)}. A buggy_line that "
-            f"only swaps such equivalent names behaves identically and will be REJECTED — "
-            f"the bug must change WHICH node is read or written."
-        )
+    aliases = _aliases_before(correct_steps, bug_line)
+    if aliases:
+        forbidden: list[str] = []
+        for t, r in aliases.items():
+            occ = [m.start() for m in re.finditer(rf'\b{re.escape(r)}\b', correct_line)]
+            for pos in occ:
+                forbidden.append(correct_line[:pos] + t + correct_line[pos + len(r):])
+            if len(occ) > 1:
+                forbidden.append(re.sub(rf'\b{re.escape(r)}\b', t, correct_line))
+        forbidden = [f for f in dict.fromkeys(forbidden) if f != correct_line][:6]
+        facts = "; ".join(f'"{t}" holds "{r}"' for t, r in aliases.items())
+        if forbidden:
+            alias_note = (
+                f"\n- When line {bug_line} runs, {facts}. These rewrites behave IDENTICALLY "
+                f"to the correct line and will be REJECTED: {json.dumps(forbidden)}. "
+                f"Make a genuinely different read/write instead (different field depth "
+                f"like .next.next, a different variable, or the wrong side of the assignment)."
+            )
 
     # Few-shot anchor: show a real authored bug of the requested subtlety so the
     # model calibrates "how hidden" instead of interpreting adjectives freely.
@@ -448,6 +481,8 @@ Rules:
   variable renamed consistently (e.g. temp -> node), it behaves identically and will be
   REJECTED. The bug must change which pointer/value is read or written.
 - provide exactly {n_wrong} wrong_option(s): incorrect variants of line {bug_line} (not copies of other steps)
+- wrong_options must NOT include the correct line "{correct_line}" — it is added
+  automatically as the right answer; every wrong_option must be genuinely wrong
 - match the requested subtlety: {subtlety}{alias_note}
 {_SLL_CONSTRAINT}
 Return ONLY the JSON."""
@@ -474,27 +509,9 @@ def _find_bug_validate(raw: str, operation: str, meta: dict) -> dict:
     if buggy_line.strip().rstrip(";") == correct_line.strip().rstrip(";"):
         raise ValueError(f"buggy_line is identical to the correct line '{correct_line}'")
 
-    # Semantic equivalence check (alias substitution).
-    # Only assignments BEFORE the bug line count as aliases: when the buggy line
-    # runs, later assignments haven't executed yet. Additionally, a reassignment
-    # KILLS stale aliases: after 'temp = head; head = head.next;' the alias
-    # temp->head no longer holds (temp names the OLD head), and a self-referential
-    # assignment like 'head = head.next' yields no textual alias at all. Without
-    # the kill rule, sequential substitution chained temp->head->head.next and
-    # wrongly rejected real bugs (e.g. removeAtHead's 'free(head.next);').
-    alias: dict[str, str] = {}
-    for i, step in enumerate(template_steps):
-        if i >= bug_line:
-            break
-        m = re.match(r'^(\w[\w.]*)\s*=\s*(.+)$', step.strip().rstrip(";"))
-        if not m:
-            continue
-        target, rhs = m.group(1).strip(), m.group(2).strip()
-        alias = {t: r for t, r in alias.items()
-                 if not re.search(rf'\b{re.escape(target)}\b', r)}
-        alias.pop(target, None)
-        if not re.search(rf'\b{re.escape(target)}\b', rhs):
-            alias[target] = rhs
+    # Semantic equivalence check (alias substitution) — aliases via
+    # _aliases_before (kill rule documented there).
+    alias = _aliases_before(template_steps, bug_line)
     def _substitute(expr: str) -> str:
         # Single simultaneous pass (longest names first) — no re-substitution of
         # produced text, so aliases never chain.
@@ -506,22 +523,32 @@ def _find_bug_validate(raw: str, operation: str, meta: dict) -> dict:
     b_norm = buggy_line.strip().rstrip(";")
     c_norm = correct_line.strip().rstrip(";")
     if _substitute(b_norm) == c_norm or b_norm == _substitute(c_norm):
+        facts = "; ".join(f"'{t}' holds '{r}'" for t, r in alias.items())
         raise ValueError(
-            f"buggy_line is semantically equivalent to correct line after alias substitution"
-        )
+            f"buggy_line '{buggy_line}' behaves identically to the correct line "
+            f"'{correct_line}' because {facts} — swapping aliased names is a rename, "
+            f"not a bug; change which pointer/field is read or written (different "
+            f"field depth like .next.next, or a different variable entirely)")
 
-    # wrong_options must not copy other template lines
-    correct_line_set = {s.strip().rstrip(";") for i, s in enumerate(template_steps) if i != bug_line}
-    wrong_opts = [_ascii_ops(o) for o in ai.get("wrong_options", [])]
-    for opt in wrong_opts:
-        if opt.strip().rstrip(";") in correct_line_set:
-            raise ValueError(f"wrong_option '{opt}' is identical to a correct pseudocode line")
-
-    # Options must be distinct (fix + 2 wrong)
-    all_opts = [correct_line] + wrong_opts
-    opt_keys = [o.strip().rstrip(";") for o in all_opts]
-    if len(opt_keys) != len(set(opt_keys)):
-        raise ValueError("options contains duplicates")
+    # Sanitize wrong_options instead of rejecting: models persistently include
+    # the correct line as a "plausible fix" (it IS the most plausible one), and
+    # burning retries on that starved removeAtHead. Drop copies of the correct
+    # line, copies of other template steps, and duplicates; the question is
+    # still sound with one fewer distractor as long as one real wrong survives.
+    correct_key = correct_line.strip().rstrip(";")
+    other_lines = {s.strip().rstrip(";") for i, s in enumerate(template_steps) if i != bug_line}
+    seen: set[str] = set()
+    wrong_opts: list[str] = []
+    for opt in (_ascii_ops(o) for o in ai.get("wrong_options", [])):
+        key = opt.strip().rstrip(";")
+        if key == correct_key or key in other_lines or key in seen:
+            continue
+        seen.add(key)
+        wrong_opts.append(opt)
+    if not wrong_opts:
+        raise ValueError(
+            "no usable wrong_options: every option was the correct line, a copy of "
+            "another step, or a duplicate — provide genuinely incorrect fixes")
 
     # SLL constraint check
     all_text = " ".join(template_steps + [buggy_line] + wrong_opts + [ai.get("bug_explanation", "")])
@@ -547,7 +574,7 @@ def _find_bug_validate(raw: str, operation: str, meta: dict) -> dict:
         "pseudocode":    pseudocode,
         "bug_line":      bug_line,
         "fix":           correct_line,
-        "options":       all_opts,
+        "options":       [correct_line] + wrong_opts,
         "bug_explanation": ai["bug_explanation"],
         "hint":          ai["hint"],
         "initialNodes":  init_nodes,
