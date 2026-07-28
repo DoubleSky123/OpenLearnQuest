@@ -43,6 +43,7 @@ from ..models.game_session import GameSession
 from ..models.question_attempt import QuestionAttempt
 from .claude_service import generate_question, OP_META
 from .static_questions import generate_static_question
+from . import question_pool
 from .error_analyzer import analyze_error
 from .concept_graph import concepts_for_op, op_prereqs_met, weakest_concept_score, CONCEPTS
 
@@ -282,7 +283,7 @@ def start_session(
     if not operation or operation not in ALL_OPS:
         operation = select_next_operation(mastery_map, emotion, concept_mastery=concept_mastery)
     intra_difficulty = compute_intra_difficulty(db, session.id, emotion)
-    question        = _generate_with_fallback(operation, emotion, mastery_map, concept_mastery, intra_difficulty)
+    question        = _generate_with_fallback(operation, emotion, mastery_map, concept_mastery, intra_difficulty, db=db, user_id=user_id)
 
     op_m    = mastery_map.get(operation, {})
     ceiling = op_m.get("type_unlocked", 1)
@@ -436,7 +437,7 @@ def level_up(
     mastery_map      = get_mastery_map(db, user_id, module_id)
     concept_mastery  = get_concept_mastery_map(db, user_id)
     intra_difficulty = compute_intra_difficulty(db, session_id, emotion)
-    question         = _generate_with_fallback(operation, emotion, mastery_map, concept_mastery, intra_difficulty)
+    question         = _generate_with_fallback(operation, emotion, mastery_map, concept_mastery, intra_difficulty, db=db, user_id=user_id)
 
     op_m    = mastery_map.get(operation, {})
     ceiling = op_m.get("type_unlocked", 1)
@@ -528,7 +529,7 @@ def next_question(
     else:
         next_op = select_next_operation(mastery_map, emotion, last_op=operation, concept_mastery=concept_mastery)
     intra_difficulty = compute_intra_difficulty(db, session_id, emotion)
-    question         = _generate_with_fallback(next_op, emotion, mastery_map, concept_mastery, intra_difficulty)
+    question         = _generate_with_fallback(next_op, emotion, mastery_map, concept_mastery, intra_difficulty, db=db, user_id=user_id)
 
     # Surface the level-up state for the upcoming operation so the client can offer
     # the choice (active < ceiling ⇒ a higher type is unlocked but not yet entered).
@@ -572,7 +573,7 @@ def prefetch_question(
     else:
         next_op = select_next_operation(mastery_map, emotion, last_op, concept_mastery=concept_mastery)
     intra_difficulty = compute_intra_difficulty(db, session_id, emotion) if session_id else None
-    question        = _generate_with_fallback(next_op, emotion, mastery_map, concept_mastery, intra_difficulty)
+    question        = _generate_with_fallback(next_op, emotion, mastery_map, concept_mastery, intra_difficulty, db=db, user_id=user_id)
     return {"operation": next_op, "question": question}
 
 
@@ -648,17 +649,30 @@ def _generate_with_fallback(
     mastery_map: dict,
     concept_mastery: dict[str, float] | None = None,
     intra_difficulty: int | None = None,
+    db: Session | None = None,
+    user_id: str | None = None,
 ) -> dict:
     """
     Generate question with type determined by mastery level (competence axis) and
     within-type difficulty from intra_difficulty (state axis / ZPD controller).
-    generate_question handles retries and static fallback internally.
+    Pooled AI types are served from question_pool first (class-shared, excluding
+    questions this student attempted); an empty pool falls back to live
+    generation. generate_question handles retries and static fallback internally.
     """
     op_m          = mastery_map.get(operation, {})
     type_unlocked = op_m.get("type_unlocked", 1)
     # The question TYPE follows the student's chosen active level (<= the earned ceiling),
     # not the ceiling itself — so unlocking a harder type does not force them into it.
     active_level  = min(op_m.get("active_type_level", type_unlocked), type_unlocked)
+
+    qtype = _TYPE_BY_LEVEL.get(active_level, "fill_blank")
+    if db is not None and user_id is not None and qtype in question_pool.POOLED_TYPES:
+        q = question_pool.serve(db, user_id, operation, qtype, intra_difficulty)
+        if q is not None:
+            q["intra_difficulty"] = intra_difficulty
+            return q
+        logger.warning("question_pool empty for (%s, %s, intra=%s) — live generation",
+                       operation, qtype, intra_difficulty)
     try:
         # attempts count drives deterministic variant rotation (blank sets / static bugs)
         q = generate_question(operation, emotion, active_level, intra_difficulty,

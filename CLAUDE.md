@@ -40,6 +40,13 @@ npm run dev        # runs on http://localhost:5173
 d:/openLearnquest/venv/Scripts/python.exe backend/clear_user_data.py --apply
 ```
 
+### Refill Question Pool
+```bash
+cd backend
+d:/openLearnquest/venv/Scripts/python.exe refill_pool.py --ops all   # scope with --ops/--types/--intra — full run costs many Haiku calls
+```
+Serving also self-heals: when a (operation, type, intra) combo drops to the low-water mark, a background thread tops it up. Pool-empty serving falls back to live generation (warning logged). `fill_blank` is never pooled (static, instant).
+
 ### Run Migrations
 ```bash
 cd backend
@@ -199,7 +206,8 @@ Always-visible hint button (no error threshold). Click → modal with a per-node
 |---|---|
 | `users` | id, email, username, xp, is_admin |
 | `game_sessions` | id, user_id, module_id, mode |
-| `question_attempts` | session_id, question_id, difficulty, passed, error_count, error_type, error_concept, **intra_difficulty, scaffold_level, emotion** (state-axis telemetry) |
+| `question_attempts` | session_id, question_id, difficulty, passed, error_count, error_type, error_concept, **intra_difficulty, scaffold_level, emotion** (state-axis telemetry), **variant** (content-variant tag: `blanksN`/`bugN-sK`/`pool:<hash8>`, null for live-AI questions) |
+| `question_pool` | operation, question_type, intra_difficulty, payload (JSON), content_hash (unique, pedagogical identity — not node values), times_served — class-shared pre-generated AI questions; serving excludes only the student's own attempted question_ids |
 | `mastery` | user_id, operation, module_id, attempts, passes, consecutive_passes, perfect_pass, type_unlocked, **active_type_level** |
 | `concept_mastery` | user_id, concept, mastery (0–1 float), attempts — Bayesian-style per-concept posterior |
 | `mistakes` | user_id, question_id, source, title, your_answer (JSON), correct_answer (JSON), explanation, created_at |

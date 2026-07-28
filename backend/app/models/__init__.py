@@ -7,3 +7,4 @@ from .emotion_log import EmotionLog
 from .mastery import Mastery
 from .concept_mastery import ConceptMastery
 from .tutor_conversation import TutorConversation, TutorMessage
+from .question_pool import QuestionPool
