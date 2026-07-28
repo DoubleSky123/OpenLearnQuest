@@ -28,8 +28,8 @@ export default function SessionSummaryOverlay({ questionsCompleted, perfectCount
             <div className="text-xs text-indigo-500 font-medium mt-0.5">Perfect</div>
           </div>
           <div className="bg-violet-50 rounded-xl p-4">
-            <div className="text-2xl font-black text-violet-700">+{totalXp}</div>
-            <div className="text-xs text-violet-500 font-medium mt-0.5">XP Earned</div>
+            <div className="text-2xl font-black text-violet-700">{questionsCompleted}</div>
+            <div className="text-xs text-violet-500 font-medium mt-0.5">Questions Completed</div>
           </div>
         </div>
 

@@ -48,7 +48,6 @@ export default function AnalysisCard({
   q,                     // current question (title, operation, consider)
   errorCount,
   timeMs,
-  xpGained,
   questionNumber,
   plannedQuestions,
   analysis,              // { concepts_exercised, peer, concept_mastery } | null while loading
@@ -95,9 +94,6 @@ export default function AnalysisCard({
             </span>
             <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-100 text-gray-600">
               🕐 {secs}s
-            </span>
-            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-violet-100 text-violet-700">
-              +{xpGained} XP
             </span>
           </div>
           {isCompetitive && livesArr.length > 0 && (

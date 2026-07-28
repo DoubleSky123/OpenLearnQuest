@@ -3,32 +3,6 @@ import React from 'react';
 // ── Section data ───────────────────────────────────────────────────────────────
 const SECTIONS = [
   {
-    icon:    '⭐',
-    color:   '#2563EB',
-    bg:      '#EFF6FF',
-    border:  '#93C5FD',
-    title:   'XP & Level System',
-    bullets: [
-      'XP stands for Experience Points — you earn them by completing questions.',
-      'Every completed question earns XP based on difficulty: Beginner 80 · Intermediate 120 · Advanced 160.',
-      'Accumulate 500 XP to reach the next level and earn a new title (Novice → Explorer → … → Master).',
-      'Your level and XP carry across all modes and modules.',
-    ],
-  },
-  {
-    icon:    '🐾',
-    color:   '#DB2777',
-    bg:      '#FDF2F8',
-    border:  '#F9A8D4',
-    title:   'Your Pet — Algo',
-    bullets: [
-      'Algo is your companion throughout the game.',
-      'Every XP point you earn also feeds Algo\'s growth meter.',
-      'Algo evolves through 5 stages as your total XP rises — keep practicing to unlock the final form!',
-      'Algo reacts to your performance: happy on success, sad on errors.',
-    ],
-  },
-  {
     icon:    '✏️',
     color:   '#059669',
     bg:      '#ECFDF5',

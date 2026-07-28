@@ -2,9 +2,6 @@ import { useState, useEffect } from 'react';
 import { gameMasterApi } from '../services/api';
 import HelpModal from './HelpModal';
 
-const XP_PER_LEVEL = 500;
-const LEVEL_NAMES = ['Novice', 'Explorer', 'Learner', 'Practitioner', 'Skilled', 'Advanced', 'Expert', 'Master'];
-
 const LEVEL_OPS = {
   1: ['insertAtHead', 'insertAtTail', 'removeAtHead', 'removeAtTail'],
   2: ['insertIntoEmpty', 'deleteEntireList', 'insertAtPosition', 'removeAtPosition'],
@@ -31,10 +28,6 @@ const OP_ICONS = {
 };
 
 function TopBar({ onBack, moduleName, xp }) {
-  const level = Math.floor(xp / XP_PER_LEVEL) + 1;
-  const levelName = LEVEL_NAMES[Math.min(level - 1, LEVEL_NAMES.length - 1)];
-  const xpInLevel = xp % XP_PER_LEVEL;
-  const xpPct = Math.round((xpInLevel / XP_PER_LEVEL) * 100);
   const [showHelp, setShowHelp] = useState(false);
 
   return (
@@ -53,15 +46,7 @@ function TopBar({ onBack, moduleName, xp }) {
         <div style={{ flex: 1, textAlign: 'center' }}>
           <span style={{ color: 'white', fontSize: 22, fontWeight: 700 }}>{moduleName}</span>
         </div>
-        <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 12 }}>
-          <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: 18, fontWeight: 700 }}>Lv {level} · {levelName}</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 130 }}>
-            <div style={{ flex: 1, height: 7, background: 'rgba(255,255,255,0.2)', borderRadius: 99, overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${xpPct}%`, background: 'rgba(255,255,255,0.85)', borderRadius: 99 }} />
-            </div>
-            <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.65)', fontWeight: 600 }}>{xpInLevel}/{XP_PER_LEVEL}</span>
-          </div>
-        </div>
+        <div style={{ flex: 1 }} />{/* XP/level display removed — gamification layer parked */}
       </div>
       <HelpModal isOpen={showHelp} onClose={() => setShowHelp(false)} />
     </div>

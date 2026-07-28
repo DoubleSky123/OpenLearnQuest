@@ -1,13 +1,6 @@
 import React from 'react';
 import { ChevronRight } from 'lucide-react';
 
-// ── Constants ──────────────────────────────────────────────────────────────────
-const XP_PER_LEVEL = 500;
-const LEVEL_NAMES = [
-  'Novice', 'Explorer', 'Learner', 'Practitioner',
-  'Skilled', 'Advanced', 'Expert', 'Master',
-];
-
 // ── Module data ────────────────────────────────────────────────────────────────
 const MODULES = [
   {
@@ -63,10 +56,6 @@ const COLOR_MAP = {
 
 // ── Component ──────────────────────────────────────────────────────────────────
 export default function ModuleSelector({ onSelect, completedModules = [], xp = 0, username, onMistakeBook, onLogout }) {
-  const level     = Math.floor(xp / XP_PER_LEVEL) + 1;
-  const levelName = LEVEL_NAMES[Math.min(level - 1, LEVEL_NAMES.length - 1)];
-  const xpInLevel = xp % XP_PER_LEVEL;
-  const xpPct     = Math.round((xpInLevel / XP_PER_LEVEL) * 100);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-8">
@@ -96,22 +85,6 @@ export default function ModuleSelector({ onSelect, completedModules = [], xp = 0
         <p className="text-gray-500 text-2xl">
           Master data structures one quest at a time
         </p>
-      </div>
-
-      {/* XP bar */}
-      <div className="flex items-center gap-6 bg-white rounded-2xl px-8 py-4 shadow-sm border border-gray-200 mb-10 w-auto min-w-[520px]">
-        <div className="text-violet-700 text-xl font-bold shrink-0">
-          Level {level} · {levelName}
-        </div>
-        <div className="flex-1 min-w-[160px]">
-          <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-violet-500 to-violet-400 rounded-full transition-all duration-500"
-              style={{ width: `${xpPct}%` }}
-            />
-          </div>
-        </div>
-        <span className="text-xl text-gray-400 shrink-0">{xpInLevel} / {XP_PER_LEVEL}</span>
       </div>
 
       {/* Module cards */}
@@ -159,7 +132,7 @@ export default function ModuleSelector({ onSelect, completedModules = [], xp = 0
 
       {/* Footer */}
       <p className="mt-4 text-gray-400 text-xl">
-        Assemble pseudocode blocks · Master pointer operations · Level up
+        Assemble pseudocode blocks · Master pointer operations
       </p>
     </div>
   );

@@ -3,16 +3,15 @@ import { shuffleArray, getCurrentPattern, assemblyToText, cloneNodes } from '../
 import { executeLinkedListOperation } from '../services/linkedListOperations';
 import { executeDLLOperation } from '../services/doublyLinkedListOperations';
 import { validateAssembly } from '../services/validationLogic';
+import { selectOrderingHint } from '../services/stepHints';
 import { progressApi, gameMasterApi, emotionApi, streamTutorChat } from '../services/api';
 import { useEmotion } from '../contexts/EmotionContext';
-import { useAdaptivePet } from '../hooks/useAdaptivePet';
 import { useScaffold } from '../hooks/useScaffold';
 import CodePool from './CodePool';
 import AssemblyArea from './AssemblyArea';
 import FillBlankBoard from './FillBlankBoard';
 import FindBugBoard from './FindBugBoard';
 import GameTopBar from './shared/GameTopBar';
-import GamePetCard from './shared/GamePetCard';
 import GameTimer from './GameTimer';
 import TutorChat from './TutorChat';
 import ConceptMasteryPanel from './ConceptMasteryPanel';
@@ -43,6 +42,8 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
   // fill_blank / find_bug board state lifted for the tutor ({lines, note}) —
   // without it the tutor only saw the ordering board's assembly
   const [boardState,    setBoardState]    = useState(null);
+  const [orderingHint,  setOrderingHint]  = useState(null);  // step-hint decision chain output (ordering)
+  const [showOpHint,    setShowOpHint]    = useState(false); // LC-style collapsed hint (Advanced ops only)
   const boardStateRef   = useRef(null);      // ref mirrors for effects with stale closures
   const assemblyAreaRef = useRef([]);
   useEffect(() => { boardStateRef.current = boardState; }, [boardState]);
@@ -108,7 +109,6 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
     emotion, setEmotion, initSession,
     recordQuestion, recordReset, markUsedTutor, getSignalsSnapshot,
   } = useEmotion();
-  const { message: petMessage, showWrong, showSuccess: triggerSuccess } = useAdaptivePet();
 
   // ── Scaffold orchestrator (single source of truth for help intensity) ────────
   // emotion sets the baseline, each error climbs one level, mastery caps the ceiling.
@@ -244,6 +244,8 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
     attemptStartRef.current = Date.now();
     timerRef.current?.reset?.();
     setBoardState(null);
+    setOrderingHint(null);
+    setShowOpHint(false);
     setQuestion(q);
   }, []);
 
@@ -295,7 +297,6 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
     if (modalShownRef.current) return;
     modalShownRef.current = true;
     setIsCorrect(true);
-    triggerSuccess();
     timerRef.current?.stop?.();
     const q       = qRef.current;
     const timeMs  = Date.now() - attemptStartRef.current;
@@ -304,7 +305,6 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
     const gained  = Math.max(Math.round(80 * 0.3), 80 - boardErrors * 20);
     const isPerfect = boardErrors === 0;
     setXpGained(gained);
-    onXpGained?.(gained);
     recordQuestion(timeMs, boardErrors, level);
     if (!isPerfect) {
       const newPlan = Math.min(plannedQuestionsRef.current + 1, 5);
@@ -338,13 +338,12 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
       console.warn('[recordResult failed]', e);
       setTimeout(() => setShowSuccess(true), 300);
     });
-  }, [sessionId, questionNumber, onXpGained, recordQuestion, triggerSuccess, startPrefetch, inferEmotion, emotion]);
+  }, [sessionId, questionNumber, onXpGained, recordQuestion, startPrefetch, inferEmotion, emotion]);
 
   const handleBoardError = useCallback(() => {
     const next = errorCountRef.current + 1;
     setErrorCount(next);
     errorCountRef.current = next;
-    showWrong();
     const q = qRef.current;
     if (q) {
       progressApi.addMistake({
@@ -356,7 +355,7 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
         explanation: q.hint,
       }).catch(() => {});
     }
-  }, [showWrong]);
+  }, []);
 
   // ── Validation ────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -371,6 +370,7 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
     if (validation.isValid && !opExecuted) {
       setOpExecuted(true);
       setErrorDetails(null);
+      setOrderingHint(null);
       setTimeout(() => {
         const opVal = q.isMerge
           ? { l1Values: q.l1Values, l2Values: q.l2Values }
@@ -383,6 +383,8 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
       }, 400);
     } else if (!opExecuted && validation.errors) {
       setErrorDetails(validation.errors);
+      // step-hint decision chain: distractor -> altitude escalation -> first-wrong step
+      setOrderingHint(selectOrderingHint(q, assemblyToText(assemblyArea, q.pseudocode, q.distractors)));
       if (full && !lastErrorRef.current) {
         const next = errorCountRef.current + 1;
         setErrorCount(next);
@@ -393,7 +395,6 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
           if (n === 0) setGameOver(true);
           return n;
         });
-        showWrong();
         progressApi.addMistake({
           question_id:   q.id ?? q.title,
           source:        'agentic',
@@ -424,7 +425,6 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
     if (!met || modalShownRef.current) return;
 
     modalShownRef.current = true;
-    triggerSuccess();
     timerRef.current?.stop?.();
 
     const timeMs   = Date.now() - attemptStartRef.current;
@@ -433,7 +433,6 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
     const gained   = Math.max(Math.round(80 * 0.3), 80 - errorCountRef.current * 20);
     const isPerfect = errorCountRef.current === 0;
     setXpGained(gained);
-    onXpGained?.(gained);
     recordQuestion(timeMs, errorCountRef.current, level);
 
     // Track session stats
@@ -639,6 +638,23 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
                     🎯 {questionInstruction(q)}
                   </p>
                 )}
+                {/* LC-style collapsed hint — Advanced (algorithm) ops only; basics
+                    are covered by the animation and would just repeat it */}
+                {_opLevel(q.operation) === 3 && q.hint && (
+                  <div className="mb-2">
+                    <button
+                      onClick={() => setShowOpHint(v => !v)}
+                      className="text-xs font-semibold text-amber-600 hover:text-amber-700"
+                    >
+                      💡 Hint {showOpHint ? '▾' : '▸'}
+                    </button>
+                    {showOpHint && (
+                      <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-2.5 py-1.5 mt-1">
+                        {q.hint}
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 <div className="bg-gray-50 rounded-lg p-2.5 mb-2">
                   <p className="text-gray-400 text-xs font-medium mb-1">Current state</p>
@@ -656,7 +672,7 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
                     onClick={() => setShowHintAnim(true)}
                     className="text-xs bg-amber-400 text-white px-2 py-1 rounded-full hover:bg-amber-500"
                   >
-                    💡 Hint
+                    🎬 Animation
                   </button>
                   <button
                     onClick={() => { setShowTutor(v => !v); markUsedTutor(); }}
@@ -682,7 +698,6 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
               {showSuccess && (
                 <div className="flex items-center gap-2.5 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2.5">
                   <span className="text-emerald-700 font-bold text-sm">✓ Passed</span>
-                  <span className="text-xs font-semibold bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full">+{xpGained} XP</span>
                   <div className="flex-1" />
                   <button
                     onClick={() => setShowAnalysis(v => !v)}
@@ -733,18 +748,22 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
                   onStateChange={setBoardState}
                 />
               )}
+              {/* Step-hint from the ordering decision chain (first-wrong anchor) */}
+              {orderingHint && !isCorrect && (
+                <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-2.5">
+                  <p className="text-red-600 text-sm">
+                    {orderingHint.kind === 'operation' ? '🧭 ' : '💡 '}
+                    {orderingHint.kind === 'step' && orderingHint.lineIdx != null
+                      ? `Check the step "${q.pseudocode[orderingHint.lineIdx]}" — ${orderingHint.text}`
+                      : orderingHint.text}
+                  </p>
+                </div>
+              )}
             </div>
 
-            {/* Col 3: Concept mastery + Pet + Tutor */}
+            {/* Col 3: Concept mastery + Tutor (pet/XP layer parked — no research value) */}
             <div className="flex flex-col gap-4">
               <ConceptMasteryPanel conceptMastery={conceptMastery} />
-              <GamePetCard
-                xp={initialXp}
-                mood={isCorrect ? 'happy' : errorDetails ? 'sad' : 'idle'}
-                theme={isCompetitive ? 'violet' : 'pink'}
-                hideable
-                message={petMessage}
-              />
               {showTutor && sessionId && (
                 <TutorChat
                   sessionId={sessionId}
@@ -760,7 +779,13 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
                   correctAnswer={
                     (!q.question_type || q.question_type === 'ordering')
                       ? closestCorrectLines(q, assemblyToText(assemblyArea, q.pseudocode, q.distractors))
-                      : (q.correctOrder ?? []).map(i => q.pseudocode[i])
+                      : q.question_type === 'fill_blank'
+                        // fill_blank pseudocode arrives pre-blanked — restore answers
+                        ? q.pseudocode.map((line, i) => {
+                            const b = (q.blanks ?? []).find(x => x.line === i);
+                            return b ? line.replace('___', b.answer) : line;
+                          })
+                        : (q.correctOrder ?? []).map(i => q.pseudocode[i])
                   }
                   errorCount={errorCount}
                   errorDiagnosis={null}

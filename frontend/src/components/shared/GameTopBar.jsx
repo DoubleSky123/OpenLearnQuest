@@ -1,23 +1,20 @@
 import React from 'react';
 import GameTimer from '../GameTimer';
 import HelpModal from '../HelpModal';
-import { XP_PER_LEVEL, LEVEL_NAMES } from '../../utils/helpers';
 
+// xp prop kept for caller compatibility — the XP/level display was removed
+// (gamification layer parked; DB columns retained for possible revival)
 export default function GameTopBar({
   onBack,
-  xp,
+  xp,             // eslint-disable-line no-unused-vars
   title,
   titleColor = 'text-violet-600',
-  barColor   = 'bg-violet-500',
+  barColor   = 'bg-violet-500', // eslint-disable-line no-unused-vars
   showModal,
   assistCount,
   timerRef,
   showTimer = true,
 }) {
-  const level     = Math.floor(xp / XP_PER_LEVEL) + 1;
-  const levelName = LEVEL_NAMES[Math.min(level - 1, LEVEL_NAMES.length - 1)];
-  const xpInLevel = xp % XP_PER_LEVEL;
-  const xpPct     = Math.round((xpInLevel / XP_PER_LEVEL) * 100);
   const [showHelp, setShowHelp] = React.useState(false);
   const timerRunning = showModal !== undefined ? !showModal : true;
 
@@ -54,17 +51,6 @@ export default function GameTopBar({
               {assistCount} assist{assistCount !== 1 ? 's' : ''}
             </div>
           )}
-          <span className="text-gray-700 text-lg font-semibold whitespace-nowrap">
-            Level {level} · {levelName}
-          </span>
-          <div className="w-36 shrink-0">
-            <div className="flex justify-between text-sm text-gray-400 mb-1">
-              <span>XP</span><span>{xpInLevel}/{XP_PER_LEVEL}</span>
-            </div>
-            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-              <div className={`h-full ${barColor} rounded-full transition-all duration-500`} style={{ width: `${xpPct}%` }} />
-            </div>
-          </div>
           {showTimer && <GameTimer ref={timerRef} isRunning={timerRunning} />}
         </div>
 
