@@ -21,6 +21,15 @@ def _distractor_count(consecutive_passes: int, emotion_default: int) -> int:
         return 1
     return emotion_default
 
+
+def _node_count_for(tmpl: dict, preferred: int) -> int:
+    """Ops flagged startsEmpty (insertIntoEmpty) begin with NO nodes — the
+    executor ignores any initial list for them, so rendering one shows a
+    'Current state' that contradicts the operation itself."""
+    if tmpl.get("startsEmpty"):
+        return 0
+    return max(preferred, tmpl["minNodes"])
+
 # ── Templates (pseudocode + metadata per operation) ────────────────────────────
 
 TEMPLATES: dict[str, dict] = {
@@ -92,7 +101,7 @@ TEMPLATES: dict[str, dict] = {
             "An empty list's head is NULL — when does it finally point at something?",
         ],
         "distractors": ["newNode.next = head;", "free(temp);", "node = head;"],
-        "needsValue": True, "needsPosition": False, "minNodes": 0,
+        "needsValue": True, "needsPosition": False, "minNodes": 0, "startsEmpty": True,
     },
     "deleteEntireList": {
         "title": "Delete Entire List",
@@ -862,12 +871,12 @@ def generate_static_question(
 
     knobs = resolve_intra("ordering", intra_level)
     if knobs:
-        node_count = max(knobs["node_count"], tmpl["minNodes"])
+        node_count = _node_count_for(tmpl, knobs["node_count"])
         n_dist     = min(knobs["distractors"], len(tmpl["distractors"]))
     else:
         # Legacy: node count from emotion, distractor count from consecutive passes
         base_nodes = {"frustrated": 2, "confused": 2, "engaged": 3, "bored": 4}.get(emotion, 3)
-        node_count = max(base_nodes, tmpl["minNodes"])
+        node_count = _node_count_for(tmpl, base_nodes)
         n_dist     = _distractor_count(consecutive_passes, 2)
 
     # Pick hint targeting the student's weakest concept for this operation
@@ -964,11 +973,11 @@ def generate_fill_blank_question(operation: str, spec) -> dict:
 
     knobs = resolve_intra("fill_blank", getattr(spec, "intra_difficulty", None))
     if knobs:
-        node_count = max(knobs["node_count"], tmpl["minNodes"])
+        node_count = _node_count_for(tmpl, knobs["node_count"])
         n_opts     = knobs["options"]
         num_blanks = knobs["num_blanks"]
     else:
-        node_count = max(2, tmpl["minNodes"])
+        node_count = _node_count_for(tmpl, 2)
         n_opts     = 3
         num_blanks = None   # blank every step
 
@@ -1032,10 +1041,10 @@ def generate_find_bug_question(operation: str, spec) -> dict:
 
     knobs = resolve_intra("find_bug", intra)
     if knobs:
-        node_count = max(knobs["node_count"], tmpl["minNodes"])
+        node_count = _node_count_for(tmpl, knobs["node_count"])
         n_opts     = knobs["options"]
     else:
-        node_count = max(3, tmpl["minNodes"])
+        node_count = _node_count_for(tmpl, 3)
         n_opts     = None
     nodes, op_value, op_pos, goal = _build_nodes_and_goal(operation, tmpl, node_count)
 

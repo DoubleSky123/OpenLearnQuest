@@ -235,7 +235,9 @@ def _ordering_validate(raw: str, operation: str, meta: dict) -> dict:
         raise ValueError(f"SLL violation in ordering question: {reason}")
 
     # ── Assemble full question ─────────────────────────────────────────────────
-    nodes      = max(meta["minNodes"], 3)
+    # startsEmpty (insertIntoEmpty): the executor ignores any initial list, so
+    # rendering one would show a 'Current state' that contradicts the operation.
+    nodes      = 0 if meta.get("startsEmpty") else max(meta["minNodes"], 3)
     is_merge   = meta.get("isMerge", False)
     correct_order = list(range(len(correct_steps)))
 
@@ -565,10 +567,13 @@ def _find_bug_validate(raw: str, operation: str, meta: dict) -> dict:
     pseudocode = list(template_steps)
     pseudocode[bug_line] = buggy_line
 
-    nodes = max(meta["minNodes"], 3)
+    # startsEmpty (insertIntoEmpty): the executor ignores any initial list, so
+    # rendering one would show a 'Current state' that contradicts the operation.
+    nodes = 0 if meta.get("startsEmpty") else max(meta["minNodes"], 3)
     init_nodes = [{"id": i, "value": random.randint(1, 30) * i, "next": i + 1 if i < nodes else None}
                   for i in range(1, nodes + 1)]
-    init_nodes[-1]["next"] = None
+    if init_nodes:
+        init_nodes[-1]["next"] = None
 
     op_value    = random.randint(1, 99) if meta["needsValue"] else None
     op_position = random.randint(2, nodes) if meta["needsPosition"] else None

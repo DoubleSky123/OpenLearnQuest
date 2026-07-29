@@ -22,7 +22,7 @@ OP_META: dict[str, dict] = {
     "insertAtTail":     {"title": "Insert at Tail",         "needsValue": True,  "needsPosition": False, "minNodes": 1},
     "removeAtHead":     {"title": "Remove at Head",         "needsValue": False, "needsPosition": False, "minNodes": 2},
     "removeAtTail":     {"title": "Remove Last Node",       "needsValue": False, "needsPosition": False, "minNodes": 2},
-    "insertIntoEmpty":  {"title": "Insert into Empty List", "needsValue": True,  "needsPosition": False, "minNodes": 0},
+    "insertIntoEmpty":  {"title": "Insert into Empty List", "needsValue": True,  "needsPosition": False, "minNodes": 0, "startsEmpty": True},
     "deleteEntireList": {"title": "Delete Entire List",     "needsValue": False, "needsPosition": False, "minNodes": 2},
     "insertAtPosition": {"title": "Insert at Position",     "needsValue": True,  "needsPosition": True,  "minNodes": 2},
     "removeAtPosition": {"title": "Remove at Position",     "needsValue": False, "needsPosition": True,  "minNodes": 3},

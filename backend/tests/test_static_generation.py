@@ -58,3 +58,27 @@ def test_blanks_and_bugs_cover_all_operations():
     assert set(_BLANKS) == set(TEMPLATES), f"missing _BLANKS: {set(TEMPLATES) - set(_BLANKS)}"
     assert set(_BUGS) == set(TEMPLATES), f"missing _BUGS: {set(TEMPLATES) - set(_BUGS)}"
     assert set(OP_META) == set(TEMPLATES)
+
+
+# ── startsEmpty: insertIntoEmpty must begin with NO nodes ────────────────────────
+# The executor ignores any initial list for it, so a rendered 'Current state'
+# with nodes contradicts the operation (user-reported bug).
+
+@pytest.mark.parametrize("qtype,level", [("fill_blank", 1), ("find_bug", 2), ("ordering", 3)])
+def test_insert_into_empty_static_has_no_initial_nodes(qtype, level):
+    spec = select_spec("insertIntoEmpty", "engaged", type_unlocked=level)
+    q = get_handler(qtype).build_static("insertIntoEmpty", spec)
+    assert q["initialNodes"] == [], f"{qtype}: {q['initialNodes']}"
+    assert q["goalPattern"] == [q["operationValue"]]
+
+
+def test_insert_into_empty_ai_validate_has_no_initial_nodes():
+    import json
+    payload = json.dumps({
+        "bug_line": 2, "buggy_line": "head = NULL;",
+        "wrong_options": ["head = newNode.next;", "newNode = head;"],
+        "bug_explanation": "discards the new node", "hint": "who should head point to?",
+    })
+    q = get_handler("find_bug").validate(payload, "insertIntoEmpty", OP_META["insertIntoEmpty"])
+    assert q["initialNodes"] == []
+    assert q["goalPattern"] == [q["operationValue"]]
