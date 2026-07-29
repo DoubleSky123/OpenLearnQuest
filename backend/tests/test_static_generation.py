@@ -72,6 +72,61 @@ def test_insert_into_empty_static_has_no_initial_nodes(qtype, level):
     assert q["goalPattern"] == [q["operationValue"]]
 
 
+# ── merge/cycle/sort payload shape (user-reported display bugs) ─────────────────
+# merge questions must carry BOTH input lists + the merged goal on every path;
+# detectCycle must carry the cycle metadata; sortList must carry a real goal.
+
+@pytest.mark.parametrize("qtype,level", [("fill_blank", 1), ("find_bug", 2), ("ordering", 3)])
+def test_merge_static_carries_both_lists_and_goal(qtype, level):
+    spec = select_spec("mergeSortedLists", "engaged", type_unlocked=level)
+    q = get_handler(qtype).build_static("mergeSortedLists", spec)
+    assert q["l1Values"] and q["l2Values"]
+    assert q["goalPattern"] == sorted(q["l1Values"] + q["l2Values"])
+    assert [n["value"] for n in q["initialNodes"]] == q["l1Values"]
+
+
+def test_merge_ai_find_bug_carries_both_lists_and_goal():
+    import json
+    payload = json.dumps({
+        "bug_line": 3, "buggy_line": "return dummy;",
+        "wrong_options": ["return node;", "return l1;"],
+        "bug_explanation": "returns the placeholder anchor", "hint": "where does the merged list start?",
+    })
+    q = get_handler("find_bug").validate(payload, "mergeSortedLists", OP_META["mergeSortedLists"])
+    assert q["l1Values"] and q["l2Values"]
+    assert q["goalPattern"] == sorted(q["l1Values"] + q["l2Values"])
+
+
+@pytest.mark.parametrize("qtype,level", [("fill_blank", 1), ("find_bug", 2), ("ordering", 3)])
+def test_detect_cycle_static_carries_cycle_metadata(qtype, level):
+    spec = select_spec("detectCycle", "engaged", type_unlocked=level)
+    q = get_handler(qtype).build_static("detectCycle", spec)
+    assert q["cycleTo"] == 1
+
+
+def test_detect_cycle_ai_find_bug_carries_cycle_and_goal():
+    import json
+    payload = json.dumps({
+        "bug_line": 2, "buggy_line": "if (slow == fast) return false;",
+        "wrong_options": ["if (slow != fast) return true;", "if (fast == NULL) return true;"],
+        "bug_explanation": "inverts the answer", "hint": "what does the pointers meeting prove?",
+    })
+    q = get_handler("find_bug").validate(payload, "detectCycle", OP_META["detectCycle"])
+    assert q["cycleTo"] == 1
+    assert q["goalPattern"] == [n["value"] for n in q["initialNodes"]]
+
+
+def test_sort_list_ai_find_bug_has_sorted_goal():
+    import json
+    payload = json.dumps({
+        "bug_line": 4, "buggy_line": "return merge(sortList(head), sortList(head));",
+        "wrong_options": ["return merge(sortList(mid), sortList(mid));", "return sortList(merge(head, mid));"],
+        "bug_explanation": "sorts the first half twice", "hint": "what happened to the second half?",
+    })
+    q = get_handler("find_bug").validate(payload, "sortList", OP_META["sortList"])
+    assert q["goalPattern"] == sorted(n["value"] for n in q["initialNodes"])
+
+
 def test_insert_into_empty_ai_validate_has_no_initial_nodes():
     import json
     payload = json.dumps({

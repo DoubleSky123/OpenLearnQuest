@@ -659,12 +659,31 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
 
                 <div className="bg-gray-50 rounded-lg p-2.5 mb-2">
                   <p className="text-gray-400 text-xs font-medium mb-1">Current state</p>
-                  <LinkedListVisualiser values={currentPattern} emptyLabel="Empty list" highlight={isCorrect} goalValues={q.goalPattern} />
+                  {q.isMerge ? (
+                    <div className="space-y-2">
+                      <div>
+                        <p className="text-gray-400 text-[11px] font-medium mb-0.5">List 1</p>
+                        <LinkedListVisualiser values={q.l1Values ?? []} emptyLabel="Empty list" />
+                      </div>
+                      <div>
+                        <p className="text-gray-400 text-[11px] font-medium mb-0.5">List 2</p>
+                        <LinkedListVisualiser values={q.l2Values ?? []} emptyLabel="Empty list" />
+                      </div>
+                    </div>
+                  ) : (
+                    <LinkedListVisualiser values={currentPattern} emptyLabel="Empty list" highlight={isCorrect} goalValues={q.goalPattern} cycleTo={q.cycleTo ?? null} />
+                  )}
                 </div>
 
                 <div className="bg-gray-50 rounded-lg p-2.5">
                   <p className="text-gray-400 text-xs font-medium mb-1">Goal state</p>
-                  <LinkedListVisualiser values={q.goalPattern} emptyLabel="Empty list" nodeColor="bg-amber-50 border-amber-300 text-amber-800" />
+                  {q.operation === 'detectCycle' ? (
+                    <p className="text-sm text-amber-800">
+                      return <span className="font-mono font-bold">true</span> — the tail points back into the list, so a cycle exists
+                    </p>
+                  ) : (
+                    <LinkedListVisualiser values={q.goalPattern} emptyLabel="Empty list" nodeColor="bg-amber-50 border-amber-300 text-amber-800" />
+                  )}
                 </div>
 
                 {/* Buttons */}

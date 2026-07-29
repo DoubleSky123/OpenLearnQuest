@@ -107,10 +107,16 @@ def _assert_valid_list(nodes: list[dict]) -> None:
 
 
 def _compute_goal(q: dict, operation: str, meta: dict) -> dict:
-    """Run executor to compute goalPattern (ground truth). Returns enriched q."""
-    if meta.get("isMerge") or operation in ("detectCycle", "sortList"):
+    """Run executor to compute goalPattern (ground truth). Returns enriched q.
+    Merge assemblies set goalPattern themselves; detectCycle's executor is a
+    stub (the ANSWER is a boolean, the frontend renders it as text), so its
+    goal falls back to the current values. sortList runs the executor normally."""
+    if meta.get("isMerge"):
         return q
     nodes = q.get("initialNodes") or []
+    if operation == "detectCycle":
+        q.setdefault("goalPattern", [n["value"] for n in nodes])
+        return q
     if nodes:
         _assert_valid_list(nodes)
     result = execute_operation(
@@ -128,6 +134,10 @@ def _enrich(q: dict, operation: str, meta: dict, qtype: str) -> dict:
     q["question_type"] = qtype
     q["operation"]     = operation
     q["isMerge"]       = meta.get("isMerge", False)
+    if operation == "detectCycle" and q.get("initialNodes"):
+        # display metadata: tail loops back to index 1 (LeetCode pos style);
+        # initialNodes stay LINEAR so board/executor logic never walks a cycle
+        q["cycleTo"] = 1
     return _compute_goal(q, operation, meta)
 
 
@@ -244,9 +254,10 @@ def _ordering_validate(raw: str, operation: str, meta: dict) -> dict:
     if is_merge:
         size      = max(2, nodes // 2)
         l1_vals   = sorted(random.sample(range(1, 30), size))
-        l2_vals   = sorted(random.sample(range(1, 30), size))
+        l2_vals   = sorted(random.sample([v for v in range(1, 30) if v not in l1_vals], size))
         op_value  = {"l1Values": l1_vals, "l2Values": l2_vals}
-        init_nodes = []
+        init_nodes = [{"id": i + 1, "value": v, "next": i + 2 if i + 1 < len(l1_vals) else None}
+                      for i, v in enumerate(l1_vals)]
         goal       = sorted(l1_vals + l2_vals)
     else:
         values     = random.sample(range(1, 99), nodes)
@@ -570,13 +581,22 @@ def _find_bug_validate(raw: str, operation: str, meta: dict) -> dict:
     # startsEmpty (insertIntoEmpty): the executor ignores any initial list, so
     # rendering one would show a 'Current state' that contradicts the operation.
     nodes = 0 if meta.get("startsEmpty") else max(meta["minNodes"], 3)
-    init_nodes = [{"id": i, "value": random.randint(1, 30) * i, "next": i + 1 if i < nodes else None}
-                  for i in range(1, nodes + 1)]
-    if init_nodes:
-        init_nodes[-1]["next"] = None
-
-    op_value    = random.randint(1, 99) if meta["needsValue"] else None
-    op_position = random.randint(2, nodes) if meta["needsPosition"] else None
+    if meta.get("isMerge"):
+        # merge needs TWO input lists + the merged goal — a generic node chain
+        # rendered a bogus single list with an empty goal state
+        size    = 3
+        l1_vals = sorted(random.sample(range(1, 50), size))
+        l2_vals = sorted(random.sample([v for v in range(1, 50) if v not in l1_vals], size))
+        init_nodes = [{"id": i + 1, "value": v, "next": i + 2 if i + 1 < len(l1_vals) else None}
+                      for i, v in enumerate(l1_vals)]
+        op_value, op_position = {"l1Values": l1_vals, "l2Values": l2_vals}, None
+    else:
+        init_nodes = [{"id": i, "value": random.randint(1, 30) * i, "next": i + 1 if i < nodes else None}
+                      for i in range(1, nodes + 1)]
+        if init_nodes:
+            init_nodes[-1]["next"] = None
+        op_value    = random.randint(1, 99) if meta["needsValue"] else None
+        op_position = random.randint(2, nodes) if meta["needsPosition"] else None
 
     q = {
         "question_type": "find_bug",
@@ -591,6 +611,9 @@ def _find_bug_validate(raw: str, operation: str, meta: dict) -> dict:
         "operationValue":    op_value,
         "operationPosition": op_position,
     }
+    if meta.get("isMerge"):
+        q["goalPattern"] = sorted(l1_vals + l2_vals)
+        q["l1Values"], q["l2Values"] = l1_vals, l2_vals
     return _enrich(q, operation, meta, "find_bug")
 
 

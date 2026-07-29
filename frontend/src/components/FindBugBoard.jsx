@@ -183,12 +183,26 @@ export default function FindBugBoard({ question, onComplete, onError, onStateCha
         <p className="text-gray-400 text-xs font-medium mb-1">
           {isDone ? 'Correct result' : 'Current state'}
         </p>
-        <LinkedListVisualiser
-          values={currentPattern}
-          emptyLabel="Empty list"
-          highlight={isDone}
-          goalValues={question.goalPattern}
-        />
+        {question.isMerge ? (
+          <div className="space-y-2">
+            <div>
+              <p className="text-gray-400 text-[11px] font-medium mb-0.5">List 1</p>
+              <LinkedListVisualiser values={question.l1Values ?? []} emptyLabel="Empty list" />
+            </div>
+            <div>
+              <p className="text-gray-400 text-[11px] font-medium mb-0.5">List 2</p>
+              <LinkedListVisualiser values={question.l2Values ?? []} emptyLabel="Empty list" />
+            </div>
+          </div>
+        ) : (
+          <LinkedListVisualiser
+            values={currentPattern}
+            emptyLabel="Empty list"
+            highlight={isDone}
+            goalValues={question.goalPattern}
+            cycleTo={question.cycleTo ?? null}
+          />
+        )}
       </div>
     </div>
   );

@@ -151,7 +151,7 @@ TEMPLATES: dict[str, dict] = {
         "title": "Reverse Linked List",
         "pseudocode": ["prev = NULL;", "node = head;", "while (node != NULL) { temp = node.next; node.next = prev; prev = node; node = temp; }", "head = prev;"],
         "correctOrder": [0, 1, 2, 3],
-        "hint": "Reverse each pointer one at a time.",
+        "hint": "Traverse the list and flip each node's next to point at the PREVIOUS node — prev, node and temp keep the rest of the list reachable while you do it.",
         "step_hints": [
             "The old first node will become the tail — what should it end up pointing to?",
             "The traversal pointer starts at the old head of the list.",
@@ -933,6 +933,7 @@ def generate_static_question(
         "distractors": _pick(tmpl["distractors"], n_dist),
         "initialNodes": nodes, "goalPattern": goal,
         "hint": hint, "isMerge": False,
+        **({"cycleTo": 1} if operation == "detectCycle" and node_count >= 2 else {}),
     }
 
 
@@ -941,7 +942,18 @@ def _pick(pool: list, k: int = 2) -> list:
 
 
 def _build_nodes_and_goal(operation: str, tmpl: dict, node_count: int):
-    """Shared helper: build random nodes + op_value/pos + goalPattern."""
+    """Shared helper: build random nodes + op_value/pos + goalPattern.
+    Returns (nodes, op_value, op_pos, goal, extra) — extra carries op-specific
+    payload fields (merge's l1Values/l2Values, detectCycle's cycleTo)."""
+    if tmpl.get("isMerge"):
+        n  = max(2, node_count - 1)
+        l1 = sorted(random.sample(range(1, 50), n))
+        l2 = sorted(random.sample([v for v in range(1, 50) if v not in l1], n))
+        nodes = [{"id": i + 1, "value": v, "next": i + 2 if i + 1 < len(l1) else None}
+                 for i, v in enumerate(l1)]
+        op_value = {"l1Values": l1, "l2Values": l2}
+        return nodes, op_value, None, sorted(l1 + l2), {"l1Values": l1, "l2Values": l2}
+
     needs_value = tmpl["needsValue"]
     needs_pos   = tmpl["needsPosition"]
 
@@ -961,7 +973,10 @@ def _build_nodes_and_goal(operation: str, tmpl: dict, node_count: int):
         op_pos = random.randint(2, node_count)
 
     result = execute_operation(operation, nodes, op_value, op_pos)
-    return nodes, op_value, op_pos, result["values"]
+    # display metadata: the tail loops back to index 1 (LeetCode pos-style);
+    # initialNodes stay LINEAR so board/executor logic never walks a real cycle
+    extra = {"cycleTo": 1} if operation == "detectCycle" and len(nodes) >= 2 else {}
+    return nodes, op_value, op_pos, result["values"], extra
 
 
 def generate_fill_blank_question(operation: str, spec) -> dict:
@@ -981,7 +996,7 @@ def generate_fill_blank_question(operation: str, spec) -> dict:
         n_opts     = 3
         num_blanks = None   # blank every step
 
-    nodes, op_value, op_pos, goal = _build_nodes_and_goal(operation, tmpl, node_count)
+    nodes, op_value, op_pos, goal, extra = _build_nodes_and_goal(operation, tmpl, node_count)
 
     # deterministic rotation: attempt N gets set N % n — consecutive plays of the
     # same operation never repeat the same blank set
@@ -1024,6 +1039,7 @@ def generate_fill_blank_question(operation: str, spec) -> dict:
         "goalPattern":     goal,
         "hint":            tmpl["hint"],
         "isMerge":         tmpl.get("isMerge", False),
+        **extra,
     }
 
 
@@ -1046,7 +1062,7 @@ def generate_find_bug_question(operation: str, spec) -> dict:
     else:
         node_count = _node_count_for(tmpl, 3)
         n_opts     = None
-    nodes, op_value, op_pos, goal = _build_nodes_and_goal(operation, tmpl, node_count)
+    nodes, op_value, op_pos, goal, extra = _build_nodes_and_goal(operation, tmpl, node_count)
 
     # Inject the selected bug into the pseudocode
     pseudocode = list(tmpl["pseudocode"])
@@ -1078,4 +1094,5 @@ def generate_find_bug_question(operation: str, spec) -> dict:
         "goalPattern":     goal,
         "hint":            tmpl["hint"],
         "isMerge":         tmpl.get("isMerge", False),
+        **extra,
     }
