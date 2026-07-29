@@ -109,7 +109,7 @@ TEMPLATES: dict[str, dict] = {
         "correctOrder": [0, 1, 2],
         "hint": "Traverse and free each node, then null the head.",
         "step_hints": [
-            "You need a walker to visit every node — where does it begin?",
+            "You need a traversal pointer to visit every node — where does it begin?",
             "Inside the loop: why must temp save node.next BEFORE the free?",
             "After every node is gone, what should the entry point say?",
         ],
@@ -154,7 +154,7 @@ TEMPLATES: dict[str, dict] = {
         "hint": "Reverse each pointer one at a time.",
         "step_hints": [
             "The old first node will become the tail — what should it end up pointing to?",
-            "The walker starts at the old front of the list.",
+            "The traversal pointer starts at the old front of the list.",
             "Three pointers rotate inside this loop — why must temp save node.next FIRST?",
             "When the loop finishes, which variable is standing on the new front?",
         ],
@@ -358,7 +358,7 @@ _BLANKS: dict[str, list[list[dict]]] = {
             {"a": "node.next","w": ["node",  "temp"]},
             {"a": "NULL",    "w": ["temp",   "head"]},
         ],
-        [  # C: walker & the free call
+        [  # C: traversal pointer & the free call
             {"a": "node", "w": ["temp",   "head.next"]},
             {"a": "free", "w": ["delete", "createNode"]},
             {"a": "NULL", "w": ["node",   "newNode"]},
