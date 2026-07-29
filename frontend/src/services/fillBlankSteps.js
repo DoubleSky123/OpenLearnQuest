@@ -79,7 +79,8 @@ export function computeStepStates(operation, initialValues, value, position) {
       ];
     }
     case 'removeAtPosition': {
-      const idx = Math.min(Math.max(pos - 1, 0), Math.max(0, last));
+      // pos is the 0-indexed target — matches the labels under the nodes
+      const idx = Math.min(Math.max(pos, 0), Math.max(0, last));
       const out = [...init.slice(0, idx), ...init.slice(idx + 1)];
       const prev = Math.max(0, idx - 1);
       return [

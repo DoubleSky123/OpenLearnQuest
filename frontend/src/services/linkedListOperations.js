@@ -123,9 +123,10 @@ export const executeLinkedListOperation = (operation, nodes, operationValue, ope
 
   if (operation === 'removeAtPosition') {
     const order    = traverseIds(nodes);
-    const targetId = order[operationPosition - 1] ?? null;
+    // position is the 0-indexed target — matches the labels under the nodes
+    const targetId = order[operationPosition] ?? null;
     if (targetId === null) return { nodes, message: '' };
-    const predId   = order[operationPosition - 2] ?? null;
+    const predId   = order[operationPosition - 1] ?? null;
     const target   = nodes.find(n => n.id === targetId);
     const updated  = nodes
       .map(n => n.id === predId ? { ...n, next: target.next } : n)

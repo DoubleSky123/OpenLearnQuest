@@ -110,7 +110,9 @@ def execute_operation(
 
     if operation == "removeAtPosition":
         order = traverse_ids(nodes)
-        pos = (operation_position or 1) - 1           # 0-indexed target
+        # position IS the 0-indexed target — matches the labels rendered under
+        # the nodes and the template's position-1 predecessor walk
+        pos = operation_position if operation_position is not None else 1
         target_id = order[pos] if 0 <= pos < len(order) else None
         if target_id is None:
             return _ok(nodes, "No-op: invalid position")

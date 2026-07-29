@@ -22,6 +22,15 @@ def _distractor_count(consecutive_passes: int, emotion_default: int) -> int:
     return emotion_default
 
 
+def _rand_position(operation: str, node_count: int) -> int:
+    """0-based position semantics, matching the on-screen node labels:
+    removeAtPosition targets index 1..n-1 (a predecessor must exist);
+    insertAtPosition's new node lands at index 2..n."""
+    if operation == "removeAtPosition":
+        return random.randint(1, node_count - 1)
+    return random.randint(2, node_count)
+
+
 def _node_count_for(tmpl: dict, preferred: int) -> int:
     """Ops flagged startsEmpty (insertIntoEmpty) begin with NO nodes — the
     executor ignores any initial list for them, so rendering one shows a
@@ -134,7 +143,7 @@ TEMPLATES: dict[str, dict] = {
     },
     "removeAtPosition": {
         "title": "Remove at Position",
-        "pseudocode": ["node = head;", "for (int i = 0; i < position-2; i++) node = node.next;", "temp = node.next;", "node.next = temp.next;", "free(temp);"],
+        "pseudocode": ["node = head;", "for (int i = 0; i < position-1; i++) node = node.next;", "temp = node.next;", "node.next = temp.next;", "free(temp);"],
         "correctOrder": [0, 1, 2, 3, 4],
         "hint": "Walk to the predecessor, bypass the target.",
         "step_hints": [
@@ -401,19 +410,19 @@ _BLANKS: dict[str, list[list[dict]]] = {
             {"a": "node.next",    "w": ["newNode.next", "node"]},
         ],
     ],
-    # ["node = head;", "for (int i = 0; i < position-2; i++) node = node.next;",
+    # ["node = head;", "for (int i = 0; i < position-1; i++) node = node.next;",
     #  "temp = node.next;", "node.next = temp.next;", "free(temp);"]
     "removeAtPosition": [
         [  # A: what to save and bypass
             {"a": "head",      "w": ["NULL",     "temp"]},
-            {"a": "position-2","w": ["position-1","position"]},
+            {"a": "position-1","w": ["position", "position-2"]},
             {"a": "node.next", "w": ["node",     "temp"]},
             {"a": "temp.next", "w": ["temp",     "node.next"]},
             {"a": "temp",      "w": ["node",     "head"]},
         ],
         [  # B: which variable owns each role
             {"a": "head",      "w": ["NULL",     "temp"]},
-            {"a": "position-2","w": ["position-1","position"]},
+            {"a": "position-1","w": ["position", "position-2"]},
             {"a": "temp",      "w": ["node",     "head"]},
             {"a": "node.next", "w": ["node",     "head"]},
             {"a": "temp",      "w": ["node",     "prev"]},
@@ -680,12 +689,12 @@ _BUGS: dict[str, list[dict]] = {
          "fix": "free(temp);",
          "explanation": "node is the predecessor, still part of the list — freeing it corrupts the chain while the removed node leaks",
          "options": ["free(temp);", "free(temp.next);", "free(head);"]},
-        {"subtlety": 2, "line": 1, "buggy": "for (int i = 0; i < position-1; i++) node = node.next;",
-         "fix": "for (int i = 0; i < position-2; i++) node = node.next;",
-         "explanation": "Walking to position-1 stops ON the target — the node AFTER the target gets removed instead",
-         "options": ["for (int i = 0; i < position-2; i++) node = node.next;",
-                     "for (int i = 0; i < position; i++) node = node.next;",
-                     "for (int i = 1; i < position-2; i++) node = node.next;"]},
+        {"subtlety": 2, "line": 1, "buggy": "for (int i = 0; i < position; i++) node = node.next;",
+         "fix": "for (int i = 0; i < position-1; i++) node = node.next;",
+         "explanation": "Looping to position stops ON the target — the node AFTER the target gets removed instead",
+         "options": ["for (int i = 0; i < position-1; i++) node = node.next;",
+                     "for (int i = 0; i < position-2; i++) node = node.next;",
+                     "for (int i = 1; i < position-1; i++) node = node.next;"]},
     ],
     "reverseList": [
         {"subtlety": 3, "line": 2,
@@ -919,7 +928,7 @@ def generate_static_question(
         op_value = random.choice([v for v in range(1, 100) if v not in used])
 
     if needs_pos and node_count >= 2:
-        op_pos = random.randint(2, node_count)
+        op_pos = _rand_position(operation, node_count)
 
     # Compute goalPattern via executor (ground truth)
     result = execute_operation(operation, nodes, op_value, op_pos)
@@ -970,7 +979,7 @@ def _build_nodes_and_goal(operation: str, tmpl: dict, node_count: int):
         used = {n["value"] for n in nodes}
         op_value = random.choice([v for v in range(1, 100) if v not in used])
     if needs_pos and node_count >= 2:
-        op_pos = random.randint(2, node_count)
+        op_pos = _rand_position(operation, node_count)
 
     result = execute_operation(operation, nodes, op_value, op_pos)
     # display metadata: the tail loops back to index 1 (LeetCode pos-style);

@@ -62,6 +62,7 @@ def _sll_reject_reason(text: str, operation: str) -> str | None:
 
 from .question_spec import QuestionSpec
 from .ll_executor import execute_operation, find_head_id
+from .static_questions import _rand_position
 
 logger = logging.getLogger(__name__)
 
@@ -264,7 +265,7 @@ def _ordering_validate(raw: str, operation: str, meta: dict) -> dict:
         init_nodes = [{"id": i + 1, "value": values[i], "next": i + 2 if i + 1 < nodes else None}
                       for i in range(nodes)]
         op_value   = random.randint(1, 99) if meta["needsValue"] else None
-        op_pos     = random.randint(2, nodes) if meta["needsPosition"] else None
+        op_pos     = _rand_position(operation, nodes) if meta["needsPosition"] else None
         goal       = None  # computed by _enrich → _compute_goal
 
     q = {
@@ -596,7 +597,7 @@ def _find_bug_validate(raw: str, operation: str, meta: dict) -> dict:
         if init_nodes:
             init_nodes[-1]["next"] = None
         op_value    = random.randint(1, 99) if meta["needsValue"] else None
-        op_position = random.randint(2, nodes) if meta["needsPosition"] else None
+        op_position = _rand_position(operation, nodes) if meta["needsPosition"] else None
 
     q = {
         "question_type": "find_bug",

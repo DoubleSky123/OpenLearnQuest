@@ -51,10 +51,11 @@ def test_insert_at_position_out_of_range_is_noop():
     assert run("insertAtPosition", [1, 2], value=9, position=99) == [1, 2]
 
 def test_remove_at_position():
-    assert run("removeAtPosition", [1, 2, 3], position=2) == [1, 3]
+    # position is the 0-indexed target (matches on-screen node labels)
+    assert run("removeAtPosition", [1, 2, 3], position=2) == [1, 2]
 
-def test_remove_at_position_head():
-    assert run("removeAtPosition", [1, 2, 3], position=1) == [2, 3]
+def test_remove_at_position_index_one():
+    assert run("removeAtPosition", [1, 2, 3], position=1) == [1, 3]
 
 # ── Level 3 ─────────────────────────────────────────────────────────────────────
 
