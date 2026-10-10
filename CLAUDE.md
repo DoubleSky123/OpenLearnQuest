@@ -49,6 +49,8 @@ Serving also self-heals: when a (operation, type, intra) combo drops to the low-
 
 **Pool staleness rule**: pool payloads embed TEMPLATES content (pseudocode, step_hints) at generation time. After editing an operation's TEMPLATES entry, regenerate its pool rows: `refill_pool.py --ops <op> --purge`.
 
+**Heap fixtures rule** (Memory City, `feat/memory-city`): `frontend/src/prototype/fixtures.json` is generated from TEMPLATES/_BLANKS/_BUGS for the ops in `PHASE0_OPS` and is both the prototype's content and the interpreter's test oracle. After editing those ops' content, from `backend/` run `d:/openLearnquest/venv/Scripts/python.exe export_heap_fixtures.py` — `test_heap_fixtures_match_current_templates` fails until you do. Design + decisions: `docs/designs/memory-city.md` (local, gitignored).
+
 ### Run Migrations
 ```bash
 cd backend
@@ -61,6 +63,13 @@ cd backend
 d:/openLearnquest/venv/Scripts/python.exe -m pytest tests/ -q
 ```
 In-memory SQLite fixtures (no Postgres needed); covers the deterministic core: `ll_executor`, mastery/unlock rules, `select_spec`, `error_analyzer`, the ZPD controller contract, scaffold clamp + closed-loop telemetry. `scaffold_level` from the client is clamped server-side (`game_master.clamp_scaffold`) — never trust client-computed telemetry.
+
+Frontend (Vitest, node environment — the Memory City heap interpreter):
+```bash
+cd frontend
+npm test
+```
+Parity of `heapInterpreter.runProgram` against `goalPattern` (computed by `ll_executor`), plus every wrong line the Phase 0 content can show (compile_error / runtime_error / ok, never "unsupported"). Data comes from `frontend/src/prototype/fixtures.json`.
 
 ## Architecture
 
