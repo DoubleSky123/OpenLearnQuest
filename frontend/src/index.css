@@ -10,3 +10,47 @@ body {
   background-color: #f9fafb;
   color: #111827;
 }
+
+/* ── Question-complete celebration (see CelebrationBurst.jsx) ────────────────
+   Particles burst outward from the centre, then gravity drags them down as they
+   fade. --tx/--ty/--rot are set per particle inline so one keyframe drives all
+   of them. */
+@keyframes olq-burst {
+  0% {
+    transform: translate(0, 0) scale(0) rotate(0deg);
+    opacity: 1;
+  }
+  18% {
+    transform: translate(calc(var(--tx) * 0.4), calc(var(--ty) * 0.4)) scale(1) rotate(40deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--tx), calc(var(--ty) + 260px)) scale(0.65) rotate(var(--rot));
+    opacity: 0;
+  }
+}
+
+/* The card pops in and STAYS — the student dismisses it themselves. */
+@keyframes olq-pop-in {
+  0%   { transform: scale(0.5); opacity: 0; }
+  62%  { transform: scale(1.05); opacity: 1; }
+  100% { transform: scale(1);    opacity: 1; }
+}
+
+@keyframes olq-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes olq-ring {
+  0%   { transform: scale(0.5); opacity: 0.55; }
+  100% { transform: scale(3.2); opacity: 0; }
+}
+
+/* Respect the OS setting: keep the card (it carries the message), drop the
+   flying confetti. */
+@media (prefers-reduced-motion: reduce) {
+  .olq-particle,
+  .olq-ring { display: none; }
+  .olq-badge { animation: olq-fade-in 0.2s ease-out forwards; }
+}

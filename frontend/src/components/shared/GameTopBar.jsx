@@ -1,6 +1,7 @@
 import React from 'react';
 import GameTimer from '../GameTimer';
 import HelpModal from '../HelpModal';
+import ConceptSlidesMenu from './ConceptSlidesMenu';
 
 // xp prop kept for caller compatibility — the XP/level display was removed
 // (gamification layer parked; DB columns retained for possible revival)
@@ -37,6 +38,8 @@ export default function GameTopBar({
           >
             ?
           </button>
+          {/* Intro slides stay reachable for the whole session, not just on signup */}
+          <ConceptSlidesMenu />
         </div>
 
         {/* Center */}

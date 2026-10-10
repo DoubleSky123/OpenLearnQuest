@@ -64,7 +64,7 @@ export default function HelpModal({ isOpen, onClose }) {
             <span className="text-3xl">📖</span>
             <div>
               <h2 className="text-2xl font-black text-white leading-tight">Game Guide</h2>
-              <p className="text-violet-200 text-base">How OpenLearnQuest works</p>
+              <p className="text-violet-200 text-base">How NodeForge works</p>
             </div>
           </div>
           <button

@@ -662,7 +662,9 @@ function StepDots({ total, current }) {
 // CONCEPT PAGES  (4 pages)
 // ─────────────────────────────────────────────────────────────────────────────
 
-const CONCEPT_PAGES = [
+// Exported so the game top bar's review dropdown reuses these exact slides —
+// one source of truth, so onboarding and review can never disagree.
+export const CONCEPT_PAGES = [
   {
     icon:    '🔗',
     accent:  'emerald',
@@ -739,56 +741,72 @@ const KEY_TERMS = [
   { term: 'NULL',    def: 'Marks the end of the list (no next node)'               },
 ];
 
-function ConceptPageView({ page, pageIdx, totalConceptPages, onContinue, onBack }) {
+/**
+ * The slide card on its own, with no navigation chrome.
+ *
+ * Exported (with CONCEPT_PAGES) so the review dropdown in the game top bar can
+ * show the same slides students saw during onboarding, instead of a second copy
+ * of the content that then drifts out of sync. `compact` shrinks the type for
+ * the modal, where the slide sits in a panel rather than filling the page.
+ */
+export function ConceptSlideCard({ page, compact = false }) {
   const c = ACCENT_COLORS[page.accent];
   const isKeyTerms = page.icon === '📖';
 
   return (
+    <div className={`bg-white rounded-3xl border-2 ${c.card} ${compact ? 'p-6' : 'p-8'} shadow-sm`}>
+      {/* Icon + title */}
+      <div className="flex items-center gap-4 mb-5">
+        <div className={`${compact ? 'w-11 h-11 text-2xl' : 'w-14 h-14 text-3xl'} rounded-2xl flex items-center justify-center border-2 ${c.icon}`}>
+          {page.icon}
+        </div>
+        <h2 className={`${compact ? 'text-2xl' : 'text-3xl'} font-black text-gray-900 leading-tight`}>{page.title}</h2>
+      </div>
+
+      {/* Body text */}
+      {page.body && (
+        <p className={`text-gray-600 ${compact ? 'text-base' : 'text-xl'} leading-relaxed mb-6`}>{page.body}</p>
+      )}
+
+      {/* Diagram */}
+      {page.diagram && (
+        <div className="bg-gray-50 rounded-2xl border border-gray-100 p-4">
+          {page.diagram}
+        </div>
+      )}
+
+      {/* Key insight callout */}
+      {page.insight && (
+        <div className="mt-4 flex items-start gap-3 bg-white border border-gray-200 rounded-2xl px-4 py-3">
+          <span className="text-lg mt-0.5">💡</span>
+          <p className="text-gray-600 text-base leading-snug">
+            <span className="font-bold text-gray-800">Key insight: </span>{page.insight}
+          </p>
+        </div>
+      )}
+
+      {/* Key terms grid */}
+      {isKeyTerms && (
+        <div className="grid grid-cols-2 gap-3">
+          {KEY_TERMS.map(({ term, def }) => (
+            <div key={term} className="bg-gray-50 rounded-2xl border border-gray-100 px-5 py-4">
+              <span className={`${compact ? 'text-lg' : 'text-xl'} font-black font-mono ${c.term}`}>{term}</span>
+              <p className={`${compact ? 'text-base' : 'text-lg'} text-gray-500 mt-1 leading-snug`}>{def}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ConceptPageView({ page, pageIdx, totalConceptPages, onContinue, onBack }) {
+  return (
     <div className="max-w-2xl mx-auto">
       <StepDots total={totalConceptPages} current={pageIdx} />
 
-      <div className={`bg-white rounded-3xl border-2 ${c.card} p-8 shadow-sm mb-8`}>
-        {/* Icon + title */}
-        <div className="flex items-center gap-4 mb-5">
-          <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-3xl border-2 ${c.icon}`}>
-            {page.icon}
-          </div>
-          <h2 className="text-3xl font-black text-gray-900 leading-tight">{page.title}</h2>
-        </div>
-
-        {/* Body text */}
-        {page.body && (
-          <p className="text-gray-600 text-xl leading-relaxed mb-6">{page.body}</p>
-        )}
-
-        {/* Diagram */}
-        {page.diagram && (
-          <div className="bg-gray-50 rounded-2xl border border-gray-100 p-4">
-            {page.diagram}
-          </div>
-        )}
-
-        {/* Key insight callout */}
-        {page.insight && (
-          <div className="mt-4 flex items-start gap-3 bg-white border border-gray-200 rounded-2xl px-4 py-3">
-            <span className="text-lg mt-0.5">💡</span>
-            <p className="text-gray-600 text-base leading-snug">
-              <span className="font-bold text-gray-800">Key insight: </span>{page.insight}
-            </p>
-          </div>
-        )}
-
-        {/* Key terms grid */}
-        {isKeyTerms && (
-          <div className="grid grid-cols-2 gap-3">
-            {KEY_TERMS.map(({ term, def }) => (
-              <div key={term} className="bg-gray-50 rounded-2xl border border-gray-100 px-5 py-4">
-                <span className={`text-xl font-black font-mono ${c.term}`}>{term}</span>
-                <p className="text-lg text-gray-500 mt-1 leading-snug">{def}</p>
-              </div>
-            ))}
-          </div>
-        )}
+      <div className="mb-8">
+        <ConceptSlideCard page={page} />
       </div>
 
       {/* Nav buttons */}

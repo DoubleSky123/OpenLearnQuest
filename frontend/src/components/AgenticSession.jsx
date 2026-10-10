@@ -12,6 +12,8 @@ import AssemblyArea from './AssemblyArea';
 import FillBlankBoard from './FillBlankBoard';
 import FindBugBoard from './FindBugBoard';
 import GameTopBar from './shared/GameTopBar';
+import NodeClassComment from './shared/NodeClassComment';
+import CelebrationBurst from './shared/CelebrationBurst';
 import GameTimer from './GameTimer';
 import TutorChat from './TutorChat';
 import ConceptMasteryPanel from './ConceptMasteryPanel';
@@ -735,6 +737,8 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
                   </button>
                 </div>
               )}
+              {/* LeetCode-style Node definition — reference material for every question type */}
+              <NodeClassComment pseudocode={q.pseudocode ?? []} />
               {(!q.question_type || q.question_type === 'ordering') && (
                 <>
                   <CodePool
@@ -849,6 +853,11 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
             markUsedTutor();
           }}
         />
+      )}
+
+      {/* Question solved — keyed on the question id so it replays on every pass */}
+      {showSuccess && q && (
+        <CelebrationBurst key={q.id} perfect={errorCount === 0} errorCount={errorCount} />
       )}
 
       {showHintAnim && q && (

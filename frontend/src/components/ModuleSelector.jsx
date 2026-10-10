@@ -80,7 +80,7 @@ export default function ModuleSelector({ onSelect, completedModules = [], xp = 0
       {/* Header */}
       <div className="text-center mb-8">
         <h1 className="text-7xl font-black text-gray-900 tracking-tight mb-3">
-          OpenLearnQuest
+          NodeForge
         </h1>
         <p className="text-gray-500 text-2xl">
           Master data structures one quest at a time
