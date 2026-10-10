@@ -16,11 +16,15 @@ from .concept_graph import concepts_for_op
 # accidentally match the memory_management " = null" pattern.
 
 _CONCEPT_RULES: list[tuple[str, list[str]]] = [
+    # `node`/`current` variants are kept so mistakes recorded before the
+    # traversal pointer was renamed to `curr` still classify correctly.
     ("traversal",          ["while", "for i in", "!= null", ".next.next",
+                            "curr = curr.next",
                             "node = node.next", "current = current.next",
                             "slow = slow.next", "fast = fast.next"]),
     ("memory_management",  ["free(", " = null", "= none", ".next = null",
-                            "head = null", "node = null", "prev = null"]),
+                            "head = null", "curr = null", "node = null",
+                            "prev = null"]),
     # Match explicit creation syntax only — "newnod" alone is too broad and
     # would match pointer-assignment steps like "head = newNode".
     ("node_creation",      ["create", "= node(", "newnode(", "node(val", "allocate"]),

@@ -171,9 +171,9 @@ export default function LinkedListHintAnimation({ question, onClose }) {
         at(0, () => setLabel('Start traversal'));
         for (let i = 0; i < pos; i++) {
           const idx = i;
-          at(650, () => { setCursor(idx); setLabel(`Moving to position ${pos}...`); });
+          at(650, () => { setCursor(idx); setLabel(`Traversing to index ${Math.max(0, pos - 1)}...`); });
         }
-        at(750, () => { addNode(setNodes, pos, operationValue); setLabel(`Insert node(${operationValue}) at position ${pos}`); });
+        at(750, () => { addNode(setNodes, pos, operationValue); setLabel(`Insert node(${operationValue}) at index ${pos}`); });
         at(800, () => { setCursor(null); setLabel('Done ✓'); });
         break;
       }
@@ -185,10 +185,12 @@ export default function LinkedListHintAnimation({ question, onClose }) {
           const idx = i;
           at(650, () => {
             setCursor(idx);
-            setLabel(idx === pos ? `Found target at position ${pos}` : 'Traverse...');
+            setLabel(idx === pos ? `Found target at index ${pos}` : 'Traverse...');
           });
         }
-        at(750, () => { markColor(setNodes, pos, 'removing'); setLabel('prev.next = node.next'); });
+        // The unlink happens FROM the predecessor — pull the curr cursor back to
+        // pos-1 so the label matches where the pointer actually is.
+        at(750, () => { setCursor(Math.max(0, pos - 1)); markColor(setNodes, pos, 'removing'); setLabel('curr.next = temp.next'); });
         at(450, () => { removeNode(setNodes, pos); setCursor(null); setLabel('Node removed ✓'); });
         break;
       }

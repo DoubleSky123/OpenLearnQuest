@@ -221,6 +221,11 @@ Always-visible hint button (no error threshold). Click → modal with a per-node
 
 ## Key Conventions
 
+- **Pseudocode naming** (`tests/test_pointer_naming.py` locks all of it in; `question_registry._sll_reject_reason` hard-rejects violations in AI output — code fields only, so "the last node" in an explanation is fine):
+  - Traversal pointer is `curr` everywhere a student can see code — TEMPLATES, distractors, blanks, bugs, the hint animation's cursor label, tutorial slides. Never `node` / `cur` / `current` / `p`. `newNode` / `createNode` are unaffected.
+  - Target position is `index`, never `position` / `pos` / `k`. Indices are **0-based**, matching the labels under the nodes.
+  - `{value}` in TEMPLATES is a **placeholder** for the operation's payload, substituted by `static_questions.instantiate()` at payload assembly (`_enrich` for AI paths, the return of each static generator) so students read `createNode(35)`. `index` deliberately stays symbolic — `index-1` is the off-by-one rule being taught, and `3-1` lets them compute the answer without learning it.
+  - Everything upstream of `instantiate` (prompts, validators, alias analysis, `content_hash`) works on the symbolic form. `question_pool.content_hash` masks `createNode(<n>)` before hashing — the payload literal is re-rolled per build and would otherwise defeat pool dedup.
 - All API routes use `/api/<prefix>/` pattern
 - Frontend calls backend directly (no Vite proxy) — `VITE_API_URL` sets the base
 - Frontend uses `/api/ai/tutor/stream` (SSE) for tutor chat, not the non-streaming endpoint

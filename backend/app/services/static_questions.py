@@ -7,6 +7,7 @@ via the pre-fetch pipeline.
 """
 
 import random
+import re
 import uuid
 
 from .ll_executor import execute_operation
@@ -23,12 +24,69 @@ def _distractor_count(consecutive_passes: int, emotion_default: int) -> int:
 
 
 def _rand_position(operation: str, node_count: int) -> int:
-    """0-based position semantics, matching the on-screen node labels:
+    """0-based index semantics, matching the on-screen node labels:
     removeAtPosition targets index 1..n-1 (a predecessor must exist);
     insertAtPosition's new node lands at index 2..n."""
     if operation == "removeAtPosition":
         return random.randint(1, node_count - 1)
     return random.randint(2, node_count)
+
+
+# ── Payload literalisation ────────────────────────────────────────────────────
+# TEMPLATES carry {value} where the operation's payload belongs. The literal is
+# substituted into the assembled question so the student reads
+# `createNode(35)` — the same 35 the prompt asked them to insert — instead of an
+# abstract `value` they have to mentally bind.
+#
+# `index` deliberately stays SYMBOLIC. `index-1` IS the off-by-one rule being
+# taught; rendering `3-1` lets the student compute 2 and skip the rule entirely.
+# The one exception is the {index} wrong-option on the createNode blank, where
+# the whole point is "did you confuse the payload with the index?".
+#
+# Only CODE fields are rewritten — explanations and hints are English prose
+# where "value" is an ordinary noun.
+_VALUE_TOKEN = "{value}"
+_INDEX_TOKEN = "{index}"
+
+
+def _filler_value(nodes: list[dict]) -> int:
+    """A payload literal for operations that don't take one (removeAtTail etc.).
+    Their distractors still borrow `newNode = createNode({value});` from the
+    insert family; leaving it symbolic there would mark it as the odd one out
+    and hand the student a free elimination."""
+    used = {n.get("value") for n in nodes or []}
+    return random.choice([v for v in range(1, 100) if v not in used])
+
+
+def _subst(text: str, value: str, index: str) -> str:
+    if not isinstance(text, str):
+        return text
+    out = text.replace(_VALUE_TOKEN, value).replace(_INDEX_TOKEN, index)
+    # A model that wrote bare `value` instead of echoing the placeholder still
+    # gets literalised — otherwise its option is the only abstract one on screen.
+    return re.sub(r"\bvalue\b", value, out)
+
+
+def instantiate(q: dict) -> dict:
+    """Substitute payload literals into a fully assembled question, in place."""
+    raw_v = q.get("operationValue")
+    value = str(raw_v) if isinstance(raw_v, int) else str(_filler_value(q.get("initialNodes") or []))
+    raw_i = q.get("operationPosition")
+    index = str(raw_i) if isinstance(raw_i, int) else "1"
+
+    for key in ("pseudocode", "distractors", "options"):
+        if isinstance(q.get(key), list):
+            q[key] = [_subst(s, value, index) for s in q[key]]
+    if isinstance(q.get("fix"), str):
+        q["fix"] = _subst(q["fix"], value, index)
+    for blank in q.get("blanks") or []:
+        if not isinstance(blank, dict):
+            continue
+        if isinstance(blank.get("answer"), str):
+            blank["answer"] = _subst(blank["answer"], value, index)
+        if isinstance(blank.get("options"), list):
+            blank["options"] = [_subst(o, value, index) for o in blank["options"]]
+    return q
 
 
 def _node_count_for(tmpl: dict, preferred: int) -> int:
@@ -44,7 +102,7 @@ def _node_count_for(tmpl: dict, preferred: int) -> int:
 TEMPLATES: dict[str, dict] = {
     "insertAtHead": {
         "title": "Insert at Head",
-        "pseudocode": ["newNode = createNode(value);", "newNode.next = head;", "head = newNode;"],
+        "pseudocode": ["newNode = createNode({value});", "newNode.next = head;", "head = newNode;"],
         "correctOrder": [0, 1, 2],
         "hint": "What happens to the old head if you overwrite it first?",
         "step_hints": [
@@ -52,12 +110,12 @@ TEMPLATES: dict[str, dict] = {
             "The new node must point to the old head BEFORE head moves — why?",
             "Only after the new node is linked in can head safely move to it.",
         ],
-        "distractors": ["node.next = newNode;", "free(temp);", "while (node.next != NULL) node = node.next;"],
+        "distractors": ["curr.next = newNode;", "free(temp);", "while (curr.next != NULL) curr = curr.next;"],
         "needsValue": True, "needsPosition": False, "minNodes": 1,
     },
     "insertAtTail": {
         "title": "Insert at Tail",
-        "pseudocode": ["node = head;", "while (node.next != NULL) node = node.next;", "newNode = createNode(value);", "node.next = newNode;", "newNode.next = NULL;"],
+        "pseudocode": ["curr = head;", "while (curr.next != NULL) curr = curr.next;", "newNode = createNode({value});", "curr.next = newNode;", "newNode.next = NULL;"],
         "correctOrder": [0, 1, 2, 3, 4],
         "validOrders": [[0, 1, 2, 3, 4], [0, 2, 1, 3, 4], [2, 0, 1, 3, 4]],
         "hint": "Traverse to the last node before linking.",
@@ -81,12 +139,12 @@ TEMPLATES: dict[str, dict] = {
             "head moves forward — which pointer still references the old head?",
             "Memory can only be freed when nothing depends on it — is that true yet?",
         ],
-        "distractors": ["node.next = newNode;", "newNode = createNode(value);", "newNode.next = NULL;"],
+        "distractors": ["curr.next = newNode;", "newNode = createNode({value});", "newNode.next = NULL;"],
         "needsValue": False, "needsPosition": False, "minNodes": 2,
     },
     "removeAtTail": {
         "title": "Remove Last Node",
-        "pseudocode": ["node = head;", "while (node.next.next != NULL) node = node.next;", "temp = node.next;", "node.next = NULL;", "free(temp);"],
+        "pseudocode": ["curr = head;", "while (curr.next.next != NULL) curr = curr.next;", "temp = curr.next;", "curr.next = NULL;", "free(temp);"],
         "correctOrder": [0, 1, 2, 3, 4],
         "hint": "Stop at the second-to-last node.",
         "step_hints": [
@@ -96,12 +154,12 @@ TEMPLATES: dict[str, dict] = {
             "The second-to-last node becomes the new tail — what must its next point to?",
             "Free the old tail only after the list no longer points to it.",
         ],
-        "distractors": ["head = head.next;", "newNode = createNode(value);", "node.next = newNode;"],
+        "distractors": ["head = head.next;", "newNode = createNode({value});", "curr.next = newNode;"],
         "needsValue": False, "needsPosition": False, "minNodes": 2,
     },
     "insertIntoEmpty": {
         "title": "Insert into Empty List",
-        "pseudocode": ["newNode = createNode(value);", "newNode.next = NULL;", "head = newNode;"],
+        "pseudocode": ["newNode = createNode({value});", "newNode.next = NULL;", "head = newNode;"],
         "correctOrder": [0, 1, 2],
         "hint": "The new node becomes the only element.",
         "step_hints": [
@@ -109,41 +167,41 @@ TEMPLATES: dict[str, dict] = {
             "The only node is also the LAST node — what marks the end of a list?",
             "An empty list's head is NULL — when does it point to the new node?",
         ],
-        "distractors": ["newNode.next = head;", "free(temp);", "node = head;"],
+        "distractors": ["newNode.next = head;", "free(temp);", "curr = head;"],
         "needsValue": True, "needsPosition": False, "minNodes": 0, "startsEmpty": True,
     },
     "deleteEntireList": {
         "title": "Delete Entire List",
-        "pseudocode": ["node = head;", "while (node != NULL) { temp = node.next; free(node); node = temp; }", "head = NULL;"],
+        "pseudocode": ["curr = head;", "while (curr != NULL) { temp = curr.next; free(curr); curr = temp; }", "head = NULL;"],
         "correctOrder": [0, 1, 2],
         "hint": "Traverse and free each node, then null the head.",
         "step_hints": [
             "You need a traversal pointer to visit every node — where does it begin?",
-            "Inside the loop: why must temp save node.next BEFORE the free?",
+            "Inside the loop: why must temp save curr.next BEFORE the free?",
             "After every node is freed, what value should head hold?",
         ],
-        "distractors": ["newNode = createNode(value);", "node.next = newNode;", "newNode.next = head;"],
+        "distractors": ["newNode = createNode({value});", "curr.next = newNode;", "newNode.next = head;"],
         "needsValue": False, "needsPosition": False, "minNodes": 2,
     },
     "insertAtPosition": {
         "title": "Insert at Position",
-        "pseudocode": ["node = head;", "for (int i = 0; i < position-1; i++) node = node.next;", "newNode = createNode(value);", "newNode.next = node.next;", "node.next = newNode;"],
+        "pseudocode": ["curr = head;", "for (int i = 0; i < index-1; i++) curr = curr.next;", "newNode = createNode({value});", "newNode.next = curr.next;", "curr.next = newNode;"],
         "correctOrder": [0, 1, 2, 3, 4],
         "validOrders": [[0, 1, 2, 3, 4], [0, 2, 1, 3, 4], [2, 0, 1, 3, 4]],
         "hint": "Walk to the predecessor, then splice in.",
         "step_hints": [
-            "Traversal to a position always starts at the head.",
-            "The traversal stops at position-1 — which node must the pointer be at, and why?",
+            "Traversal to an index always starts at the head.",
+            "The traversal stops at index-1 — which node must the pointer be at, and why?",
             "Creating the node does not modify the list — it only has to exist before linking.",
             "The new node must point to its successor BEFORE the chain is relinked — what would be lost otherwise?",
             "Now the predecessor's next is redirected — is its old successor already saved somewhere?",
         ],
-        "distractors": ["head = newNode;", "free(temp);", "while (node.next != NULL) node = node.next;"],
+        "distractors": ["head = newNode;", "free(temp);", "while (curr.next != NULL) curr = curr.next;"],
         "needsValue": True, "needsPosition": True, "minNodes": 2,
     },
     "removeAtPosition": {
         "title": "Remove at Position",
-        "pseudocode": ["node = head;", "for (int i = 0; i < position-1; i++) node = node.next;", "temp = node.next;", "node.next = temp.next;", "free(temp);"],
+        "pseudocode": ["curr = head;", "for (int i = 0; i < index-1; i++) curr = curr.next;", "temp = curr.next;", "curr.next = temp.next;", "free(temp);"],
         "correctOrder": [0, 1, 2, 3, 4],
         "hint": "Walk to the predecessor, bypass the target.",
         "step_hints": [
@@ -153,26 +211,26 @@ TEMPLATES: dict[str, dict] = {
             "The chain bypasses the removed node here — trace exactly which node now connects to which.",
             "Free the node only after the list no longer links to it.",
         ],
-        "distractors": ["newNode = createNode(value);", "newNode.next = node.next;", "head = head.next;"],
+        "distractors": ["newNode = createNode({value});", "newNode.next = curr.next;", "head = head.next;"],
         "needsValue": False, "needsPosition": True, "minNodes": 3,
     },
     "reverseList": {
         "title": "Reverse Linked List",
-        "pseudocode": ["prev = NULL;", "node = head;", "while (node != NULL) { temp = node.next; node.next = prev; prev = node; node = temp; }", "head = prev;"],
+        "pseudocode": ["prev = NULL;", "curr = head;", "while (curr != NULL) { temp = curr.next; curr.next = prev; prev = curr; curr = temp; }", "head = prev;"],
         "correctOrder": [0, 1, 2, 3],
-        "hint": "Traverse the list and flip each node's next to point at the PREVIOUS node — prev, node and temp keep the rest of the list reachable while you do it.",
+        "hint": "Traverse the list and flip each node's next to point at the PREVIOUS node — prev, curr and temp keep the rest of the list reachable while you do it.",
         "step_hints": [
             "The old first node will become the tail — what should it end up pointing to?",
             "The traversal pointer starts at the old head of the list.",
-            "Three pointers advance in this loop — why must temp save node.next FIRST?",
+            "Three pointers advance in this loop — why must temp save curr.next FIRST?",
             "When the loop finishes, which variable points to the new head?",
         ],
-        "distractors": ["newNode = createNode(value);", "node.next = newNode;", "free(temp);"],
+        "distractors": ["newNode = createNode({value});", "curr.next = newNode;", "free(temp);"],
         "needsValue": False, "needsPosition": False, "minNodes": 2,
     },
     "mergeSortedLists": {
         "title": "Merge Two Sorted Lists",
-        "pseudocode": ["dummy = createNode(0); node = dummy;", "while (l1 != NULL && l2 != NULL) { if (l1.val <= l2.val) { node.next = l1; l1 = l1.next; } else { node.next = l2; l2 = l2.next; } node = node.next; }", "node.next = (l1 != NULL) ? l1 : l2;", "return dummy.next;"],
+        "pseudocode": ["dummy = createNode(0); curr = dummy;", "while (l1 != NULL && l2 != NULL) { if (l1.val <= l2.val) { curr.next = l1; l1 = l1.next; } else { curr.next = l2; l2 = l2.next; } curr = curr.next; }", "curr.next = (l1 != NULL) ? l1 : l2;", "return dummy.next;"],
         "correctOrder": [0, 1, 2, 3],
         "hint": "Use a dummy node; always attach the smaller value.",
         "step_hints": [
@@ -181,7 +239,7 @@ TEMPLATES: dict[str, dict] = {
             "One list is exhausted — what happens to the remaining nodes of the other?",
             "Why return dummy.next and not dummy itself?",
         ],
-        "distractors": ["head = prev;", "while (node.next != NULL) node = node.next;", "free(temp);"],
+        "distractors": ["head = prev;", "while (curr.next != NULL) curr = curr.next;", "free(temp);"],
         "needsValue": False, "needsPosition": False, "minNodes": 0, "isMerge": True,
     },
     "detectCycle": {
@@ -195,7 +253,7 @@ TEMPLATES: dict[str, dict] = {
             "If the two pointers ever meet at the same node, what does that prove?",
             "Fast reached the end of the list — could a cycle have existed?",
         ],
-        "distractors": ["newNode = createNode(value);", "node.next = newNode;", "head = prev;"],
+        "distractors": ["newNode = createNode({value});", "curr.next = newNode;", "head = prev;"],
         "needsValue": False, "needsPosition": False, "minNodes": 3,
     },
     "sortList": {
@@ -210,7 +268,7 @@ TEMPLATES: dict[str, dict] = {
             "The split must truly CUT the list in two — why set slow.next to NULL?",
             "Two sorted halves remain — which earlier operation joins them into one?",
         ],
-        "distractors": ["head = prev;", "newNode = createNode(value);", "node.next = newNode;"],
+        "distractors": ["head = prev;", "newNode = createNode({value});", "curr.next = newNode;"],
         "needsValue": False, "needsPosition": False, "minNodes": 3,
     },
 }
@@ -222,7 +280,7 @@ TEMPLATES: dict[str, dict] = {
 # "a" = correct answer (must be findable via str.replace(a, "___", 1) in the step text)
 # "w" = two wrong options
 _BLANKS: dict[str, list[list[dict]]] = {
-    # ["newNode = createNode(value);", "newNode.next = head;", "head = newNode;"]
+    # ["newNode = createNode({value});", "newNode.next = head;", "head = newNode;"]
     "insertAtHead": [
         [  # A: what does each var point to?
             {"a": "newNode",          "w": ["head",    "temp"]},
@@ -230,51 +288,51 @@ _BLANKS: dict[str, list[list[dict]]] = {
             {"a": "newNode",          "w": ["head",    "temp"]},
         ],
         [  # B: which role does each var play?
-            {"a": "createNode(value)","w": ["NULL",    "head"]},
+            {"a": "createNode({value})","w": ["NULL",    "head"]},
             {"a": "newNode",          "w": ["head",    "temp"]},
             {"a": "head",             "w": ["newNode", "NULL"]},
         ],
         [  # C: fields & call arguments
-            {"a": "value",   "w": ["head",         "newNode"]},
+            {"a": "{value}", "w": ["head",  "newNode"]},
             {"a": "next",    "w": ["val",          "prev"]},
             {"a": "newNode", "w": ["newNode.next", "head.next"]},
         ],
         [  # D: functions & assignment targets
             {"a": "createNode",   "w": ["free",      "makeNode"]},
             {"a": "newNode.next", "w": ["head.next", "newNode"]},
-            {"a": "head",         "w": ["temp",      "node"]},
+            {"a": "head",         "w": ["temp",      "curr"]},
         ],
     ],
-    # ["node = head;", "while (node.next != NULL) node = node.next;",
-    #  "newNode = createNode(value);", "node.next = newNode;", "newNode.next = NULL;"]
+    # ["curr = head;", "while (curr.next != NULL) curr = curr.next;",
+    #  "newNode = createNode({value});", "curr.next = newNode;", "newNode.next = NULL;"]
     "insertAtTail": [
         [  # A: variable name focus
             {"a": "head",    "w": ["NULL",    "newNode"]},
-            {"a": "node.next","w": ["node",   "node.next.next"]},
+            {"a": "curr.next","w": ["curr",   "curr.next.next"]},
             {"a": "newNode", "w": ["head",    "temp"]},
             {"a": "newNode", "w": ["head.next","NULL"]},
             {"a": "NULL",    "w": ["newNode", "head"]},
         ],
         [  # B: loop termination & pointer roles
             {"a": "head",    "w": ["NULL",    "newNode"]},
-            {"a": "NULL",    "w": ["node",    "node.next"]},
+            {"a": "NULL",    "w": ["curr",    "curr.next"]},
             {"a": "newNode", "w": ["head",    "temp"]},
-            {"a": "node.next","w": ["node",   "head"]},
-            {"a": "newNode", "w": ["node",    "head"]},
+            {"a": "curr.next","w": ["curr",   "head"]},
+            {"a": "newNode", "w": ["curr",    "head"]},
         ],
         [  # C: fields & call arguments
-            {"a": "node",         "w": ["newNode",  "temp"]},
+            {"a": "curr",         "w": ["newNode",  "temp"]},
             {"a": "next",         "w": ["val",      "prev"]},
-            {"a": "value",        "w": ["node",     "NULL"]},
+            {"a": "{value}",     "w": ["curr",  "NULL"]},
             {"a": "next",         "w": ["val",      "prev"]},
-            {"a": "newNode.next", "w": ["newNode",  "node.next"]},
+            {"a": "newNode.next", "w": ["newNode",  "curr.next"]},
         ],
         [  # D: loop body & functions
             {"a": "head",             "w": ["head.next", "temp"]},
-            {"a": "node = node.next", "w": ["node = node.next.next", "node.next = node"]},
+            {"a": "curr = curr.next", "w": ["curr = curr.next.next", "curr.next = curr"]},
             {"a": "createNode",       "w": ["free",      "newNode"]},
-            {"a": "newNode",          "w": ["NULL",      "node"]},
-            {"a": "NULL",             "w": ["node",      "head"]},
+            {"a": "newNode",          "w": ["NULL",      "curr"]},
+            {"a": "NULL",             "w": ["curr",      "head"]},
         ],
     ],
     # ["temp = head;", "head = head.next;", "free(temp);"]
@@ -285,9 +343,9 @@ _BLANKS: dict[str, list[list[dict]]] = {
             {"a": "temp",    "w": ["head",    "NULL"]},
         ],
         [  # B: which variable to use
-            {"a": "temp",    "w": ["node",    "head"]},
+            {"a": "temp",    "w": ["curr",    "head"]},
             {"a": "head",    "w": ["temp",    "NULL"]},
-            {"a": "temp",    "w": ["node",    "prev"]},
+            {"a": "temp",    "w": ["curr",    "prev"]},
         ],
         [  # C: fields & functions
             {"a": "head", "w": ["head.next",  "temp.next"]},
@@ -295,31 +353,31 @@ _BLANKS: dict[str, list[list[dict]]] = {
             {"a": "free", "w": ["createNode", "delete"]},
         ],
         [  # D: what gets saved and freed
-            {"a": "temp",      "w": ["node",      "newNode"]},
+            {"a": "temp",      "w": ["curr",      "newNode"]},
             {"a": "head.next", "w": ["temp.next", "head"]},
-            {"a": "temp",      "w": ["head.next", "node.next"]},
+            {"a": "temp",      "w": ["head.next", "curr.next"]},
         ],
     ],
-    # ["node = head;", "while (node.next.next != NULL) node = node.next;",
-    #  "temp = node.next;", "node.next = NULL;", "free(temp);"]
+    # ["curr = head;", "while (curr.next.next != NULL) curr = curr.next;",
+    #  "temp = curr.next;", "curr.next = NULL;", "free(temp);"]
     "removeAtTail": [
         [  # A: condition & what to save
             {"a": "head",          "w": ["NULL",   "temp"]},
-            {"a": "node.next.next","w": ["node.next","node"]},
-            {"a": "node.next",     "w": ["node",   "head"]},
-            {"a": "NULL",          "w": ["temp",   "node.next"]},
-            {"a": "temp",          "w": ["node",   "head"]},
+            {"a": "curr.next.next","w": ["curr.next","curr"]},
+            {"a": "curr.next",     "w": ["curr",   "head"]},
+            {"a": "NULL",          "w": ["temp",   "curr.next"]},
+            {"a": "temp",          "w": ["curr",   "head"]},
         ],
         [  # B: termination value & pointer assignment
             {"a": "head",      "w": ["NULL",     "temp"]},
-            {"a": "NULL",      "w": ["node",     "node.next"]},
-            {"a": "temp",      "w": ["node",     "head"]},
-            {"a": "node.next", "w": ["node",     "head"]},
-            {"a": "temp",      "w": ["node",     "prev"]},
+            {"a": "NULL",      "w": ["curr",     "curr.next"]},
+            {"a": "temp",      "w": ["curr",     "head"]},
+            {"a": "curr.next", "w": ["curr",     "head"]},
+            {"a": "temp",      "w": ["curr",     "prev"]},
         ],
         [  # C: loop body & functions
-            {"a": "node",             "w": ["temp", "tail"]},
-            {"a": "node = node.next", "w": ["node = node.next.next", "node.next = node"]},
+            {"a": "curr",             "w": ["temp", "tail"]},
+            {"a": "curr = curr.next", "w": ["curr = curr.next.next", "curr.next = curr"]},
             {"a": "next",             "w": ["val",  "prev"]},
             {"a": "next",             "w": ["val",  "prev"]},
             {"a": "free",             "w": ["delete", "createNode"]},
@@ -327,12 +385,12 @@ _BLANKS: dict[str, list[list[dict]]] = {
         [  # D: comparison & saved references
             {"a": "head", "w": ["head.next", "NULL"]},
             {"a": "!=",   "w": ["==",        "="]},
-            {"a": "temp", "w": ["node",      "prev"]},
+            {"a": "temp", "w": ["curr",      "prev"]},
             {"a": "NULL", "w": ["newNode",   "head"]},
-            {"a": "temp", "w": ["node.next", "head"]},
+            {"a": "temp", "w": ["curr.next", "head"]},
         ],
     ],
-    # ["newNode = createNode(value);", "newNode.next = NULL;", "head = newNode;"]
+    # ["newNode = createNode({value});", "newNode.next = NULL;", "head = newNode;"]
     "insertIntoEmpty": [
         [  # A: pointer values
             {"a": "newNode",          "w": ["head", "temp"]},
@@ -340,14 +398,14 @@ _BLANKS: dict[str, list[list[dict]]] = {
             {"a": "newNode",          "w": ["NULL",  "temp"]},
         ],
         [  # B: variable roles
-            {"a": "createNode(value)","w": ["NULL", "head"]},
+            {"a": "createNode({value})","w": ["NULL", "head"]},
             {"a": "newNode",          "w": ["head", "temp"]},
             {"a": "head",             "w": ["newNode","NULL"]},
         ],
         [  # C: fields & call arguments
-            {"a": "value",   "w": ["NULL",         "0"]},
+            {"a": "{value}", "w": ["NULL",  "0"]},
             {"a": "next",    "w": ["val",          "prev"]},
-            {"a": "newNode", "w": ["newNode.next", "node"]},
+            {"a": "newNode", "w": ["newNode.next", "curr"]},
         ],
         [  # D: functions & assignment targets
             {"a": "createNode",   "w": ["free",      "getNode"]},
@@ -355,50 +413,50 @@ _BLANKS: dict[str, list[list[dict]]] = {
             {"a": "head",         "w": ["head.next", "temp"]},
         ],
     ],
-    # ["node = head;", "while (node != NULL) { temp = node.next; free(node); node = temp; }", "head = NULL;"]
+    # ["curr = head;", "while (curr != NULL) { temp = curr.next; free(curr); curr = temp; }", "head = NULL;"]
     "deleteEntireList": [
         [  # A: condition variable
             {"a": "head",    "w": ["NULL",   "temp"]},
-            {"a": "node",    "w": ["node.next","temp"]},
+            {"a": "curr",    "w": ["curr.next","temp"]},
             {"a": "NULL",    "w": ["temp",   "head.next"]},
         ],
         [  # B: what temp saves
-            {"a": "node",    "w": ["head",   "temp"]},
-            {"a": "node.next","w": ["node",  "temp"]},
+            {"a": "curr",    "w": ["head",   "temp"]},
+            {"a": "curr.next","w": ["curr",  "temp"]},
             {"a": "NULL",    "w": ["temp",   "head"]},
         ],
         [  # C: traversal pointer & the free call
-            {"a": "node", "w": ["temp",   "head.next"]},
+            {"a": "curr", "w": ["temp",   "head.next"]},
             {"a": "free", "w": ["delete", "createNode"]},
-            {"a": "NULL", "w": ["node",   "newNode"]},
+            {"a": "NULL", "w": ["curr",   "newNode"]},
         ],
         [  # D: saving before freeing
             {"a": "head", "w": ["head.next", "NULL"]},
-            {"a": "temp", "w": ["node",      "head"]},
-            {"a": "head", "w": ["node",      "temp"]},
+            {"a": "temp", "w": ["curr",      "head"]},
+            {"a": "head", "w": ["curr",      "temp"]},
         ],
     ],
-    # ["node = head;", "for (int i = 0; i < position-1; i++) node = node.next;",
-    #  "newNode = createNode(value);", "newNode.next = node.next;", "node.next = newNode;"]
+    # ["curr = head;", "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    #  "newNode = createNode({value});", "newNode.next = curr.next;", "curr.next = newNode;"]
     "insertAtPosition": [
         [  # A: what each pointer is set to
             {"a": "head",      "w": ["NULL",    "newNode"]},
-            {"a": "position-1","w": ["position","position-2"]},
+            {"a": "index-1","w": ["index","index-2"]},
             {"a": "newNode",   "w": ["head",    "temp"]},
-            {"a": "node.next", "w": ["node",    "NULL"]},
-            {"a": "newNode",   "w": ["node.next","NULL"]},
+            {"a": "curr.next", "w": ["curr",    "NULL"]},
+            {"a": "newNode",   "w": ["curr.next","NULL"]},
         ],
         [  # B: which variable owns the pointer
             {"a": "head",      "w": ["NULL",    "newNode"]},
-            {"a": "position-1","w": ["position","position-2"]},
+            {"a": "index-1","w": ["index","index-2"]},
             {"a": "newNode",   "w": ["head",    "temp"]},
-            {"a": "newNode",   "w": ["node",    "head"]},
-            {"a": "node.next", "w": ["node",    "head"]},
+            {"a": "newNode",   "w": ["curr",    "head"]},
+            {"a": "curr.next", "w": ["curr",    "head"]},
         ],
         [  # C: loop body & call arguments
-            {"a": "node",             "w": ["newNode", "temp"]},
-            {"a": "node = node.next", "w": ["node = node.next.next", "node.next = node"]},
-            {"a": "value",            "w": ["position", "NULL"]},
+            {"a": "curr",             "w": ["newNode", "temp"]},
+            {"a": "curr = curr.next", "w": ["curr = curr.next.next", "curr.next = curr"]},
+            {"a": "{value}",        "w": ["{index}", "NULL"]},
             {"a": "next",             "w": ["val",      "prev"]},
             {"a": "newNode",          "w": ["newNode.next", "temp"]},
         ],
@@ -406,30 +464,30 @@ _BLANKS: dict[str, list[list[dict]]] = {
             {"a": "head",         "w": ["NULL",    "head.next"]},
             {"a": "0",            "w": ["1",       "-1"]},
             {"a": "createNode",   "w": ["free",    "newNode"]},
-            {"a": "newNode.next", "w": ["newNode", "node.next"]},
-            {"a": "node.next",    "w": ["newNode.next", "node"]},
+            {"a": "newNode.next", "w": ["newNode", "curr.next"]},
+            {"a": "curr.next",    "w": ["newNode.next", "curr"]},
         ],
     ],
-    # ["node = head;", "for (int i = 0; i < position-1; i++) node = node.next;",
-    #  "temp = node.next;", "node.next = temp.next;", "free(temp);"]
+    # ["curr = head;", "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    #  "temp = curr.next;", "curr.next = temp.next;", "free(temp);"]
     "removeAtPosition": [
         [  # A: what to save and bypass
             {"a": "head",      "w": ["NULL",     "temp"]},
-            {"a": "position-1","w": ["position", "position-2"]},
-            {"a": "node.next", "w": ["node",     "temp"]},
-            {"a": "temp.next", "w": ["temp",     "node.next"]},
-            {"a": "temp",      "w": ["node",     "head"]},
+            {"a": "index-1","w": ["index", "index-2"]},
+            {"a": "curr.next", "w": ["curr",     "temp"]},
+            {"a": "temp.next", "w": ["temp",     "curr.next"]},
+            {"a": "temp",      "w": ["curr",     "head"]},
         ],
         [  # B: which variable owns each role
             {"a": "head",      "w": ["NULL",     "temp"]},
-            {"a": "position-1","w": ["position", "position-2"]},
-            {"a": "temp",      "w": ["node",     "head"]},
-            {"a": "node.next", "w": ["node",     "head"]},
-            {"a": "temp",      "w": ["node",     "prev"]},
+            {"a": "index-1","w": ["index", "index-2"]},
+            {"a": "temp",      "w": ["curr",     "head"]},
+            {"a": "curr.next", "w": ["curr",     "head"]},
+            {"a": "temp",      "w": ["curr",     "prev"]},
         ],
         [  # C: loop body & fields
-            {"a": "node",             "w": ["temp", "prev"]},
-            {"a": "node = node.next", "w": ["node = node.next.next", "temp = node.next"]},
+            {"a": "curr",             "w": ["temp", "prev"]},
+            {"a": "curr = curr.next", "w": ["curr = curr.next.next", "temp = curr.next"]},
             {"a": "next",             "w": ["val",  "prev"]},
             {"a": "next",             "w": ["val",  "prev"]},
             {"a": "free",             "w": ["delete", "remove"]},
@@ -437,68 +495,68 @@ _BLANKS: dict[str, list[list[dict]]] = {
         [  # D: loop start & bypass targets
             {"a": "head",      "w": ["head.next", "NULL"]},
             {"a": "0",         "w": ["1",         "2"]},
-            {"a": "temp",      "w": ["node",      "mid"]},
+            {"a": "temp",      "w": ["curr",      "mid"]},
             {"a": "temp.next", "w": ["temp",      "temp.next.next"]},
-            {"a": "temp",      "w": ["node.next", "head"]},
+            {"a": "temp",      "w": ["curr.next", "head"]},
         ],
     ],
-    # ["prev = NULL;", "node = head;",
-    #  "while (node != NULL) { temp = node.next; node.next = prev; prev = node; node = temp; }",
+    # ["prev = NULL;", "curr = head;",
+    #  "while (curr != NULL) { temp = curr.next; curr.next = prev; prev = curr; curr = temp; }",
     #  "head = prev;"]
     "reverseList": [
         [  # A: what prev is set to at each step
             {"a": "NULL", "w": ["head",  "temp"]},
             {"a": "head", "w": ["NULL",  "prev"]},
-            {"a": "prev", "w": ["node",  "temp"]},
-            {"a": "prev", "w": ["node",  "temp"]},
+            {"a": "prev", "w": ["curr",  "temp"]},
+            {"a": "prev", "w": ["curr",  "temp"]},
         ],
         [  # B: what saves the next pointer
             {"a": "NULL", "w": ["head",  "temp"]},
             {"a": "head", "w": ["NULL",  "prev"]},
-            {"a": "temp", "w": ["prev",  "node"]},
-            {"a": "prev", "w": ["node",  "temp"]},
+            {"a": "temp", "w": ["prev",  "curr"]},
+            {"a": "prev", "w": ["curr",  "temp"]},
         ],
         [  # C: the reversal assignment itself
-            {"a": "prev",             "w": ["temp", "node"]},
-            {"a": "node",             "w": ["temp", "prev"]},
-            {"a": "node.next = prev", "w": ["prev = node.next", "node = prev"]},
-            {"a": "prev",             "w": ["temp", "node.next"]},
+            {"a": "prev",             "w": ["temp", "curr"]},
+            {"a": "curr",             "w": ["temp", "prev"]},
+            {"a": "curr.next = prev", "w": ["prev = curr.next", "curr = prev"]},
+            {"a": "prev",             "w": ["temp", "curr.next"]},
         ],
         [  # D: saving before overwriting
-            {"a": "NULL",             "w": ["head",      "node"]},
+            {"a": "NULL",             "w": ["head",      "curr"]},
             {"a": "head",             "w": ["head.next", "temp"]},
-            {"a": "temp = node.next", "w": ["temp = node", "node = node.next"]},
-            {"a": "head",             "w": ["node",      "head.next"]},
+            {"a": "temp = curr.next", "w": ["temp = curr", "curr = curr.next"]},
+            {"a": "head",             "w": ["curr",      "head.next"]},
         ],
     ],
-    # ["dummy = createNode(0); node = dummy;",
+    # ["dummy = createNode(0); curr = dummy;",
     #  "while (l1 != NULL && l2 != NULL) { ... }",
-    #  "node.next = (l1 != NULL) ? l1 : l2;",
+    #  "curr.next = (l1 != NULL) ? l1 : l2;",
     #  "return dummy.next;"]
     "mergeSortedLists": [
         [  # A: l1 conditions
             {"a": "dummy",     "w": ["head", "NULL"]},
             {"a": "l1",        "w": ["l2",   "NULL"]},
             {"a": "l1",        "w": ["l2",   "NULL"]},
-            {"a": "dummy.next","w": ["dummy","node"]},
+            {"a": "dummy.next","w": ["dummy","curr"]},
         ],
         [  # B: l2 conditions
             {"a": "dummy",     "w": ["head", "NULL"]},
             {"a": "l2",        "w": ["l1",   "NULL"]},
             {"a": "l2",        "w": ["l1",   "NULL"]},
-            {"a": "dummy.next","w": ["dummy","node"]},
+            {"a": "dummy.next","w": ["dummy","curr"]},
         ],
         [  # C: comparison & guard conditions
-            {"a": "createNode(0)",    "w": ["createNode(value)", "NULL"]},
+            {"a": "createNode(0)",    "w": ["createNode(l1.val)", "NULL"]},
             {"a": "l1.val <= l2.val", "w": ["l1.val >= l2.val",  "l1 <= l2"]},
             {"a": "l1 != NULL",       "w": ["l1 == NULL",        "l2 != NULL"]},
-            {"a": "dummy.next",       "w": ["dummy",             "node.next"]},
+            {"a": "dummy.next",       "w": ["dummy",             "curr.next"]},
         ],
         [  # D: anchors & the advance step
-            {"a": "dummy",            "w": ["head",         "node"]},
-            {"a": "node = node.next", "w": ["node = dummy", "l1 = l1.next"]},
+            {"a": "dummy",            "w": ["head",         "curr"]},
+            {"a": "curr = curr.next", "w": ["curr = dummy", "l1 = l1.next"]},
             {"a": "NULL",             "w": ["l2",           "dummy"]},
-            {"a": "dummy",            "w": ["node",         "head"]},
+            {"a": "dummy",            "w": ["curr",         "head"]},
         ],
     ],
     # ["slow = head; fast = head;",
@@ -513,13 +571,13 @@ _BLANKS: dict[str, list[list[dict]]] = {
             {"a": "false",         "w": ["true",  "NULL"]},
         ],
         [  # B: pointer names and condition
-            {"a": "fast",  "w": ["slow",  "node"]},
+            {"a": "fast",  "w": ["slow",  "curr"]},
             {"a": "NULL",  "w": ["head",  "slow"]},
             {"a": "slow",  "w": ["fast",  "head"]},
             {"a": "false", "w": ["true",  "NULL"]},
         ],
         [  # C: pointer advances & the comparison
-            {"a": "slow",      "w": ["fast",  "node"]},
+            {"a": "slow",      "w": ["fast",  "curr"]},
             {"a": "slow.next", "w": ["slow",  "fast.next"]},
             {"a": "==",        "w": ["!=",    "="]},
             {"a": "false",     "w": ["true",  "0"]},
@@ -588,20 +646,20 @@ _BUGS: dict[str, list[dict]] = {
          "options": ["newNode.next = head;", "newNode.next = newNode;", "head.next = newNode;"]},
     ],
     "insertAtTail": [
-        {"subtlety": 1, "line": 3, "buggy": "node.next = node.next;",
-         "fix": "node.next = newNode;",
-         "explanation": "node.next = node.next is a no-op — the new node is never linked into the list",
-         "options": ["node.next = newNode;", "node.next = NULL;", "newNode.next = node;"]},
-        {"subtlety": 2, "line": 1, "buggy": "while (node != NULL) node = node.next;",
-         "fix": "while (node.next != NULL) node = node.next;",
-         "explanation": "Checking node instead of node.next walks off the end — node is NULL after the loop, so there is nothing to link from",
-         "options": ["while (node.next != NULL) node = node.next;",
-                     "while (node.next.next != NULL) node = node.next;",
-                     "while (node != NULL) node = node.next.next;"]},
+        {"subtlety": 1, "line": 3, "buggy": "curr.next = curr.next;",
+         "fix": "curr.next = newNode;",
+         "explanation": "curr.next = curr.next is a no-op — the new node is never linked into the list",
+         "options": ["curr.next = newNode;", "curr.next = NULL;", "newNode.next = curr;"]},
+        {"subtlety": 2, "line": 1, "buggy": "while (curr != NULL) curr = curr.next;",
+         "fix": "while (curr.next != NULL) curr = curr.next;",
+         "explanation": "Checking curr instead of curr.next walks off the end — curr is NULL after the loop, so there is nothing to link from",
+         "options": ["while (curr.next != NULL) curr = curr.next;",
+                     "while (curr.next.next != NULL) curr = curr.next;",
+                     "while (curr != NULL) curr = curr.next.next;"]},
         {"subtlety": 3, "line": 4, "buggy": "newNode.next = head;",
          "fix": "newNode.next = NULL;",
          "explanation": "Pointing the new tail back at head creates a cycle — the list must end at NULL",
-         "options": ["newNode.next = NULL;", "newNode.next = node;", "node.next = NULL;"]},
+         "options": ["newNode.next = NULL;", "newNode.next = curr;", "curr.next = NULL;"]},
     ],
     "removeAtHead": [
         {"subtlety": 1, "line": 1, "buggy": "head = head;",
@@ -618,20 +676,20 @@ _BUGS: dict[str, list[dict]] = {
          "options": ["temp = head;", "temp = NULL;", "temp = head.next.next;"]},
     ],
     "removeAtTail": [
-        {"subtlety": 2, "line": 1, "buggy": "while (node.next != NULL) node = node.next;",
-         "fix": "while (node.next.next != NULL) node = node.next;",
-         "explanation": "Stopping at node.next == NULL lands on the last node, not its predecessor",
-         "options": ["while (node.next.next != NULL) node = node.next;",
-                     "while (node != NULL) node = node.next;",
-                     "while (node.next != NULL) node = node.next.next;"]},
-        {"subtlety": 1, "line": 3, "buggy": "node.next = node;",
-         "fix": "node.next = NULL;",
+        {"subtlety": 2, "line": 1, "buggy": "while (curr.next != NULL) curr = curr.next;",
+         "fix": "while (curr.next.next != NULL) curr = curr.next;",
+         "explanation": "Stopping at curr.next == NULL lands on the last node, not its predecessor",
+         "options": ["while (curr.next.next != NULL) curr = curr.next;",
+                     "while (curr != NULL) curr = curr.next;",
+                     "while (curr.next != NULL) curr = curr.next.next;"]},
+        {"subtlety": 1, "line": 3, "buggy": "curr.next = curr;",
+         "fix": "curr.next = NULL;",
          "explanation": "Pointing the new tail at itself creates a one-node cycle instead of ending the list",
-         "options": ["node.next = NULL;", "node = NULL;", "node.next = temp;"]},
-        {"subtlety": 3, "line": 2, "buggy": "temp = node.next.next;",
-         "fix": "temp = node.next;",
-         "explanation": "The loop stopped where node.next.next is NULL, so temp is set to NULL — the old tail is never freed",
-         "options": ["temp = node.next;", "temp = node;", "temp = head;"]},
+         "options": ["curr.next = NULL;", "curr = NULL;", "curr.next = temp;"]},
+        {"subtlety": 3, "line": 2, "buggy": "temp = curr.next.next;",
+         "fix": "temp = curr.next;",
+         "explanation": "The loop stopped where curr.next.next is NULL, so temp is set to NULL — the old tail is never freed",
+         "options": ["temp = curr.next;", "temp = curr;", "temp = head;"]},
     ],
     "insertIntoEmpty": [
         {"subtlety": 1, "line": 2, "buggy": "head = NULL;",
@@ -648,87 +706,87 @@ _BUGS: dict[str, list[dict]] = {
          "options": ["newNode.next = NULL;", "newNode.next = head.next;", "newNode = NULL;"]},
     ],
     "deleteEntireList": [
-        {"subtlety": 2, "line": 0, "buggy": "node = head.next;",
-         "fix": "node = head;",
+        {"subtlety": 2, "line": 0, "buggy": "curr = head.next;",
+         "fix": "curr = head;",
          "explanation": "Starting at head.next skips the first node, causing a memory leak",
-         "options": ["node = head;", "node = NULL;", "node = head.next.next;"]},
+         "options": ["curr = head;", "curr = NULL;", "curr = head.next.next;"]},
         {"subtlety": 1, "line": 2, "buggy": "head = head;",
          "fix": "head = NULL;",
          "explanation": "head = head changes nothing — head still points at freed memory (dangling pointer)",
-         "options": ["head = NULL;", "head = temp;", "head = node;"]},
+         "options": ["head = NULL;", "head = temp;", "head = curr;"]},
         {"subtlety": 3, "line": 1,
-         "buggy": "while (node != NULL) { temp = node.next; free(node); node = node.next; }",
-         "fix":   "while (node != NULL) { temp = node.next; free(node); node = temp; }",
-         "explanation": "After free(node), reading node.next touches freed memory — temp exists to save the next pointer before the free",
-         "options": ["while (node != NULL) { temp = node.next; free(node); node = temp; }",
-                     "while (node != NULL) { free(node); node = node.next; }",
-                     "while (node != NULL) { temp = node; free(node); node = temp; }"]},
+         "buggy": "while (curr != NULL) { temp = curr.next; free(curr); curr = curr.next; }",
+         "fix":   "while (curr != NULL) { temp = curr.next; free(curr); curr = temp; }",
+         "explanation": "After free(curr), reading curr.next touches freed memory — temp exists to save the next pointer before the free",
+         "options": ["while (curr != NULL) { temp = curr.next; free(curr); curr = temp; }",
+                     "while (curr != NULL) { free(curr); curr = curr.next; }",
+                     "while (curr != NULL) { temp = curr; free(curr); curr = temp; }"]},
     ],
     "insertAtPosition": [
-        {"subtlety": 3, "line": 3, "buggy": "newNode.next = node;",
-         "fix": "newNode.next = node.next;",
-         "explanation": "Pointing to node (predecessor) instead of node.next (successor) corrupts the list",
-         "options": ["newNode.next = node.next;", "newNode.next = NULL;", "newNode.next = node.next.next;"]},
-        {"subtlety": 1, "line": 4, "buggy": "node.next = node.next;",
-         "fix": "node.next = newNode;",
+        {"subtlety": 3, "line": 3, "buggy": "newNode.next = curr;",
+         "fix": "newNode.next = curr.next;",
+         "explanation": "Pointing to curr (predecessor) instead of curr.next (successor) corrupts the list",
+         "options": ["newNode.next = curr.next;", "newNode.next = NULL;", "newNode.next = curr.next.next;"]},
+        {"subtlety": 1, "line": 4, "buggy": "curr.next = curr.next;",
+         "fix": "curr.next = newNode;",
          "explanation": "Self-assignment is a no-op — the new node is created but never linked into the list",
-         "options": ["node.next = newNode;", "node = newNode;", "newNode.next = newNode;"]},
-        {"subtlety": 2, "line": 1, "buggy": "for (int i = 0; i < position; i++) node = node.next;",
-         "fix": "for (int i = 0; i < position-1; i++) node = node.next;",
-         "explanation": "Looping to position walks one node too far — you land on the position itself instead of its predecessor",
-         "options": ["for (int i = 0; i < position-1; i++) node = node.next;",
-                     "for (int i = 0; i < position-2; i++) node = node.next;",
-                     "for (int i = 0; i <= position-1; i++) node = node.next;"]},
+         "options": ["curr.next = newNode;", "curr = newNode;", "newNode.next = newNode;"]},
+        {"subtlety": 2, "line": 1, "buggy": "for (int i = 0; i < index; i++) curr = curr.next;",
+         "fix": "for (int i = 0; i < index-1; i++) curr = curr.next;",
+         "explanation": "Looping to index walks one node too far — you land on the target index itself instead of its predecessor",
+         "options": ["for (int i = 0; i < index-1; i++) curr = curr.next;",
+                     "for (int i = 0; i < index-2; i++) curr = curr.next;",
+                     "for (int i = 0; i <= index-1; i++) curr = curr.next;"]},
     ],
     "removeAtPosition": [
-        {"subtlety": 3, "line": 3, "buggy": "node.next = temp;",
-         "fix": "node.next = temp.next;",
-         "explanation": "node.next = temp creates a cycle; it must skip temp by pointing to temp.next",
-         "options": ["node.next = temp.next;", "node.next = NULL;", "node.next = temp.next.next;"]},
-        {"subtlety": 1, "line": 4, "buggy": "free(node);",
+        {"subtlety": 3, "line": 3, "buggy": "curr.next = temp;",
+         "fix": "curr.next = temp.next;",
+         "explanation": "curr.next = temp creates a cycle; it must skip temp by pointing to temp.next",
+         "options": ["curr.next = temp.next;", "curr.next = NULL;", "curr.next = temp.next.next;"]},
+        {"subtlety": 1, "line": 4, "buggy": "free(curr);",
          "fix": "free(temp);",
-         "explanation": "node is the predecessor, still part of the list — freeing it corrupts the chain while the removed node leaks",
+         "explanation": "curr is the predecessor, still part of the list — freeing it corrupts the chain while the removed node leaks",
          "options": ["free(temp);", "free(temp.next);", "free(head);"]},
-        {"subtlety": 2, "line": 1, "buggy": "for (int i = 0; i < position; i++) node = node.next;",
-         "fix": "for (int i = 0; i < position-1; i++) node = node.next;",
-         "explanation": "Looping to position stops ON the target — the node AFTER the target gets removed instead",
-         "options": ["for (int i = 0; i < position-1; i++) node = node.next;",
-                     "for (int i = 0; i < position-2; i++) node = node.next;",
-                     "for (int i = 1; i < position-1; i++) node = node.next;"]},
+        {"subtlety": 2, "line": 1, "buggy": "for (int i = 0; i < index; i++) curr = curr.next;",
+         "fix": "for (int i = 0; i < index-1; i++) curr = curr.next;",
+         "explanation": "Looping to index stops ON the target — the node AFTER the target gets removed instead",
+         "options": ["for (int i = 0; i < index-1; i++) curr = curr.next;",
+                     "for (int i = 0; i < index-2; i++) curr = curr.next;",
+                     "for (int i = 1; i < index-1; i++) curr = curr.next;"]},
     ],
     "reverseList": [
         {"subtlety": 3, "line": 2,
-         "buggy": "while (node != NULL) { temp = node.next; node.next = prev; prev = node; node = node.next; }",
-         "fix":   "while (node != NULL) { temp = node.next; node.next = prev; prev = node; node = temp; }",
-         "explanation": "After node.next = prev, node.next has been overwritten — using node.next instead of temp loses the rest of the list",
-         "options": ["while (node != NULL) { temp = node.next; node.next = prev; prev = node; node = temp; }",
-                     "while (node != NULL) { node.next = prev; prev = node; node = node.next; }",
-                     "while (node != NULL) { temp = node.next; prev = node; node.next = prev; node = temp; }"]},
-        {"subtlety": 1, "line": 3, "buggy": "head = node;",
+         "buggy": "while (curr != NULL) { temp = curr.next; curr.next = prev; prev = curr; curr = curr.next; }",
+         "fix":   "while (curr != NULL) { temp = curr.next; curr.next = prev; prev = curr; curr = temp; }",
+         "explanation": "After curr.next = prev, curr.next has been overwritten — using curr.next instead of temp loses the rest of the list",
+         "options": ["while (curr != NULL) { temp = curr.next; curr.next = prev; prev = curr; curr = temp; }",
+                     "while (curr != NULL) { curr.next = prev; prev = curr; curr = curr.next; }",
+                     "while (curr != NULL) { temp = curr.next; prev = curr; curr.next = prev; curr = temp; }"]},
+        {"subtlety": 1, "line": 3, "buggy": "head = curr;",
          "fix": "head = prev;",
-         "explanation": "When the loop exits node is NULL — head = node discards the reversed list; prev points to the new head",
-         "options": ["head = prev;", "head = temp;", "head = node.next;"]},
+         "explanation": "When the loop exits curr is NULL — head = curr discards the reversed list; prev points to the new head",
+         "options": ["head = prev;", "head = temp;", "head = curr.next;"]},
         {"subtlety": 2, "line": 0, "buggy": "prev = head;",
          "fix": "prev = NULL;",
          "explanation": "prev must start as NULL so the old head becomes the tail — starting at head makes the first node point to itself (a cycle)",
          "options": ["prev = NULL;", "prev = head.next;", "prev = temp;"]},
     ],
     "mergeSortedLists": [
-        {"subtlety": 2, "line": 2, "buggy": "node.next = (l1 != NULL) ? l2 : l1;",
-         "fix": "node.next = (l1 != NULL) ? l1 : l2;",
+        {"subtlety": 2, "line": 2, "buggy": "curr.next = (l1 != NULL) ? l2 : l1;",
+         "fix": "curr.next = (l1 != NULL) ? l1 : l2;",
          "explanation": "Conditions are swapped: attaches l2 when l1 remains and vice versa",
-         "options": ["node.next = (l1 != NULL) ? l1 : l2;", "node.next = l1;", "node.next = l2;"]},
+         "options": ["curr.next = (l1 != NULL) ? l1 : l2;", "curr.next = l1;", "curr.next = l2;"]},
         {"subtlety": 1, "line": 3, "buggy": "return dummy;",
          "fix": "return dummy.next;",
          "explanation": "dummy is the placeholder anchor holding value 0 — the merged list starts at dummy.next",
-         "options": ["return dummy.next;", "return node;", "return l1;"]},
+         "options": ["return dummy.next;", "return curr;", "return l1;"]},
         {"subtlety": 3, "line": 1,
-         "buggy": "while (l1 != NULL || l2 != NULL) { if (l1.val <= l2.val) { node.next = l1; l1 = l1.next; } else { node.next = l2; l2 = l2.next; } node = node.next; }",
-         "fix":   "while (l1 != NULL && l2 != NULL) { if (l1.val <= l2.val) { node.next = l1; l1 = l1.next; } else { node.next = l2; l2 = l2.next; } node = node.next; }",
+         "buggy": "while (l1 != NULL || l2 != NULL) { if (l1.val <= l2.val) { curr.next = l1; l1 = l1.next; } else { curr.next = l2; l2 = l2.next; } curr = curr.next; }",
+         "fix":   "while (l1 != NULL && l2 != NULL) { if (l1.val <= l2.val) { curr.next = l1; l1 = l1.next; } else { curr.next = l2; l2 = l2.next; } curr = curr.next; }",
          "explanation": "With || the loop keeps running after one list is exhausted — l1.val then dereferences NULL",
-         "options": ["while (l1 != NULL && l2 != NULL) { if (l1.val <= l2.val) { node.next = l1; l1 = l1.next; } else { node.next = l2; l2 = l2.next; } node = node.next; }",
-                     "while (l1 != NULL) { if (l1.val <= l2.val) { node.next = l1; l1 = l1.next; } else { node.next = l2; l2 = l2.next; } node = node.next; }",
-                     "while (l1 != NULL && l2 != NULL) { if (l1.val <= l2.val) { node.next = l1; l2 = l2.next; } else { node.next = l2; l1 = l1.next; } node = node.next; }"]},
+         "options": ["while (l1 != NULL && l2 != NULL) { if (l1.val <= l2.val) { curr.next = l1; l1 = l1.next; } else { curr.next = l2; l2 = l2.next; } curr = curr.next; }",
+                     "while (l1 != NULL) { if (l1.val <= l2.val) { curr.next = l1; l1 = l1.next; } else { curr.next = l2; l2 = l2.next; } curr = curr.next; }",
+                     "while (l1 != NULL && l2 != NULL) { if (l1.val <= l2.val) { curr.next = l1; l2 = l2.next; } else { curr.next = l2; l1 = l1.next; } curr = curr.next; }"]},
     ],
     "detectCycle": [
         {"subtlety": 2, "line": 1,
@@ -805,7 +863,7 @@ CONSIDER: dict[str, list[str]] = {
         "Why do we save head into temp before advancing it?",
     ],
     "removeAtTail": [
-        "Why does the loop check node.next.next instead of node.next?",
+        "Why does the loop check curr.next.next instead of curr.next?",
         "What happens if the list has only one node?",
     ],
     "insertIntoEmpty": [
@@ -813,19 +871,19 @@ CONSIDER: dict[str, list[str]] = {
         "Why must newNode.next be NULL here rather than head?",
     ],
     "deleteEntireList": [
-        "Why do we save node.next into temp before freeing the node?",
+        "Why do we save curr.next into temp before freeing the node?",
         "What would go wrong if we set head = NULL first and then tried to free the nodes?",
     ],
     "insertAtPosition": [
-        "What should happen if position is larger than the list length?",
-        "Why does the loop walk to position-1 instead of position?",
+        "What should happen if index is larger than the list length?",
+        "Why does the loop walk to index-1 instead of index?",
     ],
     "removeAtPosition": [
         "Why does the loop stop at the node BEFORE the target?",
         "Would this code still work if the target were the head node?",
     ],
     "reverseList": [
-        "Why do we need THREE pointers (prev, node, temp) instead of two?",
+        "Why do we need THREE pointers (prev, curr, temp) instead of two?",
         "What does head point to at the moment the loop finishes?",
     ],
     "mergeSortedLists": [
@@ -902,7 +960,7 @@ def generate_static_question(
         l2 = sorted(random.sample([v for v in range(1, 50) if v not in l1], n))
         goal = sorted(l1 + l2)
         initial_nodes = [{"id": i + 1, "value": v, "next": i + 2 if i + 1 < len(l1) else None} for i, v in enumerate(l1)]
-        return {
+        return instantiate({
             "id": str(uuid.uuid4()), "title": tmpl["title"], "operation": operation,
             "operationValue": {"l1Values": l1, "l2Values": l2}, "operationPosition": None,
             "pseudocode": tmpl["pseudocode"], "correctOrder": tmpl["correctOrder"],
@@ -910,7 +968,7 @@ def generate_static_question(
             "distractors": _pick(tmpl["distractors"], n_dist),
             "initialNodes": initial_nodes, "goalPattern": goal,
             "hint": hint, "isMerge": True, "l1Values": l1, "l2Values": l2,
-        }
+        })
 
     # Build random initial nodes
     if node_count > 0:
@@ -934,7 +992,7 @@ def generate_static_question(
     result = execute_operation(operation, nodes, op_value, op_pos)
     goal   = result["values"]
 
-    return {
+    return instantiate({
         "id": str(uuid.uuid4()), "title": tmpl["title"], "operation": operation,
         "operationValue": op_value, "operationPosition": op_pos,
         "pseudocode": tmpl["pseudocode"], "correctOrder": tmpl["correctOrder"],
@@ -943,7 +1001,7 @@ def generate_static_question(
         "initialNodes": nodes, "goalPattern": goal,
         "hint": hint, "isMerge": False,
         **({"cycleTo": 1} if operation == "detectCycle" and node_count >= 2 else {}),
-    }
+    })
 
 
 def _pick(pool: list, k: int = 2) -> list:
@@ -1033,7 +1091,7 @@ def generate_fill_blank_question(operation: str, spec) -> dict:
         blanked.append(blanked_step)
         blanks.append({"line": i, "answer": answer, "options": options})
 
-    return {
+    return instantiate({
         "id":              str(uuid.uuid4()),
         "question_type":   "fill_blank",
         "variant":         f"blanks{set_idx}",
@@ -1049,7 +1107,7 @@ def generate_fill_blank_question(operation: str, spec) -> dict:
         "hint":            tmpl["hint"],
         "isMerge":         tmpl.get("isMerge", False),
         **extra,
-    }
+    })
 
 
 def generate_find_bug_question(operation: str, spec) -> dict:
@@ -1085,7 +1143,7 @@ def generate_find_bug_question(operation: str, spec) -> dict:
         options = [fix] + wrong
     random.shuffle(options)
 
-    return {
+    return instantiate({
         "id":              str(uuid.uuid4()),
         "question_type":   "find_bug",
         "operation":       operation,
@@ -1104,4 +1162,4 @@ def generate_find_bug_question(operation: str, spec) -> dict:
         "hint":            tmpl["hint"],
         "isMerge":         tmpl.get("isMerge", False),
         **extra,
-    }
+    })

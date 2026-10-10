@@ -37,9 +37,9 @@ const analyzeDistractorError = (wrongBlocks, level) => {
 const generateFallbackFeedback = (operation, questionHint) => {
   const reasoningMap = {
     insertAtHead:     'Head insertion: create node → newNode.next = head → head = newNode. Order matters!',
-    insertAtTail:     'Tail insertion: traverse to last → create node → lastNode.next = newNode → newNode.next = NULL.',
+    insertAtTail:     'Tail insertion: traverse to last → create node → curr.next = newNode → newNode.next = NULL.',
     removeAtHead:     'Head removal: temp = head → head = head.next → free temp. Save before you discard!',
-    removeAtTail:     'Tail removal: traverse to second-last → temp = node.next → node.next = NULL → free temp.',
+    removeAtTail:     'Tail removal: traverse to second-last → temp = curr.next → curr.next = NULL → free temp.',
     insertAtPosition: 'Position insertion: traverse to predecessor → save its .next → link newNode → update predecessor.',
     removeAtPosition: 'Position removal: traverse to predecessor → save target in temp → bypass it → free temp.',
   };

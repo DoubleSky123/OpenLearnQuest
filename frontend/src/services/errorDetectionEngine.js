@@ -157,9 +157,9 @@ const tempVariableRule = {
     type: 'temp_variable',
     message: '💾 Missing Temporary Variable',
     explanation: 'You need to save the node to a temporary variable BEFORE disconnecting or freeing it!',
-    reasoning: 'Once you disconnect a node (e.g., node.next = NULL), you lose the reference to it. Save it first in a temp variable so you can free it later.',
+    reasoning: 'Once you disconnect a node (e.g., curr.next = NULL), you lose the reference to it. Save it first in a temp variable so you can free it later.',
     correctSequence: [
-      '1. Save: temp = node (or temp = head, temp = node.next)',
+      '1. Save: temp = curr (or temp = head, temp = curr.next)',
       '2. Disconnect: update pointers',
       '3. Free: free temp'
     ],

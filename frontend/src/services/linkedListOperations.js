@@ -117,7 +117,7 @@ export const executeLinkedListOperation = (operation, nodes, operationValue, ope
     const updated = nodes.map(n => n.id === predId ? { ...n, next: nextId } : n);
     return {
       nodes: [...updated, { id: nextId, value: operationValue, next: pred.next }],
-      message: `✓ Code executed! Node inserted at position ${operationPosition}`,
+      message: `✓ Code executed! Node inserted at index ${operationPosition}`,
     };
   }
 
@@ -131,7 +131,7 @@ export const executeLinkedListOperation = (operation, nodes, operationValue, ope
     const updated  = nodes
       .map(n => n.id === predId ? { ...n, next: target.next } : n)
       .filter(n => n.id !== targetId);
-    return { nodes: updated, message: `✓ Code executed! Node removed at position ${operationPosition}` };
+    return { nodes: updated, message: `✓ Code executed! Node removed at index ${operationPosition}` };
   }
 
   return { nodes, message: '' };

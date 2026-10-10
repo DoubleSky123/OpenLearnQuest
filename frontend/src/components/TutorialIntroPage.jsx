@@ -75,11 +75,11 @@ const QUIZ_QUESTIONS = [
   {
     id: 'q6',
     question: 'During traversal, which line of code moves the pointer to the next node?',
-    options: ['node = head', 'node = node.value', 'node = node.next', 'node = NULL'],
+    options: ['curr = head', 'curr = curr.value', 'curr = curr.next', 'curr = NULL'],
     correct: 2,
     slideRef: 4,
     slideLabel: 'Slide 5 · Traversal',
-    explanation: 'node.next holds the address of the following node. Assigning it to node advances the pointer one step forward.',
+    explanation: 'curr.next holds the address of the following node. Assigning it to curr advances the pointer one step forward.',
   },
   {
     id: 'q7',
@@ -422,9 +422,9 @@ function TraversalDiagram() {
   const rowH = 80;
   const nodeY = (si) => si * rowH + 28;
   const steps = [
-    { nodeIdx: 0, code: 'node = HEAD',      code2: null },
-    { nodeIdx: 1, code: 'node = node.next', code2: null },
-    { nodeIdx: 2, code: 'node.next ≠ NULL', code2: '→ keep going' },
+    { nodeIdx: 0, code: 'curr = HEAD',      code2: null },
+    { nodeIdx: 1, code: 'curr = curr.next', code2: null },
+    { nodeIdx: 2, code: 'curr.next ≠ NULL', code2: '→ keep going' },
   ];
   const vals = ['1', '2', '3'];
 
@@ -459,14 +459,14 @@ function TraversalDiagram() {
               const done   = ni < step.nodeIdx;
               return (
                 <g key={ni}>
-                  {/* "node" pointer arrow above active box */}
+                  {/* "curr" pointer arrow above active box */}
                   {active && (
                     <>
                       <line x1={nx + nodeW / 2} y1={ny - 12}
                         x2={nx + nodeW / 2} y2={ny - 2}
                         stroke="#7C3AED" strokeWidth="2" markerEnd="url(#trv-v)"/>
                       <text x={nx + nodeW / 2} y={ny - 15} textAnchor="middle"
-                        fill="#7C3AED" fontSize="9" fontFamily="monospace" fontWeight="700">node</text>
+                        fill="#7C3AED" fontSize="9" fontFamily="monospace" fontWeight="700">curr</text>
                     </>
                   )}
 
@@ -571,7 +571,7 @@ function SearchDiagram() {
             {state === 'found' && (
               <>
                 <text x={x + 22} y="72" textAnchor="middle" fill="#059669" fontSize="11" fontFamily="sans-serif" fontWeight="700">{v} = 3 ✓</text>
-                <text x={x + 22} y="84" textAnchor="middle" fill="#059669" fontSize="10" fontFamily="sans-serif">return node</text>
+                <text x={x + 22} y="84" textAnchor="middle" fill="#059669" fontSize="10" fontFamily="sans-serif">return curr</text>
               </>
             )}
             {state === 'skip'  && <text x={x + 22} y="72" textAnchor="middle" fill="#9CA3AF" fontSize="10" fontFamily="sans-serif">not reached</text>}
@@ -581,10 +581,10 @@ function SearchDiagram() {
 
       {/* Pseudocode — 4 lines to avoid overflow */}
       <rect x="6" y="90" width="428" height="58" rx="6" fill="#F9FAFB" stroke="#E5E7EB" strokeWidth="1"/>
-      <text x="14" y="104" fill="#6B7280" fontSize="11" fontFamily="monospace">node = head</text>
-      <text x="14" y="117" fill="#6B7280" fontSize="11" fontFamily="monospace">while (node != NULL):</text>
-      <text x="26" y="130" fill="#6B7280" fontSize="11" fontFamily="monospace">  if (node.value == target): return node</text>
-      <text x="26" y="143" fill="#6B7280" fontSize="11" fontFamily="monospace">  else: node = node.next</text>
+      <text x="14" y="104" fill="#6B7280" fontSize="11" fontFamily="monospace">curr = head</text>
+      <text x="14" y="117" fill="#6B7280" fontSize="11" fontFamily="monospace">while (curr != NULL):</text>
+      <text x="26" y="130" fill="#6B7280" fontSize="11" fontFamily="monospace">  if (curr.value == target): return curr</text>
+      <text x="26" y="143" fill="#6B7280" fontSize="11" fontFamily="monospace">  else: curr = curr.next</text>
     </svg>
   );
 }
@@ -698,7 +698,7 @@ const CONCEPT_PAGES = [
     title:   'Traversal — Walking the List',
     body:    'Traversal means visiting every node one by one. Start at HEAD, process the current node, then follow its next pointer. Repeat until you reach NULL. Every operation — insert, remove, search — is built on this same walking pattern.',
     diagram: <TraversalDiagram />,
-    insight: 'node = node.next is the single line that drives every linked list algorithm.',
+    insight: 'curr = curr.next is the single line that drives every linked list algorithm.',
   },
   {
     icon:    '🔍',

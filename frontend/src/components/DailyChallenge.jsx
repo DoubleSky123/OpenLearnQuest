@@ -39,90 +39,90 @@ const DEBUG_QUESTIONS = [
     title: 'Insert at Tail',
     description: 'Find the bug in Insert at Tail:',
     lines: [
-      'node = head',
-      'while (node != NULL): node = node.next',
+      'curr = head',
+      'while (curr != NULL): curr = curr.next',
       'create newNode with value',
-      'node.next = newNode',
+      'curr.next = newNode',
       'newNode.next = NULL',
     ],
     bugLine: 1,
     bugType: 'Lost Reference',
     explanation:
-      'Line 2 advances node until it equals NULL, so by the time the loop ends node is NULL. ' +
-      'Dereferencing node.next on line 4 then causes a null pointer crash. ' +
+      'Line 2 advances curr until it equals NULL, so by the time the loop ends curr is NULL. ' +
+      'Dereferencing curr.next on line 4 then causes a null pointer crash. ' +
       'The loop condition should stop one step early, at the last real node.',
-    fix: 'while (node.next != NULL): node = node.next',
+    fix: 'while (curr.next != NULL): curr = curr.next',
   },
   {
     title: 'Remove at Tail',
     description: 'Find the bug in Remove at Tail:',
     lines: [
       'if (head == NULL): return',
-      'node = head',
-      'while (node.next.next != NULL): node = node.next',
-      'node.next = node.next',
-      'free(node.next)',
+      'curr = head',
+      'while (curr.next.next != NULL): curr = curr.next',
+      'curr.next = curr.next',
+      'free(curr.next)',
     ],
     bugLine: 3,
     bugType: 'Lost Reference',
     explanation:
-      'Line 4 assigns node.next to itself — it does nothing. ' +
-      'The tail is never unlinked. The assignment should set node.next to NULL to detach the last node.',
-    fix: 'node.next = NULL',
+      'Line 4 assigns curr.next to itself — it does nothing. ' +
+      'The tail is never unlinked. The assignment should set curr.next to NULL to detach the last node.',
+    fix: 'curr.next = NULL',
   },
   {
     title: 'Insert at Position',
     description: 'Find the bug in Insert at Position:',
     exampleList: [1, 2, 3, 4, 5],
     lines: [
-      'node = head',
-      'for i in range(pos): node = node.next',
+      'curr = head',
+      'for i in range(pos): curr = curr.next',
       'create newNode with value',
-      'newNode.next = node.next',
-      'node.next = newNode',
+      'newNode.next = curr.next',
+      'curr.next = newNode',
     ],
     bugLine: 1,
     bugType: 'Off-by-One',
     explanation:
-      'Line 2 iterates pos times, which moves node to the node AT position pos rather than the node BEFORE it. ' +
-      'To insert before position pos, the loop should stop at pos - 1 so node points to the predecessor.',
-    fix: 'for i in range(pos - 1): node = node.next',
+      'Line 2 iterates pos times, which moves curr to the node AT position pos rather than the node BEFORE it. ' +
+      'To insert before position pos, the loop should stop at pos - 1 so curr points to the predecessor.',
+    fix: 'for i in range(pos - 1): curr = curr.next',
   },
   {
     title: 'Insert at Position (Boundary)',
     description: 'Find the bug in Insert at Position with a NULL guard:',
     lines: [
-      'node = head',
-      'for i in range(pos - 1): node = node.next',
+      'curr = head',
+      'for i in range(pos - 1): curr = curr.next',
       'create newNode with value',
-      'newNode.next = node',
-      'node.next = newNode',
+      'newNode.next = curr',
+      'curr.next = newNode',
     ],
     bugLine: 3,
     bugType: 'Wrong Pointer Assignment',
     explanation:
-      'Line 4 sets newNode.next to node (the predecessor) instead of node.next (the successor). ' +
+      'Line 4 sets newNode.next to curr (the predecessor) instead of curr.next (the successor). ' +
       'This severs the link to the rest of the list and causes a cycle back to the predecessor. ' +
-      'newNode should point forward to what node currently points to.',
-    fix: 'newNode.next = node.next',
+      'newNode should point forward to whatever curr points to.',
+    fix: 'newNode.next = curr.next',
   },
   {
     title: 'Remove at Position',
     description: 'Find the bug in Remove at Position:',
     exampleList: [1, 2, 3, 4, 5],
     lines: [
-      'node = head',
-      'for i in range(pos - 1): node = node.next',
-      'temp = node.next',
-      'node.next = node.next',
+      'curr = head',
+      'for i in range(pos - 1): curr = curr.next',
+      'temp = curr.next',
+      'curr.next = curr.next',
       'free(temp)',
     ],
     bugLine: 3,
     bugType: 'Self-Assignment',
     explanation:
-      'Line 4 sets node.next to itself — it is a no-op that leaves the target node still in the list. ' +
-      'To skip over the node being removed, node.next should be set to node.next.next.',
-    fix: 'node.next = node.next.next',
+      'Line 4 sets curr.next to itself — it is a no-op that leaves the target node still in the list. ' +
+      'To skip over the node being removed, curr.next should be set to curr.next.next.',
+    fix: 'curr.next = curr.next.next',
   },
 ];
 

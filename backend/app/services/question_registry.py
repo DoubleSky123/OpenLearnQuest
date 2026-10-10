@@ -12,21 +12,27 @@ from typing import Callable
 
 # ── Singly-linked-list variable guard ─────────────────────────────────────────
 # reverseList legitimately uses `prev`; all other SLL ops must not.
+# The traversal pointer is ALWAYS named `curr` — never `node`. It has to match
+# TEMPLATES and the hint animation, which both label the cursor `curr`.
 _SLL_CONSTRAINT = """\
 PSEUDOCODE SYNTAX (mandatory — C-style):
-- while loops: "while (condition)" — no colon, no "do". Single-statement body inline: "while (node.next != NULL) node = node.next;"
-- Multi-statement loop body uses braces: "while (node != NULL) { temp = node.next; node = temp; }"
+- while loops: "while (condition)" — no colon, no "do". Single-statement body inline: "while (curr.next != NULL) curr = curr.next;"
+- Multi-statement loop body uses braces: "while (curr != NULL) { temp = curr.next; curr = temp; }"
 - if statements: "if (condition)" — no colon after condition
 - Boolean operators: && (not "and"), || (not "or")
 - Statements end with semicolons
-- Pointer access via dot notation: "node.next" — never use "->"
+- Pointer access via dot notation: "curr.next" — never use "->"
 - Use ASCII operators ONLY: != (never ≠), <= (never ≤), >= (never ≥), == for equality check
 - NULL (uppercase) for null pointer; true/false (lowercase) for booleans
 
 SINGLY LINKED LIST CONSTRAINTS (mandatory):
-- No "tail" variable — no tail pointer exists; traverse from head using node/curr/temp
+- The traversal pointer is named "curr" — NEVER "node", "cur", "current" or "p"
+- The target position is named "index" — NEVER "position", "pos" or "k"
+- "{value}" is a PLACEHOLDER for the operation's payload. Reproduce it verbatim
+  as "{value}" — do not invent a number for it and do not rename it
+- No "tail" variable — no tail pointer exists; traverse from head using curr/temp
 - No ".prev" field — singly linked lists only have .next
-- Valid variables: head, node, curr, newNode, temp, NULL, and operation-specific names (slow/fast for cycle, dummy for merge)
+- Valid variables: head, curr, newNode, temp, prev, index, NULL, and operation-specific names (slow/fast for cycle, dummy for merge)
 """
 
 _UNICODE_OPS = [
@@ -50,9 +56,21 @@ _PREV_ALLOWED_OPS = {"reverseList"}
 
 
 def _sll_reject_reason(text: str, operation: str) -> str | None:
-    """Return a rejection reason if text violates SLL or pseudocode syntax constraints."""
+    """Return a rejection reason if text violates SLL or pseudocode syntax constraints.
+
+    Callers pass CODE fields only (pseudocode steps, options, distractors) — never
+    English prose. That is what lets the `node` and `tail` checks be bare word
+    matches: "the last node" is fine in an explanation, `node = head` is not code
+    we accept. `newNode` is unaffected (no word boundary before the capital N).
+    """
     if re.search(r'\btail\b', text, re.IGNORECASE):
         return "uses 'tail' variable (not valid in singly linked list)"
+    if re.search(r'\bnode\b', text):
+        return "names the traversal pointer 'node' — it must be 'curr'"
+    if re.search(r'\b(cur|current)\b', text):
+        return "abbreviates the traversal pointer — it must be spelled 'curr'"
+    if re.search(r'\b(position|pos)\b', text):
+        return "names the target position 'position'/'pos' — it must be 'index'"
     if operation not in _PREV_ALLOWED_OPS and re.search(r'\.prev\b', text):
         return "uses '.prev' field (not valid in singly linked list)"
     # Pascal/Lua-style do keyword (e.g. "while x != null do")
@@ -62,7 +80,7 @@ def _sll_reject_reason(text: str, operation: str) -> str | None:
 
 from .question_spec import QuestionSpec
 from .ll_executor import execute_operation, find_head_id
-from .static_questions import _rand_position
+from .static_questions import _rand_position, instantiate
 
 logger = logging.getLogger(__name__)
 
@@ -139,7 +157,11 @@ def _enrich(q: dict, operation: str, meta: dict, qtype: str) -> dict:
         # display metadata: tail loops back to index 1 (LeetCode pos style);
         # initialNodes stay LINEAR so board/executor logic never walks a cycle
         q["cycleTo"] = 1
-    return _compute_goal(q, operation, meta)
+    q = _compute_goal(q, operation, meta)
+    # Payload literals LAST: everything upstream (prompts, validators, alias
+    # analysis, content_hash) works on the symbolic {value} form, so the
+    # rename-detection and dedup logic never sees a random number.
+    return instantiate(q)
 
 
 # ── ordering: parallel-create valid orders ─────────────────────────────────────

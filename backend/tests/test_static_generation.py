@@ -89,7 +89,7 @@ def test_merge_ai_find_bug_carries_both_lists_and_goal():
     import json
     payload = json.dumps({
         "bug_line": 3, "buggy_line": "return dummy;",
-        "wrong_options": ["return node;", "return l1;"],
+        "wrong_options": ["return curr;", "return l1;"],
         "bug_explanation": "returns the placeholder anchor", "hint": "where does the merged list start?",
     })
     q = get_handler("find_bug").validate(payload, "mergeSortedLists", OP_META["mergeSortedLists"])

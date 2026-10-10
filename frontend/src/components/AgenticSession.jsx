@@ -908,16 +908,16 @@ function closestCorrectLines(q, attemptLines) {
 }
 
 // Human-readable task line — professor feedback: "Insert at Position" alone
-// doesn't tell the student WHICH position/value. Indices match the 0-based
-// labels shown under the nodes.
+// doesn't tell the student WHICH index/value. "index" (not "position") matches
+// the pseudocode variable and the 0-based labels shown under the nodes.
 function questionInstruction(q) {
   const v = q.operationValue, p = q.operationPosition;
   switch (q.operation) {
     case 'insertAtHead':     return v != null ? `Insert ${v} at the head` : null;
     case 'insertAtTail':     return v != null ? `Insert ${v} at the tail` : null;
     case 'insertIntoEmpty':  return v != null ? `Insert ${v} into the empty list` : null;
-    case 'insertAtPosition': return `Insert ${v ?? '?'} at position ${p ?? '?'}`;
-    case 'removeAtPosition': return `Remove the node at position ${p ?? '?'}`;
+    case 'insertAtPosition': return `Insert ${v ?? '?'} at index ${p ?? '?'}`;
+    case 'removeAtPosition': return `Remove the node at index ${p ?? '?'}`;
     case 'removeAtHead':     return 'Remove the head node';
     case 'removeAtTail':     return 'Remove the last node';
     case 'deleteEntireList': return 'Delete every node in the list';

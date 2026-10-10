@@ -15,6 +15,7 @@ Approved design (2026-07 work queue):
 import copy
 import hashlib
 import logging
+import re
 import threading
 import time
 
@@ -35,6 +36,14 @@ _refill_last_attempt: dict[tuple, float] = {}
 _refill_in_flight: set[tuple] = set()
 
 
+# The assembled payload carries the operation's payload literal (createNode(35)),
+# which is re-rolled on every build. Mask it before hashing or two rows holding
+# the SAME bug hash differently and dedup stops working — see the docstring rule
+# that node values must not defeat dedup. Only the createNode argument is masked:
+# other digits (index-1 vs index-2, .next.next) are the pedagogical difference.
+_PAYLOAD_LITERAL = re.compile(r"createNode\(\d+\)")
+
+
 def content_hash(q: dict, intra_difficulty: int) -> str:
     """Hash of the pedagogical identity, not the whole payload: node values and
     shuffle order vary per build and must not defeat dedup. The intra tier IS
@@ -47,6 +56,7 @@ def content_hash(q: dict, intra_difficulty: int) -> str:
         core = "\n".join(q.get("pseudocode", []))          # contains the buggy line
     else:  # ordering — correct steps are fixed; the distractor set is the identity
         core = "\n".join(sorted(q.get("distractors", [])))
+    core = _PAYLOAD_LITERAL.sub("createNode(_)", core)
     key = f"{q.get('operation')}|{qtype}|i{intra_difficulty}|{core}"
     return hashlib.sha256(key.encode("utf-8")).hexdigest()
 
@@ -132,7 +142,11 @@ def generate_validated(operation: str, qtype: str, intra_difficulty: int,
 
 
 def _existing_content(rows: list[QuestionPool], qtype: str) -> list[str]:
-    """Buggy lines / distractors already pooled, for the avoid-list."""
+    """Buggy lines / distractors already pooled, for the avoid-list.
+
+    Payload literals are folded back to {value}: the model is asked to emit the
+    placeholder, so showing it `createNode(35)` here would read as a different
+    line than the one it is being told not to repeat."""
     out: list[str] = []
     for r in rows:
         p = r.payload
@@ -142,7 +156,7 @@ def _existing_content(rows: list[QuestionPool], qtype: str) -> list[str]:
                 out.append(steps[line])
         else:
             out.extend(p.get("distractors", []))
-    return list(dict.fromkeys(out))
+    return list(dict.fromkeys(_PAYLOAD_LITERAL.sub("createNode({value})", s) for s in out))
 
 
 def insert_question(db: Session, q: dict, intra_difficulty: int) -> QuestionPool | None:

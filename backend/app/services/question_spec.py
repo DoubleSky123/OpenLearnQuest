@@ -26,7 +26,9 @@ DIFFICULTY_PARAMS: dict[int, dict] = {
     },
     4: {
         "distractor_similarity": "very subtle (almost-correct step with a single wrong pointer)",
-        "variable_style": "abstract names (p, q, curr, prev)",
+        # Same names as every other level: distractors sit next to TEMPLATES steps,
+        # so a renamed variable is a giveaway rather than added difficulty.
+        "variable_style": "semantic names (newNode, head, temp, curr)",
         "step_granularity": "combined (multiple related ops per step)",
         "num_steps": 5,
     },

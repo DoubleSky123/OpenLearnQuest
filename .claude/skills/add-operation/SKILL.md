@@ -12,7 +12,10 @@ Throughout: `<op>` is the new operation's camelCase id (e.g. `removeDuplicates`)
 ## Step 0 — Decide the operation's shape first
 
 Before editing anything, pin down with the user (or infer and state):
-- **Pseudocode** (3–5 steps, same style as existing TEMPLATES entries — semicolons, `NULL`, `.next`, no `.prev` unless justified)
+- **Pseudocode** (3–5 steps, same style as existing TEMPLATES entries — semicolons, `NULL`, `.next`, no `.prev` unless justified). Naming is enforced by `question_registry._sll_reject_reason` + `tests/test_pointer_naming.py`, so get it right the first time:
+  - traversal pointer is **`curr`** (never `node`/`cur`/`current`/`p`)
+  - target position is **`index`**, 0-based (never `position`/`pos`/`k`)
+  - write the payload as **`createNode({value})`** — `{value}` is a placeholder that `static_questions.instantiate()` replaces with the actual number. Keep `index` symbolic; don't templatise it.
 - **Tier**: level 1 (basic head/tail), 2 (position/empty/whole-list), or 3 (algorithms like reverse/merge)
 - **Meta**: `needsValue` (takes a value?), `needsPosition` (takes an index?), `minNodes` (minimum starting list size)
 
