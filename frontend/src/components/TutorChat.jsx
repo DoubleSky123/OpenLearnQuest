@@ -13,6 +13,64 @@ import { useEmotion } from "../contexts/EmotionContext";
  *   errorCount     – how many wrong attempts so far
  *   onClose        – callback to hide the panel
  */
+/**
+ * Opening message, built client-side with no AI call.
+ *
+ * Professor feedback: opening with "which blank are you unsure about?" wastes the
+ * one thing we already know — the board tells us exactly which step they're on.
+ * So the greeting names the step, shows the line, and states what that step is
+ * FOR. The purpose text comes from the question's `step_hints`, which are written
+ * as Socratic prompts rather than answer statements, so this stays inside the
+ * no-leak rule even while the exercise is open.
+ *
+ * In reviewing mode the exercise is done, so "where are you stuck?" is the wrong
+ * question to open with.
+ */
+function buildGreeting({ phase, questionTitle, questionType, boardFocus: f }) {
+  if (phase === "reviewing") {
+    return `Nice work finishing "${questionTitle}". Ask me anything about it — why a step goes where it does, or what happens in an edge case.`;
+  }
+
+  // A wrong pick already prints the step hint under the line on the board.
+  // Repeating it verbatim here reads like a broken record, so when they've just
+  // missed, open on what they tried instead.
+  const closer = (hint, fallback) =>
+    hint ? (hint.trim().endsWith("?") ? hint : `${hint}\n\n${fallback}`) : fallback;
+
+  if (f?.kind === "blank") {
+    const parts = [];
+    if (f.solved > 0) {
+      parts.push(f.solved === 1
+        ? "Nice — the first blank is filled in correctly."
+        : `Nice — the first ${f.solved} blanks are filled in correctly.`);
+    }
+    parts.push(`You're on step ${f.stepNo} of ${f.total}:\n\n    ${f.line}`);
+    parts.push(f.lastWrong
+      ? `You tried '${f.lastWrong}' there. Tell me what you expected that to do, and we'll start from what actually happens.`
+      : closer(f.hint, "What are you thinking for this blank?"));
+    return parts.join("\n\n");
+  }
+
+  if (f?.kind === "fix") {
+    return [
+      `You've found the buggy line — step ${f.stepNo} of ${f.total}:\n\n    ${f.line}`,
+      f.lastWrong
+        ? `The fix you tried, '${f.lastWrong}', isn't the one. What did you expect that version to change?`
+        : closer(f.hint, "What would you change it to?"),
+    ].join("\n\n");
+  }
+
+  if (f?.kind === "hunting" && f.lastWrong) {
+    return `Step ${f.lastWrong} turned out to be fine. Instead of checking line by line — walk a small list through the code in your head, and tell me the first moment the picture stops matching what you expect.`;
+  }
+
+  return {
+    fill_blank: `Hi! I'm your tutor for "${questionTitle}". Which blank are you unsure about — and what do you think belongs there?`,
+    find_bug:   `Hi! I'm your tutor for "${questionTitle}". Which line looks suspicious to you so far?`,
+    ordering:   `Hi! I'm your tutor for "${questionTitle}". Which step are you stuck on — or tell me the order you're considering?`,
+  }[questionType] ?? `Hi! I'm your tutor for "${questionTitle}". Which step are you stuck on?`;
+}
+
 export default function TutorChat({
   sessionId,
   questionTitle,
@@ -23,18 +81,14 @@ export default function TutorChat({
   errorCount = 0,
   errorDiagnosis = null,
   boardNote = null,      // one-line "where the student is right now" from the board
+  boardFocus = null,     // structured form of the same — anchors the opening message
   initialMessages = null,
   initialInput = null,   // pre-typed question (e.g. the analysis card's "Consider")
+  phase = "solving",     // "reviewing" once the answer is on screen — lets the tutor explain it
   onClose,
 }) {
   const { setEmotion } = useEmotion();
-  // Type-aware, focused greeting (client-side, no AI call) — professor feedback:
-  // the tutor should anchor on the current blank/line/step, never open generic.
-  const greeting = {
-    fill_blank: `Hi! I'm your tutor for "${questionTitle}". Which blank are you unsure about — and what do you think belongs there?`,
-    find_bug:   `Hi! I'm your tutor for "${questionTitle}". Which line looks suspicious to you so far?`,
-    ordering:   `Hi! I'm your tutor for "${questionTitle}". Which step are you stuck on — or tell me the order you're considering?`,
-  }[questionType] ?? `Hi! I'm your tutor for "${questionTitle}". Which step are you stuck on?`;
+  const greeting = buildGreeting({ phase, questionTitle, questionType, boardFocus });
   const [messages, setMessages] = useState(
     initialMessages ?? [{ role: "assistant", content: greeting }]
   );
@@ -87,6 +141,7 @@ export default function TutorChat({
         messages:        messages,   // legacy fallback; DB history is authoritative
         user_message:    text.trim(),
         error_diagnosis: messages.length === 0 ? errorDiagnosis : null,
+        phase,
       },
       (token) => {
         accumulatedRef.current += token;

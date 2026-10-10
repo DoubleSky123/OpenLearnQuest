@@ -35,7 +35,10 @@ SCENARIOS = {
         ),
         "expect_tool": False,
     },
-    # error_count >= 2 — system prompt says the model should call lookup_resource.
+    # error_count >= 2 but this is the FIRST message: a video here would arrive
+    # before the tutor has explained anything, which is the exact complaint that
+    # drove the phase split. Explanation first; the video belongs on a later turn
+    # once questioning has demonstrably failed (see third_turn_video).
     "stuck_error2": {
         "kwargs": dict(
             question_title="Insert at Head", operation="insertAtHead",
@@ -43,7 +46,8 @@ SCENARIOS = {
             error_count=2, messages=[], user_message="I tried again and it's still wrong, I'm stuck.",
             question_type="ordering",
         ),
-        "expect_tool": True,
+        "expect_tool": False,
+        "no_leak": True,
     },
     # fill_blank vocabulary — must not talk about "assembly" / placement order.
     # Also exercises board_note (the lifted board state: where the student is).
@@ -60,7 +64,9 @@ SCENARIOS = {
         "forbidden": ["assembly", "order you placed"],
     },
     # Student demands the answer — reply must not contain a correct line verbatim.
-    # New policy: on give-up the tutor should offer the video (if unused) instead.
+    # Policy since the phase split: EXPLAIN the idea in plain words rather than
+    # refusing or answering with only a video. A video may accompany the
+    # explanation, so the tool is discretionary here.
     "give_up": {
         "kwargs": dict(
             question_title="Insert at Head", operation="insertAtHead",
@@ -68,10 +74,45 @@ SCENARIOS = {
             error_count=1, messages=[], user_message="Just tell me the correct order, I give up.",
             question_type="ordering",
         ),
-        "expect_tool": True,
+        "expect_tool": False,
         "no_leak": True,
     },
-    # Student makes a WRONG claim — reply must open with an explicit verdict.
+    # A QUESTION is not an attempt: judging it tells the student their question
+    # was wrong. Regression from live testing — the tutor opened "Not quite —" on
+    # the analysis card's follow-up question and then refused to answer it.
+    "question_is_not_judged": {
+        "kwargs": dict(
+            question_title="Insert at Head", operation="insertAtHead",
+            your_answer=INSERT_AT_HEAD["wrong"], correct_answer=INSERT_AT_HEAD["correct"],
+            error_count=1, messages=[],
+            user_message="Why must newNode.next = head happen before head = newNode?",
+            question_type="ordering", phase="solving",
+        ),
+        "expect_tool": False,
+        "forbidden": ["not quite", "let's focus on", "let us focus on"],
+        "no_leak": True,
+    },
+    # phase='reviewing': the exercise is DONE and the answer is already on the
+    # student's screen, so the tutor must actually answer the follow-up question.
+    # no_leak is deliberately absent — explaining the solution is the point here.
+    "reviewing_answers_followup": {
+        "kwargs": dict(
+            question_title="Insert at Head", operation="insertAtHead",
+            your_answer=INSERT_AT_HEAD["correct"], correct_answer=INSERT_AT_HEAD["correct"],
+            error_count=0, messages=[],
+            user_message="What would change if the list were empty when this ran?",
+            question_type="ordering", phase="reviewing",
+        ),
+        "expect_tool": False,
+        "forbidden": ["not quite", "let's focus on", "i can't tell you", "can't give you the answer"],
+        "required_any": ["null", "empty"],
+    },
+    # Student makes a WRONG claim — the reply must contain an explicit negative
+    # read, so they actually learn they were wrong before the explanation starts.
+    # required_any deliberately lists MANY phrasings: the prompt does not mandate a
+    # fixed opener (mandating one made the tutor grade students' questions), so this
+    # checks that a verdict is PRESENT, not that it is worded a particular way.
+    # Add new natural phrasings here rather than constraining the prompt.
     "verdict_wrong_claim": {
         "kwargs": dict(
             question_title="Insert at Head", operation="insertAtHead",
@@ -81,10 +122,13 @@ SCENARIOS = {
             question_type="ordering",
         ),
         "expect_tool": False,
-        "required_any": ["not quite", "close", "not exactly"],
+        "required_any": ["not quite", "close", "not exactly", "backwards", "wrong",
+                         "not right", "isn't right", "the opposite", "other way"],
         "no_leak": True,
     },
-    # Student makes a CORRECT claim — reply must confirm it, not just ask again.
+    # Student makes a CORRECT claim — reply must confirm it, not hedge it with a
+    # "but" or hunt for a technicality (regression: the tutor once answered a
+    # correct student with "the node is still there in memory, but...").
     "verdict_correct_claim": {
         "kwargs": dict(
             question_title="Insert at Head", operation="insertAtHead",
@@ -94,7 +138,8 @@ SCENARIOS = {
             question_type="ordering",
         ),
         "expect_tool": False,
-        "required_any": ["right", "exactly", "yes"],
+        "required_any": ["right", "exactly", "yes", "correct", "that's it"],
+        "forbidden": ["still there in memory", "still in memory"],
     },
     # Tutor has already asked 2 questions and the student is still stuck →
     # policy says STOP quizzing and hand out the video.

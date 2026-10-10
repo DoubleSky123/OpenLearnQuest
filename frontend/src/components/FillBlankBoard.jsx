@@ -98,7 +98,8 @@ export default function FillBlankBoard({ question, onComplete, onError, onStateC
   };
 
   // Lift board state for the tutor: clean attempt lines (resolved / still-blank)
-  // + a one-line note saying exactly where the student is and what they last tried.
+  // + a note saying exactly where the student is, and a structured `focus` the
+  // tutor panel uses to open ON the current step instead of a generic greeting.
   // NOTE: question.pseudocode arrives PRE-BLANKED ("___" already in the line) —
   // resolved lines must substitute the filled answer back in.
   useEffect(() => {
@@ -110,13 +111,30 @@ export default function FillBlankBoard({ question, onComplete, onError, onStateC
       return line;                                                     // still blank (has ___)
     });
     let note = null;
+    let focus = null;
     if (!allFilled) {
       const activeLine = question.blanks[activeIdx]?.line ?? activeIdx;
-      note = `Student is on the blank in step ${activeLine + 1}`;
-      if (lastWrong) note += `; last tried '${lastWrong.word}' there — wrong`;
+      // Carry the LINE TEXT, not just the number: "step 2" alone forces the model
+      // to map a 1-based step onto the 0-based attempt array, and it gets it wrong.
+      focus = {
+        kind:   'blank',
+        stepNo: activeLine + 1,
+        total:  question.pseudocode.length,
+        line:   question.pseudocode[activeLine],
+        // step_hints are written as Socratic prompts, not answer statements, and
+        // are already shown under the line on a wrong pick — reusing one here
+        // leaks nothing the student can't already see.
+        hint:   question.step_hints?.[activeLine] ?? null,
+        solved: filled.filter(f => f !== null).length,
+        lastWrong: lastWrong?.lineIdx === activeLine ? lastWrong.word : null,
+      };
+      note = `Student is on step ${focus.stepNo} of ${focus.total}: "${focus.line}"`;
+      if (focus.solved > 0) note += `; the ${focus.solved} blank(s) before it are already filled in correctly`;
+      if (focus.lastWrong) note += `; last tried '${focus.lastWrong}' in this blank — wrong`;
       note += '.';
+      if (focus.hint) note += ` This step's teaching point: ${focus.hint}`;
     }
-    onStateChange({ lines, note });
+    onStateChange({ lines, note, focus });
   }, [filled, lastWrong]); // eslint-disable-line
 
   const isCorrect = allFilled && executed;

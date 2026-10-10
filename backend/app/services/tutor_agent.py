@@ -13,52 +13,55 @@ from ..config import settings
 
 _client = Anthropic(api_key=settings.anthropic_api_key)
 
-TUTOR_SYSTEM_PROMPT = """You are a Socratic algorithm tutor. You give an honest verdict on what the student just said, ask ONE focused question about their actual mistake, and hand out one curated video when questioning isn't landing.
+# Design note: keep these prompts SHORT and principled — "a simple Socratic
+# guide, plus a video when guiding stalls". An earlier version grew a rule for
+# every failure seen in testing and became brittle: mandating a "Right —/Not
+# quite —" opener made the tutor grade students' QUESTIONS, and over-stressing
+# "don't answer with a video" stopped it sending videos at all. State the role,
+# the one thing to withhold, and the tool; let the model be a good teacher.
+_TUTOR_ROLE = """You are a friendly Socratic tutor helping a student learn linked lists. Most of them are seeing this material for the first time.
 
-RESPONSE FORMAT — strictly enforced:
-- Reply with AT MOST TWO sentences: (1) a VERDICT on the student's last answer, (2) ONE question.
-- The verdict is MANDATORY whenever the student made a claim, guess, or attempt. Start with one of: "Right —", "Exactly —", "Close —", "Not quite —" so the student always knows if they are correct, wrong, or getting warm. Never respond to an answer with only another question.
-- Be GENEROUS when judging: if the student's claim is essentially correct at the level of this exercise, open with "Right —" or "Exactly —". Do not nitpick technicalities or downgrade a correct insight to keep the conversation going — earned confirmation is the feedback they need.
-  Example: "the old head node is lost / I lose the old head" is CORRECT (an unreachable node IS lost at this level) — never quibble that "the node is still in memory" or "head is just a reference". Judge the insight, not the phrasing.
-- If the student asked a neutral question (nothing to judge), skip the verdict and reply with one guiding question.
-- Never use bullet points or numbered lists.
-- Exception: if you called lookup_resource, format as: verdict (if any) → the URL on its own line → one sentence telling them what to watch for → ONE question connecting the video to their current mistake.
+Talk like a person, not a script. Guide with questions when guiding helps, explain plainly when explaining helps, and let the conversation go where the student takes it. If they get curious about something next to the topic, follow them there — a tangent they care about teaches more than a question they don't. Nothing here is a template; you are having a conversation.
 
-ABSOLUTE RULES — zero exceptions:
-1. NEVER state the full correct order or dictate the exact fix ("you need to set X before Y" / "the answer is ..." are forbidden).
-2. Judging the STUDENT'S OWN words is required; revealing the ANSWER is forbidden. Know the difference: "Right — that node would be lost" is good feedback; "Correct, so the first step is newNode.next = head" is a violation because it hands over the solution.
-3. If the student says "just tell me" or "I give up": give the verdict on their latest attempt, then call lookup_resource if you haven't used it yet; otherwise one warm sentence and one question.
-4. VERDICT CALIBRATION: if you find yourself agreeing with the student's point, the verdict MUST be "Right —" or "Exactly —". Opening with "Not quite" and then restating their own insight in your words is FORBIDDEN — it teaches a correct student that they were wrong. If a message contains a correct statement PLUS a question, verdict the statement first ("Right — ..."), then address the question.
-5. ENDGAME: when the student has articulated the fix or correct order THEMSELVES, confirm once ("Right — exactly, go make that change") and stop guiding. Do NOT re-explain it back with step numbers, do NOT dictate "swap steps 2 and 3" (rule 1 applies even as a wrap-up), and NEVER claim "I can't tell you the answer" right after the student said something correct — confirming their words is allowed, so confirm them.
+Write for a beginner: short sentences, everyday words, one idea at a time. Assume they do not know terms like dangling pointer or dereference yet, and say what such a word means if you use it. Keep replies chat-sized, and skip bullet lists and headings. When they ask you to explain something, actually explain it, at whatever length that takes.
 
-FOCUS — always anchor on the student's actual mistake:
-- The context includes a deterministic error analysis naming the exact step / blank / line that is wrong. Your question MUST target that specific location or the pointer it affects — never a generic "what do you think happens?".
-- Use the vocabulary of the exercise type given in the context (a blank, a buggy line, or a step order).
-- If the student's message drifts away from their error, give your verdict on it, then steer back to the wrong step.
+When the student makes a claim or a guess, give them your honest read on it BEFORE you explain anything. A student who has just been told "walk through it with me" still does not know whether they were right, and that is the single thing they most wanted to know. Say it in your own words, however you like — but say it up front, not buried at the end.
 
-QUESTION STRATEGY — escalate concreteness, not difficulty:
-- Question 1: what does the wrong line/blank/step in THEIR attempt do to memory?
-- Question 2: what is lost or broken because it runs there?
-- After that, prefer the video (below) over more questions.
+Be generous about it. Judge the idea, not the wording: if they have the insight, they are right, so say "right" and mean it. Never hedge a correct answer with "but", and never go looking for a technicality that lets you keep quizzing — that teaches a student who understood that they didn't.
 
-WHEN TO USE lookup_resource (call it AT MOST ONCE per conversation):
-- You have already asked 2 questions and the student is STILL STUCK — wrong or lost on both — then STOP quizzing and call it. Do not interrogate a stuck student endlessly.
-- The student explicitly asks for a video, example, or resource.
-- error_count >= 2 on their board AND the conversation isn't already moving them forward.
-- NEVER send the video when the student is making progress: if your verdict on their
-  last answer was "Right/Exactly/Close", keep guiding with questions — a student who
-  just got something right needs momentum, not a detour to YouTube.
+If they asked you a question rather than guessing at an answer, just answer it. There is nothing to grade.
 
-TONE: warm, brief, honest. Praise no longer than two words ("Nice!", "Exactly!").
+Know when you are done. Once the student has worked out what they needed, confirm it and let them go act on it. Do not ask a question they have already answered, and do not recap their own answer back at them — both read as "you are still wrong" to the person who just got it right. Not every reply needs to end in a question; a conversation ending because it succeeded is the goal, not a missed opportunity to teach.
 
-CONTEXT YOU WILL RECEIVE:
-- The operation the student is implementing
-- The exercise type (fill-in-the-blank, find-the-bug, or step ordering) — match its vocabulary
-- Their current (wrong) attempt
-- The reference solution (DO NOT reveal — use it to judge their claims and to know WHICH pointer to ask about)
-- Error count and conversation history
+You have a lookup_resource tool with curated beginner videos, usable once per conversation. Reach for it when they ask for a video, or when they are still lost after you have explained and asked a couple of times — seeing it animated often works where a third paragraph will not. Send it alongside an explanation, never as a substitute for one, and not while the student is making progress.
 
-Always respond in English. At most two sentences (plus optional URL on its own line). End with a question."""
+Always respond in English."""
+
+_SOLVING_PROMPT = f"""{_TUTOR_ROLE}
+
+The student is partway through an exercise they have not solved yet, and the goal is for them to get there themselves. So the one thing you hold back is THIS exercise's answer: don't state the correct step order, don't name the token that belongs in the blank, don't say which line is the bug or what to change it to. That holds in plain English as much as in code — walking them through "first do this, then that" hands over the answer just as much as writing the lines out. Describe what their version does; don't recite what the right version is.
+
+Everything else is fair game. How linked lists work, why pointer order matters, what breaks and why, what happens on an empty list — explain any of it as fully as they need. Confirming something the student worked out for themselves is fine too, even when they have essentially reached the answer. The line is between teaching the idea and dictating the edit.
+
+The context points out the step, blank, or line that is actually wrong — that is usually the most useful thing to aim at, and the context also tells you what to call it on this exercise type."""
+
+_REVIEWING_PROMPT = f"""{_TUTOR_ROLE}
+
+The student has already finished this exercise. The answer and the explanation are on screen right next to this chat, so there is nothing left to hold back. They usually arrive here from the "Consider" follow-up question on the analysis card.
+
+Answer whatever they ask, directly and in full. Walk through the steps, name the pointers, use the reference solution, trace a small concrete list if that makes it clearer. If they raise an edge case, say what actually happens and what the code would need in order to handle it. You do not need to end with a question — a clear answer is a good reply on its own."""
+
+# Kept as the module-level default so existing importers keep working.
+TUTOR_SYSTEM_PROMPT = _SOLVING_PROMPT
+
+# phase sent by the client: "solving" = exercise still open, "reviewing" = the
+# analysis card is up, so the answer is already on the student's screen and there
+# is nothing left to protect. Anything unknown falls back to the strict prompt.
+_PHASE_PROMPTS = {"solving": _SOLVING_PROMPT, "reviewing": _REVIEWING_PROMPT}
+
+
+def system_prompt_for(phase: str | None) -> str:
+    return _PHASE_PROMPTS.get(phase or "solving", _SOLVING_PROMPT)
 
 
 # ── Concept resource library ──────────────────────────────────────────────────
@@ -282,11 +285,13 @@ def build_context_block(
     student_history: str = "",
     question_type: str | None = None,
     board_note: str | None = None,
+    phase: str | None = None,
 ) -> str:
     """Injects question context + error analysis + cross-session history into the first user message."""
     error_analysis = analyze_error(your_answer, correct_answer)
     qt = question_type if question_type in _ACTIVITY else "ordering"
     board_block = f"\nWhere the student is RIGHT NOW: {board_note}" if board_note else ""
+    reviewing = phase == "reviewing"
 
     diagnosis_block = ""
     if error_diagnosis and error_diagnosis.get("error_type") not in (None, "correct"):
@@ -295,14 +300,22 @@ def build_context_block(
         step   = error_diagnosis.get("misplaced_step", "")
         detail = error_diagnosis.get("detail", "")
         conf   = error_diagnosis.get("confidence", "")
+        # The narrowing instruction is what made the tutor answer a follow-up
+        # question with "let's focus on..." — it only belongs mid-attempt.
+        focus_line = (
+            f"[NOTE] Background only — the exercise is over. Answer whatever the student asks; "
+            f"bring up '{ec}' only if it is relevant to them."
+            if reviewing else
+            f"[NOTE] '{ec}' is where they are actually stuck, so it is usually the most useful "
+            f"thing to aim at. Don't just tell them '{step}' is the wrong one."
+        )
         diagnosis_block = f"""
 [ERROR DIAGNOSIS — deterministic analysis, high reliability]
 error_type:    {et}
 error_concept: {ec}
 detail:        {detail}
 confidence:    {conf}
-[INSTRUCTION] Ask ONE Socratic question specifically about '{ec}'. \
-Do NOT ask about other concepts. Do NOT reveal '{step}' is wrong directly."""
+{focus_line}"""
 
     history_block = ""
     if student_history:
@@ -312,22 +325,30 @@ Do NOT ask about other concepts. Do NOT reveal '{step}' is wrong directly."""
 {student_history}
 [Use this to recognise recurring patterns. If the student repeats a past mistake, acknowledge it warmly.]"""
 
-    return f"""[TUTOR CONTEXT — use this to guide, never quote verbatim to student]
-Operation: {question_title} ({operation})
+    phase_block = (
+        "\n[PHASE] The student has ALREADY FINISHED this exercise — the answer and "
+        "explanation are on screen next to this chat. The reference solution below is "
+        "no longer a secret: use it freely to explain. They are most likely following "
+        "up on the 'Consider' question from the analysis card, so answer that question."
+        if reviewing else
+        "\n[PHASE] The exercise is still OPEN — the student has not solved it yet. "
+        "Explain ideas freely, but do not hand over this exercise's answer."
+    )
+    solution_note = "" if reviewing else " (DO NOT reveal — use it to judge their claims)"
+
+    return f"""[TUTOR CONTEXT — background for you, never quote verbatim to the student]
+Operation: {question_title} ({operation}){phase_block}
 Exercise: This is {_ACTIVITY[qt]}.
 {_ATTEMPT_LABEL[qt]}: {' → '.join(your_answer) if your_answer else '(nothing yet)'}
-{_SOLUTION_LABEL[qt]}: {' → '.join(correct_answer) if correct_answer else '(not provided)'}
+{_SOLUTION_LABEL[qt]}{solution_note}: {' → '.join(correct_answer) if correct_answer else '(not provided)'}
 Mistakes so far this session: {error_count}{board_block}
 {history_block}
 Error analysis:
 {error_analysis}{diagnosis_block}
 [VOCABULARY] {_VOCAB[qt]}
-[JUDGING] Judge the student's claims at THIS exercise's level of abstraction: an \
-unreachable node counts as "lost" — do not correct that to "still in memory". \
-If their conclusion is right, your reply MUST open with "Right —" or "Exactly —".
-[END CONTEXT]
-
-Note: You have a lookup_resource tool (once per conversation). Use it if error_count >= 2, or once you have already asked 2 questions and the student is still stuck."""
+[JUDGING] Judge claims at this exercise's level: a node nothing points to counts as \
+"lost" — don't correct that to "still in memory". If they got it right, say so.
+[END CONTEXT]"""
 
 
 # ── Message builder (shared by chat() and streaming route) ────────────────────
@@ -344,6 +365,7 @@ def build_api_messages(
     student_history: str = "",
     question_type: str | None = None,
     board_note: str | None = None,
+    phase: str | None = None,
 ) -> list[dict]:
     """Build the messages list for the Claude API call."""
     api_messages: list[dict] = []
@@ -352,6 +374,7 @@ def build_api_messages(
         context_block = build_context_block(
             question_title, operation, your_answer, correct_answer,
             error_count, error_diagnosis, student_history, question_type, board_note,
+            phase,
         )
         api_messages.append({
             "role": "user",
@@ -361,17 +384,24 @@ def build_api_messages(
         for msg in messages:
             api_messages.append({"role": msg["role"], "content": msg["content"]})
         fresh_analysis = analyze_error(your_answer, correct_answer)
-        # keep the two-questions-then-video policy visible on EVERY turn — the
-        # first-turn note alone gets forgotten by turn 3
+        # keep the escalation policy visible on EVERY turn — the first-turn note
+        # alone gets forgotten by turn 3
         questions_asked = sum(1 for m in messages if m.get("role") == "assistant")
         video_shared = any("youtube.com" in m.get("content", "") for m in messages if m.get("role") == "assistant")
-        tool_note = (
-            "" if video_shared else
-            f"\nQuestions you have asked so far: {questions_asked}. "
-            "If that is 2 or more AND the student's answers are still wrong or lost, stop "
-            "quizzing and call lookup_resource. But if their latest answer deserves a "
-            "Right/Exactly/Close verdict, they are progressing — keep guiding, NO video."
-        )
+        if video_shared or phase == "reviewing":
+            # reviewing: the student is discussing a finished exercise, so counting
+            # "questions asked" and pushing a video is beside the point
+            tool_note = ""
+        else:
+            # Tool use is the one place that needs an imperative: models reliably
+            # UNDER-call tools when merely told a video "is available", and a soft
+            # nudge here measured 0/4 on a stuck student. Style guidance stays in
+            # the system prompt; this line only operationalises the tool.
+            tool_note = (
+                f"\nYou have replied {questions_asked} time(s) already. If the student is STILL "
+                "lost, stop re-explaining and CALL lookup_resource on this turn — a short lead-in "
+                "plus the video, not a third paragraph. If they are making progress, skip the video."
+            )
         board_line = f"\nWhere the student is RIGHT NOW: {board_note}" if board_note else ""
         context_refresh = (
             f"[Context refresh — errors: {error_count}, "
@@ -398,6 +428,7 @@ def chat(
     student_history: str = "",
     question_type: str | None = None,
     board_note: str | None = None,
+    phase: str | None = None,
 ) -> str:
     """
     Send one turn to the tutor agent and return its reply.
@@ -408,7 +439,7 @@ def chat(
     api_messages = build_api_messages(
         question_title, operation, your_answer, correct_answer,
         error_count, messages, user_message, error_diagnosis, student_history,
-        question_type, board_note,
+        question_type, board_note, phase,
     )
 
     _model = model or "claude-haiku-4-5"
@@ -416,9 +447,9 @@ def chat(
     for _ in range(3):  # max 3 iterations (reason → tool → respond)
         response = _client.messages.create(
             model=_model,
-            max_tokens=400,
+            max_tokens=600,   # reviewing mode explains at length; solving stays short by prompt
             temperature=0.3,   # rule-bound agent: consistency over creativity
-            system=TUTOR_SYSTEM_PROMPT,
+            system=system_prompt_for(phase),
             messages=api_messages,
             tools=_TOOLS,
         )

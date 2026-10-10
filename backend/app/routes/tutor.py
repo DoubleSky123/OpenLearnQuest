@@ -39,6 +39,11 @@ class TutorRequest(BaseModel):
     model: str | None = None
     error_diagnosis: dict | None = None
     question_type: str | None = None
+    # "solving" = exercise still open (strict: no answer reveal).
+    # "reviewing" = analysis card is up, so the answer is already on the student's
+    # screen and the tutor may explain it outright. Unknown values fall back to
+    # "solving" — a stale client can never accidentally unlock answer reveal.
+    phase: str | None = None
 
 
 class TutorResponse(BaseModel):
@@ -132,6 +137,7 @@ def tutor_chat(
             student_history=student_history,
             question_type=body.question_type,
             board_note=body.board_note,
+            phase=body.phase,
         )
     except APIError as e:
         raise HTTPException(status_code=503, detail=f"Claude API error: {str(e)}")
@@ -175,7 +181,7 @@ def tutor_chat_stream(
             body.your_answer, body.correct_answer,
             body.error_count, history, body.user_message,
             _auto_diagnosis(body), student_history, body.question_type,
-            body.board_note,
+            body.board_note, body.phase,
         )
         _model = body.model or "claude-haiku-4-5"
         full_text = ""
@@ -184,9 +190,9 @@ def tutor_chat_stream(
             for _ in range(3):  # max 3 iterations (1 tool call is the common case)
                 with _client.messages.stream(
                     model=_model,
-                    max_tokens=400,
+                    max_tokens=600,    # keep in sync with tutor_agent.chat()
                     temperature=0.3,   # keep in sync with tutor_agent.chat()
-                    system=tutor_agent.TUTOR_SYSTEM_PROMPT,
+                    system=tutor_agent.system_prompt_for(body.phase),
                     messages=api_messages,
                     tools=tutor_agent._TOOLS,
                 ) as stream:

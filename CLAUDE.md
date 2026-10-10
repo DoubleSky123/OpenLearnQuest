@@ -130,6 +130,29 @@ When the student is stuck (error_count ≥ 2 or 3+ stalled exchanges), Claude au
 
 Claude decides WHEN to call the tool — this is the agentic behaviour (not a hardcoded threshold).
 
+### Prompt design rule: stay lean, do NOT add a rule per failure
+The whole tutor is **"a simple Socratic guide, plus a video when guiding stalls"**. `_TUTOR_ROLE` (shared) + a short phase paragraph is the entire prompt — keep it that way. An earlier version grew one rule per observed failure and became brittle in ways that were worse than the bugs they fixed:
+
+- Mandating a `"Right —"` / `"Not quite —"` opener made the tutor **grade the student's questions** ("Not quite —" in reply to a question), then deflect them.
+- Over-stressing "never answer with a video" stopped `lookup_resource` firing **at all** (0/4 on a stuck student), killing a deliberate feature.
+- A "≤ 2 sentences" cap was the *cause* of the unreadable phrasing — everything got crammed into one clause-stacked sentence. Tighter limit, more complex output.
+
+When behaviour is off, prefer restating the *principle* over adding a clause. Tangents are explicitly allowed: a student wandering onto "why not just use an array?" should get a real answer, not a redirect.
+
+**The one exception is tool use.** Models reliably under-call tools from descriptive guidance, so the per-turn note in `build_api_messages()` keeps an imperative ("stop re-explaining and CALL lookup_resource on this turn"). Style guidance belongs in the system prompt; the tool policy has to be operationalised per turn, because the first-turn prompt is forgotten by turn 3. Measured: 4/4 fire when stuck, 0/3 when the student is progressing.
+
+### Two phases: `solving` vs `reviewing`
+`TutorRequest.phase` (client-sent, default `solving`; unknown values fall back to `solving` so a stale client can never unlock answer reveal) picks the prompt via `tutor_agent.system_prompt_for()`:
+
+| | `solving` (exercise open) | `reviewing` (analysis card up) |
+|---|---|---|
+| Concepts, tangents, casual chat | free | free |
+| This exercise's answer (step order / blank token / bug line) | withheld — **including in plain English**; "first create it, then connect it, then move head" is as much a leak as the code | already on the student's screen, so explain it outright |
+
+`AgenticSession` sets `phase='reviewing'` when the tutor is opened from the analysis card's "Ask the tutor" (the Consider follow-up). Without this the tutor answered that follow-up with "let's focus on..." — it was withholding an answer the student could already see.
+
+**Verdicts are substance, not format**: give the honest read up front when the student *asserts* something, in whatever words; a student *question* just gets answered. `tests`/`tutor_sim.py` therefore assert that a verdict is PRESENT (a broad synonym list), never that it is phrased a particular way — extend the synonym list rather than constraining the prompt.
+
 ### Type-aware context
 `build_context_block()` adapts its wording to the question type (passed as `question_type`): `fill_blank` → "the blank / value that belongs here", `find_bug` → "the line", `ordering` → "assembly / step order". This prevents the tutor from saying "assembly" on a fill-in-the-blank question. The proactive push (in `AgenticSession.jsx`) likewise uses a type-specific `PROACTIVE_INIT`.
 

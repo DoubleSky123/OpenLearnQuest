@@ -40,6 +40,9 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
   const [analysisData,  setAnalysisData]  = useState(null);  // recordResult response
   const [masteryDelta,  setMasteryDelta]  = useState(null);  // [{concept, before, after}]
   const [tutorSeed,     setTutorSeed]     = useState(null);  // "consider" question pre-typed into tutor
+  // 'reviewing' when the tutor is opened from the analysis card: the answer is
+  // already on screen, so the tutor is allowed to explain it outright
+  const [tutorPhase,    setTutorPhase]    = useState('solving');
   const [showAnalysis,  setShowAnalysis]  = useState(false); // non-blocking analysis panel toggle
   // fill_blank / find_bug board state lifted for the tutor ({lines, note}) —
   // without it the tutor only saw the ordering board's assembly
@@ -800,6 +803,7 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
                       : (boardState?.lines ?? [])
                   }
                   boardNote={boardState?.note ?? null}
+                  boardFocus={boardState?.focus ?? null}
                   correctAnswer={
                     (!q.question_type || q.question_type === 'ordering')
                       ? closestCorrectLines(q, assemblyToText(assemblyArea, q.pseudocode, q.distractors))
@@ -815,7 +819,8 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
                   errorDiagnosis={null}
                   initialMessages={proactiveHistory}
                   initialInput={tutorSeed}
-                  onClose={() => { setShowTutor(false); setTutorSeed(null); }}
+                  phase={tutorPhase}
+                  onClose={() => { setShowTutor(false); setTutorSeed(null); setTutorPhase('solving'); }}
                 />
               )}
             </div>
@@ -849,6 +854,7 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
           onClose={() => setShowAnalysis(false)}
           onAskTutor={() => {
             setTutorSeed(q.consider ?? null);
+            setTutorPhase('reviewing');   // answer is on screen — let the tutor explain it
             setShowTutor(true);
             markUsedTutor();
           }}

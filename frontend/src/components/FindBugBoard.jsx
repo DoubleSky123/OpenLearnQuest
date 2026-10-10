@@ -18,19 +18,33 @@ export default function FindBugBoard({ question, onComplete, onError, onStateCha
   const [errors,      setErrors]      = useState(0);
 
   // Lift board state for the tutor: the buggy code as shown + where the student is.
+  // `focus` is the structured form the tutor panel opens on (see FillBlankBoard).
   useEffect(() => {
     if (!onStateChange) return;
     let note = null;
+    let focus = null;
     if (phase === 'identify') {
+      // No single step to anchor on yet — the whole point is that they're hunting.
       note = 'Student is looking for the buggy line'
         + (wrongLine != null ? `; last guessed step ${wrongLine + 1} — that line is fine` : '')
         + '.';
+      focus = { kind: 'hunting', total: question.pseudocode.length, lastWrong: wrongLine != null ? wrongLine + 1 : null };
     } else if (phase === 'fix') {
-      note = `Student found the buggy line (step ${(selectedLine ?? 0) + 1}) and is choosing a fix`
+      const line = selectedLine ?? 0;
+      focus = {
+        kind:   'fix',
+        stepNo: line + 1,
+        total:  question.pseudocode.length,
+        line:   question.pseudocode[line],
+        hint:   question.step_hints?.[line] ?? null,
+        lastWrong: wrongFix ?? null,
+      };
+      note = `Student found the buggy line (step ${focus.stepNo}: "${focus.line}") and is choosing a fix`
         + (wrongFix != null ? `; last tried '${wrongFix}' — wrong` : '')
         + '.';
+      if (focus.hint) note += ` This step's teaching point: ${focus.hint}`;
     }
-    onStateChange({ lines: question.pseudocode, note });
+    onStateChange({ lines: question.pseudocode, note, focus });
   }, [phase, wrongLine, wrongFix]); // eslint-disable-line
 
   useEffect(() => {
