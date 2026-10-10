@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import fixtures from '../prototype/fixtures.json';
-import { STEP_LIMIT, addrForPlot, predictionAnswer, runProgram } from './heapInterpreter';
+import { STEP_LIMIT, addrForPlot, describeScene, predictionAnswer, runProgram } from './heapInterpreter';
 
 const declared = (op) => fixtures.declared[op];
 const run = (row) => runProgram(row.program, { ...row, declared: declared(row.operation) });
@@ -147,6 +147,24 @@ describe('layout', () => {
     }
     expect(r.steps.at(-1).heap.map(n => n.value)).toEqual([10, 20, 30, 40, 5]);   // plot order, not list order
     expect(r.final.values).toEqual([10, 20, 5, 30, 40]);
+  });
+
+  it('the initial frame is the list before line 1, even for a rejected program', () => {
+    const r = runProgram(['newNode = makeNode(5);'], HEAD3);
+    expect(r.outcome).toBe('compile_error');
+    expect(r.initial.heap.map(n => n.value)).toEqual([10, 20, 30]);
+    expect(r.initial.vars).toMatchObject({ head: addrForPlot(0), newNode: 'undef' });
+  });
+
+  it('describeScene gives both views the same building states, cables and signposts', () => {
+    // temp keeps the old head, free(temp) empties its lot; head is moved onto a self-loop
+    const r = runProgram(['temp = head;', 'head = head.next;', 'free(temp);', 'head.next = head;'],
+      { initialNodes: list(10, 20, 30), declared: ['head', 'temp'] });
+    const scene = describeScene(r.steps.at(-1));
+    expect(scene.buildings.map(b => [b.value, b.state, b.nextKind])).toEqual([
+      [10, 'freed', 'none'], [20, 'live', 'self'], [30, 'leaked', 'null'],
+    ]);
+    expect(scene.signs).toEqual({ [addrForPlot(0)]: ['temp'], [addrForPlot(1)]: ['head'] });
   });
 });
 

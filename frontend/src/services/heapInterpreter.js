@@ -555,14 +555,20 @@ function execute(lines, state) {
  *        `declared` = pointer locals of the operation (fixtures.json → declared);
  *        without it every common pointer name counts as declared.
  * @returns {{outcome: 'ok'|'compile_error'|'runtime_error'|'unsupported',
- *            steps: object[], error?: {line:number, kind:string, message:string},
+ *            initial: object, steps: object[], error?: {line:number, kind:string, message:string},
  *            final: null|{values:number[], cycle:boolean, dangling:boolean,
  *                         leaked:string[], matchesGoal:boolean|null}}}
  */
 export function runProgram(lines, init = {}) {
   const locals = [...new Set(['head', ...(init.declared ?? DEFAULT_LOCALS)])];
   const ints = Number.isInteger(init.operationPosition) ? ['index'] : [];
+  // the city before line 1 runs — drawn even when the program is rejected
+  const initial = { ...snapshot(buildInitialState(init, locals)), leaked: [], events: [] };
+  const result = runChecked(lines, init, locals, ints);
+  return { ...result, initial };
+}
 
+function runChecked(lines, init, locals, ints) {
   let parsed;
   try {
     parsed = lines.map((src, line) => {
@@ -601,6 +607,38 @@ export function runProgram(lines, init = {}) {
   return error
     ? { outcome: 'runtime_error', steps, error, final }
     : { outcome: 'ok', steps, final };
+}
+
+/**
+ * What a view should draw for one frame ({heap, vars, leaked, events}). Both the
+ * 2D and the 3D view render ONLY this, so they can't show different information
+ * (eng review R2).
+ *   buildings  one per heap object, in plot order; state live | leaked | freed;
+ *              nextKind node | self | freed (cable into an empty lot) | null |
+ *              none (a freed node's next is garbage, so no cable is drawn)
+ *   signs      addr -> pointer variables standing on that building
+ *   nullVars / unsetVars   pointer variables holding NULL / never assigned
+ */
+export function describeScene(frame) {
+  const byAddr = new Map(frame.heap.map(n => [n.addr, n]));
+  const leaked = new Set(frame.leaked ?? []);
+  const fresh = new Set((frame.events ?? []).filter(e => e.type === 'alloc').map(e => e.addr));
+  const buildings = frame.heap.map(n => ({
+    addr: n.addr, plot: n.plot, value: n.value, next: n.next,
+    state: n.freed ? 'freed' : leaked.has(n.addr) ? 'leaked' : 'live',
+    isNew: fresh.has(n.addr),
+    nextKind: n.freed ? 'none'
+      : n.next === null ? 'null'
+      : n.next === n.addr ? 'self'
+      : byAddr.get(n.next)?.freed ? 'freed' : 'node',
+  }));
+  const signs = {}, nullVars = [], unsetVars = [];
+  for (const [name, v] of Object.entries(frame.vars)) {
+    if (v === UNDEF) unsetVars.push(name);
+    else if (v === null) nullVars.push(name);
+    else (signs[v] ??= []).push(name);
+  }
+  return { buildings, signs, nullVars, unsetVars };
 }
 
 /**
