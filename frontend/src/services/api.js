@@ -106,6 +106,12 @@ export const gameMasterApi = {
     request("POST", "/api/gm/test-generation", { operation, n, emotion }),
 };
 
+// Home city — buildings are earned from mastery; the student places them on lots
+export const cityApi = {
+  get: () => request("GET", "/api/city"),
+  place: (building_key, lot) => request("POST", "/api/city/place", { building_key, lot }),
+};
+
 // Admin
 export const adminApi = {
   getOverview: () => request("GET", "/api/admin/overview"),

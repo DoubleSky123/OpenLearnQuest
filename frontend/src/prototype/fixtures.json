@@ -1,0 +1,6975 @@
+{
+ "schema": 1,
+ "generatedBy": "backend/export_heap_fixtures.py — do not edit by hand; re-run after editing TEMPLATES/_BLANKS/_BUGS",
+ "operations": [
+  "insertAtHead",
+  "insertAtPosition",
+  "removeAtPosition"
+ ],
+ "declared": {
+  "insertAtHead": [
+   "head",
+   "newNode"
+  ],
+  "insertAtPosition": [
+   "curr",
+   "head",
+   "newNode"
+  ],
+  "removeAtPosition": [
+   "curr",
+   "head",
+   "temp"
+  ]
+ },
+ "parity": [
+  {
+   "id": "insertAtHead-fill_blank-i1-s0",
+   "operation": "insertAtHead",
+   "question_type": "fill_blank",
+   "program": [
+    "newNode = createNode(98);",
+    "newNode.next = head;",
+    "head = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 44,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 84,
+     "next": null
+    }
+   ],
+   "operationValue": 98,
+   "operationPosition": null,
+   "goalPattern": [
+    98,
+    44,
+    84
+   ]
+  },
+  {
+   "id": "insertAtHead-fill_blank-i2-s0",
+   "operation": "insertAtHead",
+   "question_type": "fill_blank",
+   "program": [
+    "newNode = createNode(22);",
+    "newNode.next = head;",
+    "head = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 95,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 64,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 73,
+     "next": null
+    }
+   ],
+   "operationValue": 22,
+   "operationPosition": null,
+   "goalPattern": [
+    22,
+    95,
+    64,
+    73
+   ]
+  },
+  {
+   "id": "insertAtHead-fill_blank-i3-s0",
+   "operation": "insertAtHead",
+   "question_type": "fill_blank",
+   "program": [
+    "newNode = createNode(78);",
+    "newNode.next = head;",
+    "head = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 19,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 18,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 54,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 28,
+     "next": null
+    }
+   ],
+   "operationValue": 78,
+   "operationPosition": null,
+   "goalPattern": [
+    78,
+    19,
+    18,
+    54,
+    28
+   ]
+  },
+  {
+   "id": "insertAtHead-find_bug-i1-s0",
+   "operation": "insertAtHead",
+   "question_type": "find_bug",
+   "program": [
+    "newNode = createNode(11);",
+    "newNode.next = head;",
+    "head = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 17,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 42,
+     "next": null
+    }
+   ],
+   "operationValue": 11,
+   "operationPosition": null,
+   "goalPattern": [
+    11,
+    17,
+    42
+   ]
+  },
+  {
+   "id": "insertAtHead-find_bug-i2-s0",
+   "operation": "insertAtHead",
+   "question_type": "find_bug",
+   "program": [
+    "newNode = createNode(73);",
+    "newNode.next = head;",
+    "head = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 26,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 23,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 15,
+     "next": null
+    }
+   ],
+   "operationValue": 73,
+   "operationPosition": null,
+   "goalPattern": [
+    73,
+    26,
+    23,
+    15
+   ]
+  },
+  {
+   "id": "insertAtHead-find_bug-i3-s0",
+   "operation": "insertAtHead",
+   "question_type": "find_bug",
+   "program": [
+    "newNode = createNode(69);",
+    "newNode.next = head;",
+    "head = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 38,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 58,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 86,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 39,
+     "next": null
+    }
+   ],
+   "operationValue": 69,
+   "operationPosition": null,
+   "goalPattern": [
+    69,
+    38,
+    58,
+    86,
+    39
+   ]
+  },
+  {
+   "id": "insertAtHead-ordering-i1-s0",
+   "operation": "insertAtHead",
+   "question_type": "ordering",
+   "program": [
+    "newNode = createNode(80);",
+    "newNode.next = head;",
+    "head = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 13,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 10,
+     "next": null
+    }
+   ],
+   "operationValue": 80,
+   "operationPosition": null,
+   "goalPattern": [
+    80,
+    13,
+    10
+   ]
+  },
+  {
+   "id": "insertAtHead-ordering-i2-s0",
+   "operation": "insertAtHead",
+   "question_type": "ordering",
+   "program": [
+    "newNode = createNode(92);",
+    "newNode.next = head;",
+    "head = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 90,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 42,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 76,
+     "next": null
+    }
+   ],
+   "operationValue": 92,
+   "operationPosition": null,
+   "goalPattern": [
+    92,
+    90,
+    42,
+    76
+   ]
+  },
+  {
+   "id": "insertAtHead-ordering-i3-s0",
+   "operation": "insertAtHead",
+   "question_type": "ordering",
+   "program": [
+    "newNode = createNode(75);",
+    "newNode.next = head;",
+    "head = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 27,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 94,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 71,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 62,
+     "next": null
+    }
+   ],
+   "operationValue": 75,
+   "operationPosition": null,
+   "goalPattern": [
+    75,
+    27,
+    94,
+    71,
+    62
+   ]
+  },
+  {
+   "id": "insertAtPosition-fill_blank-i1-s0",
+   "operation": "insertAtPosition",
+   "question_type": "fill_blank",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(96);",
+    "newNode.next = curr.next;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 41,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 24,
+     "next": null
+    }
+   ],
+   "operationValue": 96,
+   "operationPosition": 2,
+   "goalPattern": [
+    41,
+    24,
+    96
+   ]
+  },
+  {
+   "id": "insertAtPosition-fill_blank-i2-s0",
+   "operation": "insertAtPosition",
+   "question_type": "fill_blank",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(51);",
+    "newNode.next = curr.next;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 85,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 89,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 6,
+     "next": null
+    }
+   ],
+   "operationValue": 51,
+   "operationPosition": 2,
+   "goalPattern": [
+    85,
+    89,
+    51,
+    6
+   ]
+  },
+  {
+   "id": "insertAtPosition-fill_blank-i2-s2",
+   "operation": "insertAtPosition",
+   "question_type": "fill_blank",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(39);",
+    "newNode.next = curr.next;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 23,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 95,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 98,
+     "next": null
+    }
+   ],
+   "operationValue": 39,
+   "operationPosition": 3,
+   "goalPattern": [
+    23,
+    95,
+    98,
+    39
+   ]
+  },
+  {
+   "id": "insertAtPosition-fill_blank-i3-s0",
+   "operation": "insertAtPosition",
+   "question_type": "fill_blank",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(62);",
+    "newNode.next = curr.next;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 63,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 26,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 57,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 3,
+     "next": null
+    }
+   ],
+   "operationValue": 62,
+   "operationPosition": 2,
+   "goalPattern": [
+    63,
+    26,
+    62,
+    57,
+    3
+   ]
+  },
+  {
+   "id": "insertAtPosition-fill_blank-i3-s1",
+   "operation": "insertAtPosition",
+   "question_type": "fill_blank",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(9);",
+    "newNode.next = curr.next;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 56,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 70,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 88,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 98,
+     "next": null
+    }
+   ],
+   "operationValue": 9,
+   "operationPosition": 4,
+   "goalPattern": [
+    56,
+    70,
+    88,
+    98,
+    9
+   ]
+  },
+  {
+   "id": "insertAtPosition-fill_blank-i3-s5",
+   "operation": "insertAtPosition",
+   "question_type": "fill_blank",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(35);",
+    "newNode.next = curr.next;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 54,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 98,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 32,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 99,
+     "next": null
+    }
+   ],
+   "operationValue": 35,
+   "operationPosition": 3,
+   "goalPattern": [
+    54,
+    98,
+    32,
+    35,
+    99
+   ]
+  },
+  {
+   "id": "insertAtPosition-find_bug-i1-s0",
+   "operation": "insertAtPosition",
+   "question_type": "find_bug",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(73);",
+    "newNode.next = curr.next;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 21,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 97,
+     "next": null
+    }
+   ],
+   "operationValue": 73,
+   "operationPosition": 2,
+   "goalPattern": [
+    21,
+    97,
+    73
+   ]
+  },
+  {
+   "id": "insertAtPosition-find_bug-i2-s0",
+   "operation": "insertAtPosition",
+   "question_type": "find_bug",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(89);",
+    "newNode.next = curr.next;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 66,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 25,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 39,
+     "next": null
+    }
+   ],
+   "operationValue": 89,
+   "operationPosition": 2,
+   "goalPattern": [
+    66,
+    25,
+    89,
+    39
+   ]
+  },
+  {
+   "id": "insertAtPosition-find_bug-i2-s2",
+   "operation": "insertAtPosition",
+   "question_type": "find_bug",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(94);",
+    "newNode.next = curr.next;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 70,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 11,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 10,
+     "next": null
+    }
+   ],
+   "operationValue": 94,
+   "operationPosition": 3,
+   "goalPattern": [
+    70,
+    11,
+    10,
+    94
+   ]
+  },
+  {
+   "id": "insertAtPosition-find_bug-i3-s0",
+   "operation": "insertAtPosition",
+   "question_type": "find_bug",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(65);",
+    "newNode.next = curr.next;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 89,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 72,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 74,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 36,
+     "next": null
+    }
+   ],
+   "operationValue": 65,
+   "operationPosition": 3,
+   "goalPattern": [
+    89,
+    72,
+    74,
+    65,
+    36
+   ]
+  },
+  {
+   "id": "insertAtPosition-find_bug-i3-s1",
+   "operation": "insertAtPosition",
+   "question_type": "find_bug",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(43);",
+    "newNode.next = curr.next;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 96,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 93,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 4,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 94,
+     "next": null
+    }
+   ],
+   "operationValue": 43,
+   "operationPosition": 4,
+   "goalPattern": [
+    96,
+    93,
+    4,
+    94,
+    43
+   ]
+  },
+  {
+   "id": "insertAtPosition-find_bug-i3-s6",
+   "operation": "insertAtPosition",
+   "question_type": "find_bug",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(3);",
+    "newNode.next = curr.next;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 47,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 69,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 27,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 50,
+     "next": null
+    }
+   ],
+   "operationValue": 3,
+   "operationPosition": 2,
+   "goalPattern": [
+    47,
+    69,
+    3,
+    27,
+    50
+   ]
+  },
+  {
+   "id": "insertAtPosition-ordering-i1-s0",
+   "operation": "insertAtPosition",
+   "question_type": "ordering",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(43);",
+    "newNode.next = curr.next;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 23,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 18,
+     "next": null
+    }
+   ],
+   "operationValue": 43,
+   "operationPosition": 2,
+   "goalPattern": [
+    23,
+    18,
+    43
+   ]
+  },
+  {
+   "id": "insertAtPosition-ordering-i2-s0",
+   "operation": "insertAtPosition",
+   "question_type": "ordering",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(84);",
+    "newNode.next = curr.next;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 56,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 36,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 78,
+     "next": null
+    }
+   ],
+   "operationValue": 84,
+   "operationPosition": 3,
+   "goalPattern": [
+    56,
+    36,
+    78,
+    84
+   ]
+  },
+  {
+   "id": "insertAtPosition-ordering-i2-s1",
+   "operation": "insertAtPosition",
+   "question_type": "ordering",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(10);",
+    "newNode.next = curr.next;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 20,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 93,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 40,
+     "next": null
+    }
+   ],
+   "operationValue": 10,
+   "operationPosition": 2,
+   "goalPattern": [
+    20,
+    93,
+    10,
+    40
+   ]
+  },
+  {
+   "id": "insertAtPosition-ordering-i3-s0",
+   "operation": "insertAtPosition",
+   "question_type": "ordering",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(43);",
+    "newNode.next = curr.next;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 41,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 59,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 76,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 18,
+     "next": null
+    }
+   ],
+   "operationValue": 43,
+   "operationPosition": 4,
+   "goalPattern": [
+    41,
+    59,
+    76,
+    18,
+    43
+   ]
+  },
+  {
+   "id": "insertAtPosition-ordering-i3-s1",
+   "operation": "insertAtPosition",
+   "question_type": "ordering",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(96);",
+    "newNode.next = curr.next;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 52,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 89,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 69,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 39,
+     "next": null
+    }
+   ],
+   "operationValue": 96,
+   "operationPosition": 3,
+   "goalPattern": [
+    52,
+    89,
+    69,
+    96,
+    39
+   ]
+  },
+  {
+   "id": "insertAtPosition-ordering-i3-s2",
+   "operation": "insertAtPosition",
+   "question_type": "ordering",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(55);",
+    "newNode.next = curr.next;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 28,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 43,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 33,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 85,
+     "next": null
+    }
+   ],
+   "operationValue": 55,
+   "operationPosition": 2,
+   "goalPattern": [
+    28,
+    43,
+    55,
+    33,
+    85
+   ]
+  },
+  {
+   "id": "removeAtPosition-fill_blank-i1-s0",
+   "operation": "removeAtPosition",
+   "question_type": "fill_blank",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 39,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 80,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 42,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    39,
+    80
+   ]
+  },
+  {
+   "id": "removeAtPosition-fill_blank-i1-s3",
+   "operation": "removeAtPosition",
+   "question_type": "fill_blank",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 17,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 59,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 41,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 1,
+   "goalPattern": [
+    17,
+    41
+   ]
+  },
+  {
+   "id": "removeAtPosition-fill_blank-i2-s0",
+   "operation": "removeAtPosition",
+   "question_type": "fill_blank",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 36,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 77,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 41,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    36,
+    77
+   ]
+  },
+  {
+   "id": "removeAtPosition-fill_blank-i2-s1",
+   "operation": "removeAtPosition",
+   "question_type": "fill_blank",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 51,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 32,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 49,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 1,
+   "goalPattern": [
+    51,
+    49
+   ]
+  },
+  {
+   "id": "removeAtPosition-fill_blank-i3-s0",
+   "operation": "removeAtPosition",
+   "question_type": "fill_blank",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 1,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 14,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 16,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 2,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    1,
+    14,
+    2
+   ]
+  },
+  {
+   "id": "removeAtPosition-fill_blank-i3-s1",
+   "operation": "removeAtPosition",
+   "question_type": "fill_blank",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 78,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 95,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 76,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 40,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 1,
+   "goalPattern": [
+    78,
+    76,
+    40
+   ]
+  },
+  {
+   "id": "removeAtPosition-fill_blank-i3-s2",
+   "operation": "removeAtPosition",
+   "question_type": "fill_blank",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 34,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 24,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 53,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 18,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 3,
+   "goalPattern": [
+    34,
+    24,
+    53
+   ]
+  },
+  {
+   "id": "removeAtPosition-find_bug-i1-s0",
+   "operation": "removeAtPosition",
+   "question_type": "find_bug",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 52,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 32,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 7,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 1,
+   "goalPattern": [
+    52,
+    7
+   ]
+  },
+  {
+   "id": "removeAtPosition-find_bug-i1-s6",
+   "operation": "removeAtPosition",
+   "question_type": "find_bug",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 96,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 51,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 68,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    96,
+    51
+   ]
+  },
+  {
+   "id": "removeAtPosition-find_bug-i2-s0",
+   "operation": "removeAtPosition",
+   "question_type": "find_bug",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 25,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 51,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 64,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 1,
+   "goalPattern": [
+    25,
+    64
+   ]
+  },
+  {
+   "id": "removeAtPosition-find_bug-i2-s3",
+   "operation": "removeAtPosition",
+   "question_type": "find_bug",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 12,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 73,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 33,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    12,
+    73
+   ]
+  },
+  {
+   "id": "removeAtPosition-find_bug-i3-s0",
+   "operation": "removeAtPosition",
+   "question_type": "find_bug",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 26,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 81,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 34,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 63,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 1,
+   "goalPattern": [
+    26,
+    34,
+    63
+   ]
+  },
+  {
+   "id": "removeAtPosition-find_bug-i3-s1",
+   "operation": "removeAtPosition",
+   "question_type": "find_bug",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 35,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 8,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 40,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 62,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 3,
+   "goalPattern": [
+    35,
+    8,
+    40
+   ]
+  },
+  {
+   "id": "removeAtPosition-find_bug-i3-s8",
+   "operation": "removeAtPosition",
+   "question_type": "find_bug",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 39,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 58,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 66,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 68,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    39,
+    58,
+    68
+   ]
+  },
+  {
+   "id": "removeAtPosition-ordering-i1-s0",
+   "operation": "removeAtPosition",
+   "question_type": "ordering",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 72,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 38,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 68,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    72,
+    38
+   ]
+  },
+  {
+   "id": "removeAtPosition-ordering-i1-s1",
+   "operation": "removeAtPosition",
+   "question_type": "ordering",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 45,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 57,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 22,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 1,
+   "goalPattern": [
+    45,
+    22
+   ]
+  },
+  {
+   "id": "removeAtPosition-ordering-i2-s0",
+   "operation": "removeAtPosition",
+   "question_type": "ordering",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 42,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 85,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 75,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 1,
+   "goalPattern": [
+    42,
+    75
+   ]
+  },
+  {
+   "id": "removeAtPosition-ordering-i2-s8",
+   "operation": "removeAtPosition",
+   "question_type": "ordering",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 61,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 39,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 45,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    61,
+    39
+   ]
+  },
+  {
+   "id": "removeAtPosition-ordering-i3-s0",
+   "operation": "removeAtPosition",
+   "question_type": "ordering",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 14,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 51,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 32,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 47,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 3,
+   "goalPattern": [
+    14,
+    51,
+    32
+   ]
+  },
+  {
+   "id": "removeAtPosition-ordering-i3-s1",
+   "operation": "removeAtPosition",
+   "question_type": "ordering",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 58,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 62,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 42,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 64,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 1,
+   "goalPattern": [
+    58,
+    42,
+    64
+   ]
+  },
+  {
+   "id": "removeAtPosition-ordering-i3-s3",
+   "operation": "removeAtPosition",
+   "question_type": "ordering",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 58,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 49,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 27,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 37,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    58,
+    49,
+    37
+   ]
+  }
+ ],
+ "wrong": [
+  {
+   "id": "insertAtHead-wrong-1",
+   "operation": "insertAtHead",
+   "kind": "blank",
+   "line": 0,
+   "text": "head = createNode(75);",
+   "program": [
+    "head = createNode(75);",
+    "newNode.next = head;",
+    "head = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 27,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 94,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 71,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 62,
+     "next": null
+    }
+   ],
+   "operationValue": 75,
+   "operationPosition": null,
+   "goalPattern": [
+    75,
+    27,
+    94,
+    71,
+    62
+   ]
+  },
+  {
+   "id": "insertAtHead-wrong-2",
+   "operation": "insertAtHead",
+   "kind": "blank",
+   "line": 0,
+   "text": "temp = createNode(75);",
+   "program": [
+    "temp = createNode(75);",
+    "newNode.next = head;",
+    "head = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 27,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 94,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 71,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 62,
+     "next": null
+    }
+   ],
+   "operationValue": 75,
+   "operationPosition": null,
+   "goalPattern": [
+    75,
+    27,
+    94,
+    71,
+    62
+   ]
+  },
+  {
+   "id": "insertAtHead-wrong-3",
+   "operation": "insertAtHead",
+   "kind": "blank",
+   "line": 1,
+   "text": "newNode.next = head.next;",
+   "program": [
+    "newNode = createNode(75);",
+    "newNode.next = head.next;",
+    "head = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 27,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 94,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 71,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 62,
+     "next": null
+    }
+   ],
+   "operationValue": 75,
+   "operationPosition": null,
+   "goalPattern": [
+    75,
+    27,
+    94,
+    71,
+    62
+   ]
+  },
+  {
+   "id": "insertAtHead-wrong-4",
+   "operation": "insertAtHead",
+   "kind": "blank",
+   "line": 1,
+   "text": "newNode.next = NULL;",
+   "program": [
+    "newNode = createNode(75);",
+    "newNode.next = NULL;",
+    "head = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 27,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 94,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 71,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 62,
+     "next": null
+    }
+   ],
+   "operationValue": 75,
+   "operationPosition": null,
+   "goalPattern": [
+    75,
+    27,
+    94,
+    71,
+    62
+   ]
+  },
+  {
+   "id": "insertAtHead-wrong-5",
+   "operation": "insertAtHead",
+   "kind": "blank",
+   "line": 2,
+   "text": "head = head;",
+   "program": [
+    "newNode = createNode(75);",
+    "newNode.next = head;",
+    "head = head;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 27,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 94,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 71,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 62,
+     "next": null
+    }
+   ],
+   "operationValue": 75,
+   "operationPosition": null,
+   "goalPattern": [
+    75,
+    27,
+    94,
+    71,
+    62
+   ]
+  },
+  {
+   "id": "insertAtHead-wrong-6",
+   "operation": "insertAtHead",
+   "kind": "blank",
+   "line": 2,
+   "text": "head = temp;",
+   "program": [
+    "newNode = createNode(75);",
+    "newNode.next = head;",
+    "head = temp;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 27,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 94,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 71,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 62,
+     "next": null
+    }
+   ],
+   "operationValue": 75,
+   "operationPosition": null,
+   "goalPattern": [
+    75,
+    27,
+    94,
+    71,
+    62
+   ]
+  },
+  {
+   "id": "insertAtHead-wrong-7",
+   "operation": "insertAtHead",
+   "kind": "blank",
+   "line": 0,
+   "text": "newNode = NULL;",
+   "program": [
+    "newNode = NULL;",
+    "newNode.next = head;",
+    "head = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 27,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 94,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 71,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 62,
+     "next": null
+    }
+   ],
+   "operationValue": 75,
+   "operationPosition": null,
+   "goalPattern": [
+    75,
+    27,
+    94,
+    71,
+    62
+   ]
+  },
+  {
+   "id": "insertAtHead-wrong-8",
+   "operation": "insertAtHead",
+   "kind": "blank",
+   "line": 0,
+   "text": "newNode = head;",
+   "program": [
+    "newNode = head;",
+    "newNode.next = head;",
+    "head = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 27,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 94,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 71,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 62,
+     "next": null
+    }
+   ],
+   "operationValue": 75,
+   "operationPosition": null,
+   "goalPattern": [
+    75,
+    27,
+    94,
+    71,
+    62
+   ]
+  },
+  {
+   "id": "insertAtHead-wrong-9",
+   "operation": "insertAtHead",
+   "kind": "blank",
+   "line": 1,
+   "text": "head.next = head;",
+   "program": [
+    "newNode = createNode(75);",
+    "head.next = head;",
+    "head = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 27,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 94,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 71,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 62,
+     "next": null
+    }
+   ],
+   "operationValue": 75,
+   "operationPosition": null,
+   "goalPattern": [
+    75,
+    27,
+    94,
+    71,
+    62
+   ]
+  },
+  {
+   "id": "insertAtHead-wrong-10",
+   "operation": "insertAtHead",
+   "kind": "blank",
+   "line": 1,
+   "text": "temp.next = head;",
+   "program": [
+    "newNode = createNode(75);",
+    "temp.next = head;",
+    "head = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 27,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 94,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 71,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 62,
+     "next": null
+    }
+   ],
+   "operationValue": 75,
+   "operationPosition": null,
+   "goalPattern": [
+    75,
+    27,
+    94,
+    71,
+    62
+   ]
+  },
+  {
+   "id": "insertAtHead-wrong-11",
+   "operation": "insertAtHead",
+   "kind": "blank",
+   "line": 2,
+   "text": "newNode = newNode;",
+   "program": [
+    "newNode = createNode(75);",
+    "newNode.next = head;",
+    "newNode = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 27,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 94,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 71,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 62,
+     "next": null
+    }
+   ],
+   "operationValue": 75,
+   "operationPosition": null,
+   "goalPattern": [
+    75,
+    27,
+    94,
+    71,
+    62
+   ]
+  },
+  {
+   "id": "insertAtHead-wrong-12",
+   "operation": "insertAtHead",
+   "kind": "blank",
+   "line": 2,
+   "text": "NULL = newNode;",
+   "program": [
+    "newNode = createNode(75);",
+    "newNode.next = head;",
+    "NULL = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 27,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 94,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 71,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 62,
+     "next": null
+    }
+   ],
+   "operationValue": 75,
+   "operationPosition": null,
+   "goalPattern": [
+    75,
+    27,
+    94,
+    71,
+    62
+   ]
+  },
+  {
+   "id": "insertAtHead-wrong-13",
+   "operation": "insertAtHead",
+   "kind": "blank",
+   "line": 0,
+   "text": "newNode = createNode(head);",
+   "program": [
+    "newNode = createNode(head);",
+    "newNode.next = head;",
+    "head = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 27,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 94,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 71,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 62,
+     "next": null
+    }
+   ],
+   "operationValue": 75,
+   "operationPosition": null,
+   "goalPattern": [
+    75,
+    27,
+    94,
+    71,
+    62
+   ]
+  },
+  {
+   "id": "insertAtHead-wrong-14",
+   "operation": "insertAtHead",
+   "kind": "blank",
+   "line": 0,
+   "text": "newNode = createNode(newNode);",
+   "program": [
+    "newNode = createNode(newNode);",
+    "newNode.next = head;",
+    "head = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 27,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 94,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 71,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 62,
+     "next": null
+    }
+   ],
+   "operationValue": 75,
+   "operationPosition": null,
+   "goalPattern": [
+    75,
+    27,
+    94,
+    71,
+    62
+   ]
+  },
+  {
+   "id": "insertAtHead-wrong-15",
+   "operation": "insertAtHead",
+   "kind": "blank",
+   "line": 1,
+   "text": "newNode.val = head;",
+   "program": [
+    "newNode = createNode(75);",
+    "newNode.val = head;",
+    "head = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 27,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 94,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 71,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 62,
+     "next": null
+    }
+   ],
+   "operationValue": 75,
+   "operationPosition": null,
+   "goalPattern": [
+    75,
+    27,
+    94,
+    71,
+    62
+   ]
+  },
+  {
+   "id": "insertAtHead-wrong-16",
+   "operation": "insertAtHead",
+   "kind": "blank",
+   "line": 1,
+   "text": "newNode.prev = head;",
+   "program": [
+    "newNode = createNode(75);",
+    "newNode.prev = head;",
+    "head = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 27,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 94,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 71,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 62,
+     "next": null
+    }
+   ],
+   "operationValue": 75,
+   "operationPosition": null,
+   "goalPattern": [
+    75,
+    27,
+    94,
+    71,
+    62
+   ]
+  },
+  {
+   "id": "insertAtHead-wrong-17",
+   "operation": "insertAtHead",
+   "kind": "blank",
+   "line": 2,
+   "text": "head = newNode.next;",
+   "program": [
+    "newNode = createNode(75);",
+    "newNode.next = head;",
+    "head = newNode.next;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 27,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 94,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 71,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 62,
+     "next": null
+    }
+   ],
+   "operationValue": 75,
+   "operationPosition": null,
+   "goalPattern": [
+    75,
+    27,
+    94,
+    71,
+    62
+   ]
+  },
+  {
+   "id": "insertAtHead-wrong-18",
+   "operation": "insertAtHead",
+   "kind": "blank",
+   "line": 2,
+   "text": "head = head.next;",
+   "program": [
+    "newNode = createNode(75);",
+    "newNode.next = head;",
+    "head = head.next;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 27,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 94,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 71,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 62,
+     "next": null
+    }
+   ],
+   "operationValue": 75,
+   "operationPosition": null,
+   "goalPattern": [
+    75,
+    27,
+    94,
+    71,
+    62
+   ]
+  },
+  {
+   "id": "insertAtHead-wrong-19",
+   "operation": "insertAtHead",
+   "kind": "blank",
+   "line": 0,
+   "text": "newNode = free(75);",
+   "program": [
+    "newNode = free(75);",
+    "newNode.next = head;",
+    "head = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 27,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 94,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 71,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 62,
+     "next": null
+    }
+   ],
+   "operationValue": 75,
+   "operationPosition": null,
+   "goalPattern": [
+    75,
+    27,
+    94,
+    71,
+    62
+   ]
+  },
+  {
+   "id": "insertAtHead-wrong-20",
+   "operation": "insertAtHead",
+   "kind": "blank",
+   "line": 0,
+   "text": "newNode = makeNode(75);",
+   "program": [
+    "newNode = makeNode(75);",
+    "newNode.next = head;",
+    "head = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 27,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 94,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 71,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 62,
+     "next": null
+    }
+   ],
+   "operationValue": 75,
+   "operationPosition": null,
+   "goalPattern": [
+    75,
+    27,
+    94,
+    71,
+    62
+   ]
+  },
+  {
+   "id": "insertAtHead-wrong-21",
+   "operation": "insertAtHead",
+   "kind": "blank",
+   "line": 1,
+   "text": "newNode = head;",
+   "program": [
+    "newNode = createNode(75);",
+    "newNode = head;",
+    "head = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 27,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 94,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 71,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 62,
+     "next": null
+    }
+   ],
+   "operationValue": 75,
+   "operationPosition": null,
+   "goalPattern": [
+    75,
+    27,
+    94,
+    71,
+    62
+   ]
+  },
+  {
+   "id": "insertAtHead-wrong-22",
+   "operation": "insertAtHead",
+   "kind": "blank",
+   "line": 2,
+   "text": "temp = newNode;",
+   "program": [
+    "newNode = createNode(75);",
+    "newNode.next = head;",
+    "temp = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 27,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 94,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 71,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 62,
+     "next": null
+    }
+   ],
+   "operationValue": 75,
+   "operationPosition": null,
+   "goalPattern": [
+    75,
+    27,
+    94,
+    71,
+    62
+   ]
+  },
+  {
+   "id": "insertAtHead-wrong-23",
+   "operation": "insertAtHead",
+   "kind": "blank",
+   "line": 2,
+   "text": "curr = newNode;",
+   "program": [
+    "newNode = createNode(75);",
+    "newNode.next = head;",
+    "curr = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 27,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 94,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 71,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 62,
+     "next": null
+    }
+   ],
+   "operationValue": 75,
+   "operationPosition": null,
+   "goalPattern": [
+    75,
+    27,
+    94,
+    71,
+    62
+   ]
+  },
+  {
+   "id": "insertAtHead-wrong-24",
+   "operation": "insertAtHead",
+   "kind": "bug_option",
+   "line": 1,
+   "text": "head.next = newNode;",
+   "program": [
+    "newNode = createNode(75);",
+    "head.next = newNode;",
+    "head = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 27,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 94,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 71,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 62,
+     "next": null
+    }
+   ],
+   "operationValue": 75,
+   "operationPosition": null,
+   "goalPattern": [
+    75,
+    27,
+    94,
+    71,
+    62
+   ]
+  },
+  {
+   "id": "insertAtHead-wrong-25",
+   "operation": "insertAtHead",
+   "kind": "bug",
+   "line": 1,
+   "text": "newNode.next = newNode;",
+   "program": [
+    "newNode = createNode(75);",
+    "newNode.next = newNode;",
+    "head = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 27,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 94,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 71,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 62,
+     "next": null
+    }
+   ],
+   "operationValue": 75,
+   "operationPosition": null,
+   "goalPattern": [
+    75,
+    27,
+    94,
+    71,
+    62
+   ]
+  },
+  {
+   "id": "insertAtHead-wrong-26",
+   "operation": "insertAtHead",
+   "kind": "bug_option",
+   "line": 1,
+   "text": "head = newNode.next;",
+   "program": [
+    "newNode = createNode(75);",
+    "head = newNode.next;",
+    "head = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 27,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 94,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 71,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 62,
+     "next": null
+    }
+   ],
+   "operationValue": 75,
+   "operationPosition": null,
+   "goalPattern": [
+    75,
+    27,
+    94,
+    71,
+    62
+   ]
+  },
+  {
+   "id": "insertAtHead-wrong-27",
+   "operation": "insertAtHead",
+   "kind": "distractor_start",
+   "line": 0,
+   "text": "curr.next = newNode;",
+   "program": [
+    "curr.next = newNode;",
+    "newNode = createNode(75);",
+    "newNode.next = head;",
+    "head = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 27,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 94,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 71,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 62,
+     "next": null
+    }
+   ],
+   "operationValue": 75,
+   "operationPosition": null,
+   "goalPattern": [
+    75,
+    27,
+    94,
+    71,
+    62
+   ]
+  },
+  {
+   "id": "insertAtHead-wrong-28",
+   "operation": "insertAtHead",
+   "kind": "distractor_end",
+   "line": 3,
+   "text": "curr.next = newNode;",
+   "program": [
+    "newNode = createNode(75);",
+    "newNode.next = head;",
+    "head = newNode;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 27,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 94,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 71,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 62,
+     "next": null
+    }
+   ],
+   "operationValue": 75,
+   "operationPosition": null,
+   "goalPattern": [
+    75,
+    27,
+    94,
+    71,
+    62
+   ]
+  },
+  {
+   "id": "insertAtHead-wrong-29",
+   "operation": "insertAtHead",
+   "kind": "distractor_start",
+   "line": 0,
+   "text": "free(temp);",
+   "program": [
+    "free(temp);",
+    "newNode = createNode(75);",
+    "newNode.next = head;",
+    "head = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 27,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 94,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 71,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 62,
+     "next": null
+    }
+   ],
+   "operationValue": 75,
+   "operationPosition": null,
+   "goalPattern": [
+    75,
+    27,
+    94,
+    71,
+    62
+   ]
+  },
+  {
+   "id": "insertAtHead-wrong-30",
+   "operation": "insertAtHead",
+   "kind": "distractor_end",
+   "line": 3,
+   "text": "free(temp);",
+   "program": [
+    "newNode = createNode(75);",
+    "newNode.next = head;",
+    "head = newNode;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 27,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 94,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 71,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 62,
+     "next": null
+    }
+   ],
+   "operationValue": 75,
+   "operationPosition": null,
+   "goalPattern": [
+    75,
+    27,
+    94,
+    71,
+    62
+   ]
+  },
+  {
+   "id": "insertAtHead-wrong-31",
+   "operation": "insertAtHead",
+   "kind": "distractor_start",
+   "line": 0,
+   "text": "while (curr.next != NULL) curr = curr.next;",
+   "program": [
+    "while (curr.next != NULL) curr = curr.next;",
+    "newNode = createNode(75);",
+    "newNode.next = head;",
+    "head = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 27,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 94,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 71,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 62,
+     "next": null
+    }
+   ],
+   "operationValue": 75,
+   "operationPosition": null,
+   "goalPattern": [
+    75,
+    27,
+    94,
+    71,
+    62
+   ]
+  },
+  {
+   "id": "insertAtHead-wrong-32",
+   "operation": "insertAtHead",
+   "kind": "distractor_end",
+   "line": 3,
+   "text": "while (curr.next != NULL) curr = curr.next;",
+   "program": [
+    "newNode = createNode(75);",
+    "newNode.next = head;",
+    "head = newNode;",
+    "while (curr.next != NULL) curr = curr.next;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 27,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 94,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 71,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 62,
+     "next": null
+    }
+   ],
+   "operationValue": 75,
+   "operationPosition": null,
+   "goalPattern": [
+    75,
+    27,
+    94,
+    71,
+    62
+   ]
+  },
+  {
+   "id": "insertAtPosition-wrong-1",
+   "operation": "insertAtPosition",
+   "kind": "blank",
+   "line": 0,
+   "text": "curr = NULL;",
+   "program": [
+    "curr = NULL;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(96);",
+    "newNode.next = curr.next;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 52,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 89,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 69,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 39,
+     "next": null
+    }
+   ],
+   "operationValue": 96,
+   "operationPosition": 3,
+   "goalPattern": [
+    52,
+    89,
+    69,
+    96,
+    39
+   ]
+  },
+  {
+   "id": "insertAtPosition-wrong-2",
+   "operation": "insertAtPosition",
+   "kind": "blank",
+   "line": 0,
+   "text": "curr = newNode;",
+   "program": [
+    "curr = newNode;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(96);",
+    "newNode.next = curr.next;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 52,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 89,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 69,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 39,
+     "next": null
+    }
+   ],
+   "operationValue": 96,
+   "operationPosition": 3,
+   "goalPattern": [
+    52,
+    89,
+    69,
+    96,
+    39
+   ]
+  },
+  {
+   "id": "insertAtPosition-wrong-3",
+   "operation": "insertAtPosition",
+   "kind": "blank",
+   "line": 1,
+   "text": "for (int i = 0; i < index; i++) curr = curr.next;",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index; i++) curr = curr.next;",
+    "newNode = createNode(96);",
+    "newNode.next = curr.next;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 52,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 89,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 69,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 39,
+     "next": null
+    }
+   ],
+   "operationValue": 96,
+   "operationPosition": 3,
+   "goalPattern": [
+    52,
+    89,
+    69,
+    96,
+    39
+   ]
+  },
+  {
+   "id": "insertAtPosition-wrong-4",
+   "operation": "insertAtPosition",
+   "kind": "blank",
+   "line": 1,
+   "text": "for (int i = 0; i < index-2; i++) curr = curr.next;",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-2; i++) curr = curr.next;",
+    "newNode = createNode(96);",
+    "newNode.next = curr.next;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 52,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 89,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 69,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 39,
+     "next": null
+    }
+   ],
+   "operationValue": 96,
+   "operationPosition": 3,
+   "goalPattern": [
+    52,
+    89,
+    69,
+    96,
+    39
+   ]
+  },
+  {
+   "id": "insertAtPosition-wrong-5",
+   "operation": "insertAtPosition",
+   "kind": "blank",
+   "line": 2,
+   "text": "head = createNode(96);",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "head = createNode(96);",
+    "newNode.next = curr.next;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 52,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 89,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 69,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 39,
+     "next": null
+    }
+   ],
+   "operationValue": 96,
+   "operationPosition": 3,
+   "goalPattern": [
+    52,
+    89,
+    69,
+    96,
+    39
+   ]
+  },
+  {
+   "id": "insertAtPosition-wrong-6",
+   "operation": "insertAtPosition",
+   "kind": "blank",
+   "line": 2,
+   "text": "temp = createNode(96);",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = createNode(96);",
+    "newNode.next = curr.next;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 52,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 89,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 69,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 39,
+     "next": null
+    }
+   ],
+   "operationValue": 96,
+   "operationPosition": 3,
+   "goalPattern": [
+    52,
+    89,
+    69,
+    96,
+    39
+   ]
+  },
+  {
+   "id": "insertAtPosition-wrong-7",
+   "operation": "insertAtPosition",
+   "kind": "blank",
+   "line": 3,
+   "text": "newNode.next = curr;",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(96);",
+    "newNode.next = curr;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 52,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 89,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 69,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 39,
+     "next": null
+    }
+   ],
+   "operationValue": 96,
+   "operationPosition": 3,
+   "goalPattern": [
+    52,
+    89,
+    69,
+    96,
+    39
+   ]
+  },
+  {
+   "id": "insertAtPosition-wrong-8",
+   "operation": "insertAtPosition",
+   "kind": "blank",
+   "line": 3,
+   "text": "newNode.next = NULL;",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(96);",
+    "newNode.next = NULL;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 52,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 89,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 69,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 39,
+     "next": null
+    }
+   ],
+   "operationValue": 96,
+   "operationPosition": 3,
+   "goalPattern": [
+    52,
+    89,
+    69,
+    96,
+    39
+   ]
+  },
+  {
+   "id": "insertAtPosition-wrong-9",
+   "operation": "insertAtPosition",
+   "kind": "blank",
+   "line": 4,
+   "text": "curr.next = curr.next;",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(96);",
+    "newNode.next = curr.next;",
+    "curr.next = curr.next;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 52,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 89,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 69,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 39,
+     "next": null
+    }
+   ],
+   "operationValue": 96,
+   "operationPosition": 3,
+   "goalPattern": [
+    52,
+    89,
+    69,
+    96,
+    39
+   ]
+  },
+  {
+   "id": "insertAtPosition-wrong-10",
+   "operation": "insertAtPosition",
+   "kind": "blank",
+   "line": 4,
+   "text": "curr.next = NULL;",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(96);",
+    "newNode.next = curr.next;",
+    "curr.next = NULL;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 52,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 89,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 69,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 39,
+     "next": null
+    }
+   ],
+   "operationValue": 96,
+   "operationPosition": 3,
+   "goalPattern": [
+    52,
+    89,
+    69,
+    96,
+    39
+   ]
+  },
+  {
+   "id": "insertAtPosition-wrong-11",
+   "operation": "insertAtPosition",
+   "kind": "blank",
+   "line": 3,
+   "text": "curr.next = curr.next;",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(96);",
+    "curr.next = curr.next;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 52,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 89,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 69,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 39,
+     "next": null
+    }
+   ],
+   "operationValue": 96,
+   "operationPosition": 3,
+   "goalPattern": [
+    52,
+    89,
+    69,
+    96,
+    39
+   ]
+  },
+  {
+   "id": "insertAtPosition-wrong-12",
+   "operation": "insertAtPosition",
+   "kind": "blank",
+   "line": 3,
+   "text": "head.next = curr.next;",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(96);",
+    "head.next = curr.next;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 52,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 89,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 69,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 39,
+     "next": null
+    }
+   ],
+   "operationValue": 96,
+   "operationPosition": 3,
+   "goalPattern": [
+    52,
+    89,
+    69,
+    96,
+    39
+   ]
+  },
+  {
+   "id": "insertAtPosition-wrong-13",
+   "operation": "insertAtPosition",
+   "kind": "blank",
+   "line": 4,
+   "text": "curr = newNode;",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(96);",
+    "newNode.next = curr.next;",
+    "curr = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 52,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 89,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 69,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 39,
+     "next": null
+    }
+   ],
+   "operationValue": 96,
+   "operationPosition": 3,
+   "goalPattern": [
+    52,
+    89,
+    69,
+    96,
+    39
+   ]
+  },
+  {
+   "id": "insertAtPosition-wrong-14",
+   "operation": "insertAtPosition",
+   "kind": "blank",
+   "line": 4,
+   "text": "head = newNode;",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(96);",
+    "newNode.next = curr.next;",
+    "head = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 52,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 89,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 69,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 39,
+     "next": null
+    }
+   ],
+   "operationValue": 96,
+   "operationPosition": 3,
+   "goalPattern": [
+    52,
+    89,
+    69,
+    96,
+    39
+   ]
+  },
+  {
+   "id": "insertAtPosition-wrong-15",
+   "operation": "insertAtPosition",
+   "kind": "blank",
+   "line": 0,
+   "text": "newNode = head;",
+   "program": [
+    "newNode = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(96);",
+    "newNode.next = curr.next;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 52,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 89,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 69,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 39,
+     "next": null
+    }
+   ],
+   "operationValue": 96,
+   "operationPosition": 3,
+   "goalPattern": [
+    52,
+    89,
+    69,
+    96,
+    39
+   ]
+  },
+  {
+   "id": "insertAtPosition-wrong-16",
+   "operation": "insertAtPosition",
+   "kind": "blank",
+   "line": 0,
+   "text": "temp = head;",
+   "program": [
+    "temp = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(96);",
+    "newNode.next = curr.next;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 52,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 89,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 69,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 39,
+     "next": null
+    }
+   ],
+   "operationValue": 96,
+   "operationPosition": 3,
+   "goalPattern": [
+    52,
+    89,
+    69,
+    96,
+    39
+   ]
+  },
+  {
+   "id": "insertAtPosition-wrong-17",
+   "operation": "insertAtPosition",
+   "kind": "blank",
+   "line": 1,
+   "text": "for (int i = 0; i < index-1; i++) curr = curr.next.next;",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next.next;",
+    "newNode = createNode(96);",
+    "newNode.next = curr.next;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 52,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 89,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 69,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 39,
+     "next": null
+    }
+   ],
+   "operationValue": 96,
+   "operationPosition": 3,
+   "goalPattern": [
+    52,
+    89,
+    69,
+    96,
+    39
+   ]
+  },
+  {
+   "id": "insertAtPosition-wrong-18",
+   "operation": "insertAtPosition",
+   "kind": "blank",
+   "line": 1,
+   "text": "for (int i = 0; i < index-1; i++) curr.next = curr;",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr.next = curr;",
+    "newNode = createNode(96);",
+    "newNode.next = curr.next;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 52,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 89,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 69,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 39,
+     "next": null
+    }
+   ],
+   "operationValue": 96,
+   "operationPosition": 3,
+   "goalPattern": [
+    52,
+    89,
+    69,
+    96,
+    39
+   ]
+  },
+  {
+   "id": "insertAtPosition-wrong-19",
+   "operation": "insertAtPosition",
+   "kind": "blank",
+   "line": 2,
+   "text": "newNode = createNode(3);",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(3);",
+    "newNode.next = curr.next;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 52,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 89,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 69,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 39,
+     "next": null
+    }
+   ],
+   "operationValue": 96,
+   "operationPosition": 3,
+   "goalPattern": [
+    52,
+    89,
+    69,
+    96,
+    39
+   ]
+  },
+  {
+   "id": "insertAtPosition-wrong-20",
+   "operation": "insertAtPosition",
+   "kind": "blank",
+   "line": 2,
+   "text": "newNode = createNode(NULL);",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(NULL);",
+    "newNode.next = curr.next;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 52,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 89,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 69,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 39,
+     "next": null
+    }
+   ],
+   "operationValue": 96,
+   "operationPosition": 3,
+   "goalPattern": [
+    52,
+    89,
+    69,
+    96,
+    39
+   ]
+  },
+  {
+   "id": "insertAtPosition-wrong-21",
+   "operation": "insertAtPosition",
+   "kind": "blank",
+   "line": 3,
+   "text": "newNode.val = curr.next;",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(96);",
+    "newNode.val = curr.next;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 52,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 89,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 69,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 39,
+     "next": null
+    }
+   ],
+   "operationValue": 96,
+   "operationPosition": 3,
+   "goalPattern": [
+    52,
+    89,
+    69,
+    96,
+    39
+   ]
+  },
+  {
+   "id": "insertAtPosition-wrong-22",
+   "operation": "insertAtPosition",
+   "kind": "blank",
+   "line": 3,
+   "text": "newNode.prev = curr.next;",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(96);",
+    "newNode.prev = curr.next;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 52,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 89,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 69,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 39,
+     "next": null
+    }
+   ],
+   "operationValue": 96,
+   "operationPosition": 3,
+   "goalPattern": [
+    52,
+    89,
+    69,
+    96,
+    39
+   ]
+  },
+  {
+   "id": "insertAtPosition-wrong-23",
+   "operation": "insertAtPosition",
+   "kind": "blank",
+   "line": 4,
+   "text": "curr.next = newNode.next;",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(96);",
+    "newNode.next = curr.next;",
+    "curr.next = newNode.next;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 52,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 89,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 69,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 39,
+     "next": null
+    }
+   ],
+   "operationValue": 96,
+   "operationPosition": 3,
+   "goalPattern": [
+    52,
+    89,
+    69,
+    96,
+    39
+   ]
+  },
+  {
+   "id": "insertAtPosition-wrong-24",
+   "operation": "insertAtPosition",
+   "kind": "blank",
+   "line": 4,
+   "text": "curr.next = temp;",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(96);",
+    "newNode.next = curr.next;",
+    "curr.next = temp;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 52,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 89,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 69,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 39,
+     "next": null
+    }
+   ],
+   "operationValue": 96,
+   "operationPosition": 3,
+   "goalPattern": [
+    52,
+    89,
+    69,
+    96,
+    39
+   ]
+  },
+  {
+   "id": "insertAtPosition-wrong-25",
+   "operation": "insertAtPosition",
+   "kind": "blank",
+   "line": 0,
+   "text": "curr = head.next;",
+   "program": [
+    "curr = head.next;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(96);",
+    "newNode.next = curr.next;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 52,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 89,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 69,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 39,
+     "next": null
+    }
+   ],
+   "operationValue": 96,
+   "operationPosition": 3,
+   "goalPattern": [
+    52,
+    89,
+    69,
+    96,
+    39
+   ]
+  },
+  {
+   "id": "insertAtPosition-wrong-26",
+   "operation": "insertAtPosition",
+   "kind": "blank",
+   "line": 1,
+   "text": "for (int i = 1; i < index-1; i++) curr = curr.next;",
+   "program": [
+    "curr = head;",
+    "for (int i = 1; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(96);",
+    "newNode.next = curr.next;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 52,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 89,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 69,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 39,
+     "next": null
+    }
+   ],
+   "operationValue": 96,
+   "operationPosition": 3,
+   "goalPattern": [
+    52,
+    89,
+    69,
+    96,
+    39
+   ]
+  },
+  {
+   "id": "insertAtPosition-wrong-27",
+   "operation": "insertAtPosition",
+   "kind": "blank",
+   "line": 1,
+   "text": "for (int i = -1; i < index-1; i++) curr = curr.next;",
+   "program": [
+    "curr = head;",
+    "for (int i = -1; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(96);",
+    "newNode.next = curr.next;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 52,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 89,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 69,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 39,
+     "next": null
+    }
+   ],
+   "operationValue": 96,
+   "operationPosition": 3,
+   "goalPattern": [
+    52,
+    89,
+    69,
+    96,
+    39
+   ]
+  },
+  {
+   "id": "insertAtPosition-wrong-28",
+   "operation": "insertAtPosition",
+   "kind": "blank",
+   "line": 2,
+   "text": "newNode = free(96);",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = free(96);",
+    "newNode.next = curr.next;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 52,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 89,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 69,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 39,
+     "next": null
+    }
+   ],
+   "operationValue": 96,
+   "operationPosition": 3,
+   "goalPattern": [
+    52,
+    89,
+    69,
+    96,
+    39
+   ]
+  },
+  {
+   "id": "insertAtPosition-wrong-29",
+   "operation": "insertAtPosition",
+   "kind": "blank",
+   "line": 2,
+   "text": "newNode = newNode(96);",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = newNode(96);",
+    "newNode.next = curr.next;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 52,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 89,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 69,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 39,
+     "next": null
+    }
+   ],
+   "operationValue": 96,
+   "operationPosition": 3,
+   "goalPattern": [
+    52,
+    89,
+    69,
+    96,
+    39
+   ]
+  },
+  {
+   "id": "insertAtPosition-wrong-30",
+   "operation": "insertAtPosition",
+   "kind": "blank",
+   "line": 3,
+   "text": "newNode = curr.next;",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(96);",
+    "newNode = curr.next;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 52,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 89,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 69,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 39,
+     "next": null
+    }
+   ],
+   "operationValue": 96,
+   "operationPosition": 3,
+   "goalPattern": [
+    52,
+    89,
+    69,
+    96,
+    39
+   ]
+  },
+  {
+   "id": "insertAtPosition-wrong-31",
+   "operation": "insertAtPosition",
+   "kind": "blank",
+   "line": 4,
+   "text": "newNode.next = newNode;",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(96);",
+    "newNode.next = curr.next;",
+    "newNode.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 52,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 89,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 69,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 39,
+     "next": null
+    }
+   ],
+   "operationValue": 96,
+   "operationPosition": 3,
+   "goalPattern": [
+    52,
+    89,
+    69,
+    96,
+    39
+   ]
+  },
+  {
+   "id": "insertAtPosition-wrong-32",
+   "operation": "insertAtPosition",
+   "kind": "bug_option",
+   "line": 3,
+   "text": "newNode.next = curr.next.next;",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(96);",
+    "newNode.next = curr.next.next;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 52,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 89,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 69,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 39,
+     "next": null
+    }
+   ],
+   "operationValue": 96,
+   "operationPosition": 3,
+   "goalPattern": [
+    52,
+    89,
+    69,
+    96,
+    39
+   ]
+  },
+  {
+   "id": "insertAtPosition-wrong-33",
+   "operation": "insertAtPosition",
+   "kind": "bug_option",
+   "line": 1,
+   "text": "for (int i = 0; i <= index-1; i++) curr = curr.next;",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i <= index-1; i++) curr = curr.next;",
+    "newNode = createNode(96);",
+    "newNode.next = curr.next;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 52,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 89,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 69,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 39,
+     "next": null
+    }
+   ],
+   "operationValue": 96,
+   "operationPosition": 3,
+   "goalPattern": [
+    52,
+    89,
+    69,
+    96,
+    39
+   ]
+  },
+  {
+   "id": "insertAtPosition-wrong-34",
+   "operation": "insertAtPosition",
+   "kind": "distractor_start",
+   "line": 0,
+   "text": "head = newNode;",
+   "program": [
+    "head = newNode;",
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(96);",
+    "newNode.next = curr.next;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 52,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 89,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 69,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 39,
+     "next": null
+    }
+   ],
+   "operationValue": 96,
+   "operationPosition": 3,
+   "goalPattern": [
+    52,
+    89,
+    69,
+    96,
+    39
+   ]
+  },
+  {
+   "id": "insertAtPosition-wrong-35",
+   "operation": "insertAtPosition",
+   "kind": "distractor_end",
+   "line": 5,
+   "text": "head = newNode;",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(96);",
+    "newNode.next = curr.next;",
+    "curr.next = newNode;",
+    "head = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 52,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 89,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 69,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 39,
+     "next": null
+    }
+   ],
+   "operationValue": 96,
+   "operationPosition": 3,
+   "goalPattern": [
+    52,
+    89,
+    69,
+    96,
+    39
+   ]
+  },
+  {
+   "id": "insertAtPosition-wrong-36",
+   "operation": "insertAtPosition",
+   "kind": "distractor_start",
+   "line": 0,
+   "text": "free(temp);",
+   "program": [
+    "free(temp);",
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(96);",
+    "newNode.next = curr.next;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 52,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 89,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 69,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 39,
+     "next": null
+    }
+   ],
+   "operationValue": 96,
+   "operationPosition": 3,
+   "goalPattern": [
+    52,
+    89,
+    69,
+    96,
+    39
+   ]
+  },
+  {
+   "id": "insertAtPosition-wrong-37",
+   "operation": "insertAtPosition",
+   "kind": "distractor_end",
+   "line": 5,
+   "text": "free(temp);",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(96);",
+    "newNode.next = curr.next;",
+    "curr.next = newNode;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 52,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 89,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 69,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 39,
+     "next": null
+    }
+   ],
+   "operationValue": 96,
+   "operationPosition": 3,
+   "goalPattern": [
+    52,
+    89,
+    69,
+    96,
+    39
+   ]
+  },
+  {
+   "id": "insertAtPosition-wrong-38",
+   "operation": "insertAtPosition",
+   "kind": "distractor_start",
+   "line": 0,
+   "text": "while (curr.next != NULL) curr = curr.next;",
+   "program": [
+    "while (curr.next != NULL) curr = curr.next;",
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(96);",
+    "newNode.next = curr.next;",
+    "curr.next = newNode;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 52,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 89,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 69,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 39,
+     "next": null
+    }
+   ],
+   "operationValue": 96,
+   "operationPosition": 3,
+   "goalPattern": [
+    52,
+    89,
+    69,
+    96,
+    39
+   ]
+  },
+  {
+   "id": "insertAtPosition-wrong-39",
+   "operation": "insertAtPosition",
+   "kind": "distractor_end",
+   "line": 5,
+   "text": "while (curr.next != NULL) curr = curr.next;",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(96);",
+    "newNode.next = curr.next;",
+    "curr.next = newNode;",
+    "while (curr.next != NULL) curr = curr.next;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 52,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 89,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 69,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 39,
+     "next": null
+    }
+   ],
+   "operationValue": 96,
+   "operationPosition": 3,
+   "goalPattern": [
+    52,
+    89,
+    69,
+    96,
+    39
+   ]
+  },
+  {
+   "id": "removeAtPosition-wrong-1",
+   "operation": "removeAtPosition",
+   "kind": "blank",
+   "line": 0,
+   "text": "curr = NULL;",
+   "program": [
+    "curr = NULL;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 58,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 49,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 27,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 37,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    58,
+    49,
+    37
+   ]
+  },
+  {
+   "id": "removeAtPosition-wrong-2",
+   "operation": "removeAtPosition",
+   "kind": "blank",
+   "line": 0,
+   "text": "curr = temp;",
+   "program": [
+    "curr = temp;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 58,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 49,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 27,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 37,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    58,
+    49,
+    37
+   ]
+  },
+  {
+   "id": "removeAtPosition-wrong-3",
+   "operation": "removeAtPosition",
+   "kind": "blank",
+   "line": 1,
+   "text": "for (int i = 0; i < index; i++) curr = curr.next;",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 58,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 49,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 27,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 37,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    58,
+    49,
+    37
+   ]
+  },
+  {
+   "id": "removeAtPosition-wrong-4",
+   "operation": "removeAtPosition",
+   "kind": "blank",
+   "line": 1,
+   "text": "for (int i = 0; i < index-2; i++) curr = curr.next;",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-2; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 58,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 49,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 27,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 37,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    58,
+    49,
+    37
+   ]
+  },
+  {
+   "id": "removeAtPosition-wrong-5",
+   "operation": "removeAtPosition",
+   "kind": "blank",
+   "line": 2,
+   "text": "temp = curr;",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr;",
+    "curr.next = temp.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 58,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 49,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 27,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 37,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    58,
+    49,
+    37
+   ]
+  },
+  {
+   "id": "removeAtPosition-wrong-6",
+   "operation": "removeAtPosition",
+   "kind": "blank",
+   "line": 2,
+   "text": "temp = temp;",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = temp;",
+    "curr.next = temp.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 58,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 49,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 27,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 37,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    58,
+    49,
+    37
+   ]
+  },
+  {
+   "id": "removeAtPosition-wrong-7",
+   "operation": "removeAtPosition",
+   "kind": "blank",
+   "line": 3,
+   "text": "curr.next = temp;",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 58,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 49,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 27,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 37,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    58,
+    49,
+    37
+   ]
+  },
+  {
+   "id": "removeAtPosition-wrong-8",
+   "operation": "removeAtPosition",
+   "kind": "blank",
+   "line": 3,
+   "text": "curr.next = curr.next;",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = curr.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 58,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 49,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 27,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 37,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    58,
+    49,
+    37
+   ]
+  },
+  {
+   "id": "removeAtPosition-wrong-9",
+   "operation": "removeAtPosition",
+   "kind": "blank",
+   "line": 4,
+   "text": "free(curr);",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next;",
+    "free(curr);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 58,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 49,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 27,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 37,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    58,
+    49,
+    37
+   ]
+  },
+  {
+   "id": "removeAtPosition-wrong-10",
+   "operation": "removeAtPosition",
+   "kind": "blank",
+   "line": 4,
+   "text": "free(head);",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next;",
+    "free(head);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 58,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 49,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 27,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 37,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    58,
+    49,
+    37
+   ]
+  },
+  {
+   "id": "removeAtPosition-wrong-11",
+   "operation": "removeAtPosition",
+   "kind": "blank",
+   "line": 2,
+   "text": "curr = curr.next;",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "curr = curr.next;",
+    "curr.next = temp.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 58,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 49,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 27,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 37,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    58,
+    49,
+    37
+   ]
+  },
+  {
+   "id": "removeAtPosition-wrong-12",
+   "operation": "removeAtPosition",
+   "kind": "blank",
+   "line": 2,
+   "text": "head = curr.next;",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "head = curr.next;",
+    "curr.next = temp.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 58,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 49,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 27,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 37,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    58,
+    49,
+    37
+   ]
+  },
+  {
+   "id": "removeAtPosition-wrong-13",
+   "operation": "removeAtPosition",
+   "kind": "blank",
+   "line": 3,
+   "text": "curr = temp.next;",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr = temp.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 58,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 49,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 27,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 37,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    58,
+    49,
+    37
+   ]
+  },
+  {
+   "id": "removeAtPosition-wrong-14",
+   "operation": "removeAtPosition",
+   "kind": "blank",
+   "line": 3,
+   "text": "head = temp.next;",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "head = temp.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 58,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 49,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 27,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 37,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    58,
+    49,
+    37
+   ]
+  },
+  {
+   "id": "removeAtPosition-wrong-15",
+   "operation": "removeAtPosition",
+   "kind": "blank",
+   "line": 4,
+   "text": "free(prev);",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next;",
+    "free(prev);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 58,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 49,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 27,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 37,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    58,
+    49,
+    37
+   ]
+  },
+  {
+   "id": "removeAtPosition-wrong-16",
+   "operation": "removeAtPosition",
+   "kind": "blank",
+   "line": 0,
+   "text": "temp = head;",
+   "program": [
+    "temp = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 58,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 49,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 27,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 37,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    58,
+    49,
+    37
+   ]
+  },
+  {
+   "id": "removeAtPosition-wrong-17",
+   "operation": "removeAtPosition",
+   "kind": "blank",
+   "line": 0,
+   "text": "prev = head;",
+   "program": [
+    "prev = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 58,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 49,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 27,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 37,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    58,
+    49,
+    37
+   ]
+  },
+  {
+   "id": "removeAtPosition-wrong-18",
+   "operation": "removeAtPosition",
+   "kind": "blank",
+   "line": 1,
+   "text": "for (int i = 0; i < index-1; i++) curr = curr.next.next;",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 58,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 49,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 27,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 37,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    58,
+    49,
+    37
+   ]
+  },
+  {
+   "id": "removeAtPosition-wrong-19",
+   "operation": "removeAtPosition",
+   "kind": "blank",
+   "line": 1,
+   "text": "for (int i = 0; i < index-1; i++) temp = curr.next;",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) temp = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 58,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 49,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 27,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 37,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    58,
+    49,
+    37
+   ]
+  },
+  {
+   "id": "removeAtPosition-wrong-20",
+   "operation": "removeAtPosition",
+   "kind": "blank",
+   "line": 2,
+   "text": "temp = curr.val;",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.val;",
+    "curr.next = temp.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 58,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 49,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 27,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 37,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    58,
+    49,
+    37
+   ]
+  },
+  {
+   "id": "removeAtPosition-wrong-21",
+   "operation": "removeAtPosition",
+   "kind": "blank",
+   "line": 2,
+   "text": "temp = curr.prev;",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.prev;",
+    "curr.next = temp.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 58,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 49,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 27,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 37,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    58,
+    49,
+    37
+   ]
+  },
+  {
+   "id": "removeAtPosition-wrong-22",
+   "operation": "removeAtPosition",
+   "kind": "blank",
+   "line": 3,
+   "text": "curr.val = temp.next;",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.val = temp.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 58,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 49,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 27,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 37,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    58,
+    49,
+    37
+   ]
+  },
+  {
+   "id": "removeAtPosition-wrong-23",
+   "operation": "removeAtPosition",
+   "kind": "blank",
+   "line": 3,
+   "text": "curr.prev = temp.next;",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.prev = temp.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 58,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 49,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 27,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 37,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    58,
+    49,
+    37
+   ]
+  },
+  {
+   "id": "removeAtPosition-wrong-24",
+   "operation": "removeAtPosition",
+   "kind": "blank",
+   "line": 4,
+   "text": "delete(temp);",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next;",
+    "delete(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 58,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 49,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 27,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 37,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    58,
+    49,
+    37
+   ]
+  },
+  {
+   "id": "removeAtPosition-wrong-25",
+   "operation": "removeAtPosition",
+   "kind": "blank",
+   "line": 4,
+   "text": "remove(temp);",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next;",
+    "remove(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 58,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 49,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 27,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 37,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    58,
+    49,
+    37
+   ]
+  },
+  {
+   "id": "removeAtPosition-wrong-26",
+   "operation": "removeAtPosition",
+   "kind": "blank",
+   "line": 0,
+   "text": "curr = head.next;",
+   "program": [
+    "curr = head.next;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 58,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 49,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 27,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 37,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    58,
+    49,
+    37
+   ]
+  },
+  {
+   "id": "removeAtPosition-wrong-27",
+   "operation": "removeAtPosition",
+   "kind": "blank",
+   "line": 1,
+   "text": "for (int i = 1; i < index-1; i++) curr = curr.next;",
+   "program": [
+    "curr = head;",
+    "for (int i = 1; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 58,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 49,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 27,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 37,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    58,
+    49,
+    37
+   ]
+  },
+  {
+   "id": "removeAtPosition-wrong-28",
+   "operation": "removeAtPosition",
+   "kind": "blank",
+   "line": 1,
+   "text": "for (int i = 2; i < index-1; i++) curr = curr.next;",
+   "program": [
+    "curr = head;",
+    "for (int i = 2; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 58,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 49,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 27,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 37,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    58,
+    49,
+    37
+   ]
+  },
+  {
+   "id": "removeAtPosition-wrong-29",
+   "operation": "removeAtPosition",
+   "kind": "blank",
+   "line": 2,
+   "text": "mid = curr.next;",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "mid = curr.next;",
+    "curr.next = temp.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 58,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 49,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 27,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 37,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    58,
+    49,
+    37
+   ]
+  },
+  {
+   "id": "removeAtPosition-wrong-30",
+   "operation": "removeAtPosition",
+   "kind": "blank",
+   "line": 3,
+   "text": "curr.next = temp.next.next;",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 58,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 49,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 27,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 37,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    58,
+    49,
+    37
+   ]
+  },
+  {
+   "id": "removeAtPosition-wrong-31",
+   "operation": "removeAtPosition",
+   "kind": "blank",
+   "line": 4,
+   "text": "free(curr.next);",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next;",
+    "free(curr.next);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 58,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 49,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 27,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 37,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    58,
+    49,
+    37
+   ]
+  },
+  {
+   "id": "removeAtPosition-wrong-32",
+   "operation": "removeAtPosition",
+   "kind": "bug_option",
+   "line": 3,
+   "text": "curr.next = NULL;",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = NULL;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 58,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 49,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 27,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 37,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    58,
+    49,
+    37
+   ]
+  },
+  {
+   "id": "removeAtPosition-wrong-33",
+   "operation": "removeAtPosition",
+   "kind": "bug_option",
+   "line": 4,
+   "text": "free(temp.next);",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next;",
+    "free(temp.next);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 58,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 49,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 27,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 37,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    58,
+    49,
+    37
+   ]
+  },
+  {
+   "id": "removeAtPosition-wrong-34",
+   "operation": "removeAtPosition",
+   "kind": "distractor_start",
+   "line": 0,
+   "text": "newNode = createNode(66);",
+   "program": [
+    "newNode = createNode(66);",
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 58,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 49,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 27,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 37,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    58,
+    49,
+    37
+   ]
+  },
+  {
+   "id": "removeAtPosition-wrong-35",
+   "operation": "removeAtPosition",
+   "kind": "distractor_end",
+   "line": 5,
+   "text": "newNode = createNode(79);",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next;",
+    "free(temp);",
+    "newNode = createNode(79);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 58,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 49,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 27,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 37,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    58,
+    49,
+    37
+   ]
+  },
+  {
+   "id": "removeAtPosition-wrong-36",
+   "operation": "removeAtPosition",
+   "kind": "distractor_start",
+   "line": 0,
+   "text": "newNode.next = curr.next;",
+   "program": [
+    "newNode.next = curr.next;",
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 58,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 49,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 27,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 37,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    58,
+    49,
+    37
+   ]
+  },
+  {
+   "id": "removeAtPosition-wrong-37",
+   "operation": "removeAtPosition",
+   "kind": "distractor_end",
+   "line": 5,
+   "text": "newNode.next = curr.next;",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next;",
+    "free(temp);",
+    "newNode.next = curr.next;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 58,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 49,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 27,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 37,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    58,
+    49,
+    37
+   ]
+  },
+  {
+   "id": "removeAtPosition-wrong-38",
+   "operation": "removeAtPosition",
+   "kind": "distractor_start",
+   "line": 0,
+   "text": "head = head.next;",
+   "program": [
+    "head = head.next;",
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next;",
+    "free(temp);"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 58,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 49,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 27,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 37,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    58,
+    49,
+    37
+   ]
+  },
+  {
+   "id": "removeAtPosition-wrong-39",
+   "operation": "removeAtPosition",
+   "kind": "distractor_end",
+   "line": 5,
+   "text": "head = head.next;",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next;",
+    "free(temp);",
+    "head = head.next;"
+   ],
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 58,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 49,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 27,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 37,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    58,
+    49,
+    37
+   ]
+  }
+ ],
+ "prototype": [
+  {
+   "id": "A1",
+   "set": "A",
+   "operation": "insertAtHead",
+   "title": "Insert at Head",
+   "program": [
+    "newNode = createNode(92);",
+    "head = newNode;",
+    "newNode.next = head;"
+   ],
+   "correctProgram": [
+    "newNode = createNode(92);",
+    "newNode.next = head;",
+    "head = newNode;"
+   ],
+   "predict": {
+    "kind": "target",
+    "line": 2,
+    "var": "newNode",
+    "field": "next",
+    "prompt": "After line 3 runs, which building does newNode.next point to? Click it."
+   },
+   "note": "head moves before the new node is linked: newNode.next = head now reads the NEW head, a self-loop; the old list leaks",
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 90,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 42,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 76,
+     "next": null
+    }
+   ],
+   "operationValue": 92,
+   "operationPosition": null,
+   "goalPattern": [
+    92,
+    90,
+    42,
+    76
+   ]
+  },
+  {
+   "id": "A2",
+   "set": "A",
+   "operation": "insertAtPosition",
+   "title": "Insert at Position",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(10);",
+    "curr.next = newNode;",
+    "newNode.next = curr.next;"
+   ],
+   "correctProgram": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(10);",
+    "newNode.next = curr.next;",
+    "curr.next = newNode;"
+   ],
+   "predict": {
+    "kind": "leaked",
+    "prompt": "When the program ends, which buildings are leaked — nothing points to them and they were never freed? Click all of them (or none)."
+   },
+   "note": "curr.next is overwritten before the successor is saved: newNode points at itself and every node after curr leaks",
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 20,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 93,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 40,
+     "next": null
+    }
+   ],
+   "operationValue": 10,
+   "operationPosition": 2,
+   "goalPattern": [
+    20,
+    93,
+    10,
+    40
+   ]
+  },
+  {
+   "id": "A3",
+   "set": "A",
+   "operation": "removeAtPosition",
+   "title": "Remove at Position",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "free(temp);",
+    "curr.next = temp.next;"
+   ],
+   "correctProgram": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next;",
+    "free(temp);"
+   ],
+   "predict": {
+    "kind": "outcome",
+    "prompt": "What happens when this program runs?"
+   },
+   "note": "free(temp) runs before the bypass, so curr.next = temp.next reads a freed node — use after free",
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 14,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 51,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 32,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 47,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 3,
+   "goalPattern": [
+    14,
+    51,
+    32
+   ]
+  },
+  {
+   "id": "B1",
+   "set": "B",
+   "operation": "insertAtHead",
+   "title": "Insert at Head",
+   "program": [
+    "newNode = createNode(19);",
+    "newNode.next = head.next;",
+    "head = newNode;"
+   ],
+   "correctProgram": [
+    "newNode = createNode(19);",
+    "newNode.next = head;",
+    "head = newNode;"
+   ],
+   "predict": {
+    "kind": "leaked",
+    "prompt": "When the program ends, which buildings are leaked — nothing points to them and they were never freed? Click all of them (or none)."
+   },
+   "note": "head.next skips the original head, which nothing references any more",
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 82,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 9,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 12,
+     "next": null
+    }
+   ],
+   "operationValue": 19,
+   "operationPosition": null,
+   "goalPattern": [
+    19,
+    82,
+    9,
+    12
+   ]
+  },
+  {
+   "id": "B2",
+   "set": "B",
+   "operation": "insertAtPosition",
+   "title": "Insert at Position",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index; i++) curr = curr.next;",
+    "newNode = createNode(96);",
+    "newNode.next = curr.next;",
+    "curr.next = newNode;"
+   ],
+   "correctProgram": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "newNode = createNode(96);",
+    "newNode.next = curr.next;",
+    "curr.next = newNode;"
+   ],
+   "predict": {
+    "kind": "target",
+    "line": 1,
+    "var": "curr",
+    "field": null,
+    "prompt": "After line 2 runs, which building does curr point to? Click it."
+   },
+   "note": "i < index walks one node too far, so the new node is spliced in one position late",
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 52,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 89,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 69,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 39,
+     "next": null
+    }
+   ],
+   "operationValue": 96,
+   "operationPosition": 3,
+   "goalPattern": [
+    52,
+    89,
+    69,
+    96,
+    39
+   ]
+  },
+  {
+   "id": "B3",
+   "set": "B",
+   "operation": "removeAtPosition",
+   "title": "Remove at Position",
+   "program": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr;",
+    "curr.next = temp.next;",
+    "free(temp);"
+   ],
+   "correctProgram": [
+    "curr = head;",
+    "for (int i = 0; i < index-1; i++) curr = curr.next;",
+    "temp = curr.next;",
+    "curr.next = temp.next;",
+    "free(temp);"
+   ],
+   "predict": {
+    "kind": "outcome",
+    "prompt": "What happens when this program runs?"
+   },
+   "note": "temp = curr makes the bypass a no-op and frees the predecessor; nothing dereferences it afterwards, so it runs to completion — with a dangling link left in the list",
+   "initialNodes": [
+    {
+     "id": 1,
+     "value": 58,
+     "next": 2
+    },
+    {
+     "id": 2,
+     "value": 49,
+     "next": 3
+    },
+    {
+     "id": 3,
+     "value": 27,
+     "next": 4
+    },
+    {
+     "id": 4,
+     "value": 37,
+     "next": null
+    }
+   ],
+   "operationValue": null,
+   "operationPosition": 2,
+   "goalPattern": [
+    58,
+    49,
+    37
+   ]
+  }
+ ]
+}

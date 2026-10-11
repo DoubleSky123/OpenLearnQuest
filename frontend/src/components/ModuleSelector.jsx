@@ -55,10 +55,17 @@ const COLOR_MAP = {
 };
 
 // ── Component ──────────────────────────────────────────────────────────────────
-export default function ModuleSelector({ onSelect, completedModules = [], xp = 0, username, onMistakeBook, onLogout }) {
+export default function ModuleSelector({ onSelect, completedModules = [], xp = 0, username, onMistakeBook, onLogout, onBack }) {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-8">
+
+      {/* Back to the student's city (home) */}
+      {onBack && (
+        <button onClick={onBack} className="fixed top-4 left-6 z-10 text-sm text-gray-500 hover:text-gray-800 transition-colors border border-gray-200 rounded-xl px-3 py-1.5 bg-white">
+          ← City
+        </button>
+      )}
 
       {/* Top-right user bar */}
       {(username || onLogout) && (

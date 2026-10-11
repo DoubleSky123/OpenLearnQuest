@@ -137,3 +137,22 @@ def test_insert_into_empty_ai_validate_has_no_initial_nodes():
     q = get_handler("find_bug").validate(payload, "insertIntoEmpty", OP_META["insertIntoEmpty"])
     assert q["initialNodes"] == []
     assert q["goalPattern"] == [q["operationValue"]]
+
+
+def test_heap_fixtures_match_current_templates():
+    """frontend/src/prototype/fixtures.json is generated from TEMPLATES/_BLANKS/_BUGS
+    (export_heap_fixtures.py) and is both the Memory City prototype's content and
+    the heap interpreter's test oracle. Re-export in memory with the same seeds:
+    any difference means content changed without re-running the export."""
+    import random
+
+    import export_heap_fixtures as ehf
+
+    state = random.getstate()   # the export reseeds the global RNG
+    try:
+        expected = ehf.render(ehf.build_fixtures())
+    finally:
+        random.setstate(state)
+    assert ehf.FIXTURES_PATH.read_text(encoding="utf-8") == expected, (
+        "fixtures.json is stale — from backend/ run: "
+        "d:/openLearnquest/venv/Scripts/python.exe export_heap_fixtures.py")

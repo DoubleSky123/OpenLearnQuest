@@ -49,6 +49,8 @@ Serving also self-heals: when a (operation, type, intra) combo drops to the low-
 
 **Pool staleness rule**: pool payloads embed TEMPLATES content (pseudocode, step_hints) at generation time. After editing an operation's TEMPLATES entry, regenerate its pool rows: `refill_pool.py --ops <op> --purge`.
 
+**Heap fixtures rule** (Memory City, `feat/memory-city`): `frontend/src/prototype/fixtures.json` is generated from TEMPLATES/_BLANKS/_BUGS for the ops in `PHASE0_OPS` and is both the prototype's content and the interpreter's test oracle. After editing those ops' content, from `backend/` run `d:/openLearnquest/venv/Scripts/python.exe export_heap_fixtures.py` — `test_heap_fixtures_match_current_templates` fails until you do. Design + decisions: `docs/designs/memory-city.md` (local, gitignored).
+
 ### Run Migrations
 ```bash
 cd backend
@@ -61,6 +63,13 @@ cd backend
 d:/openLearnquest/venv/Scripts/python.exe -m pytest tests/ -q
 ```
 In-memory SQLite fixtures (no Postgres needed); covers the deterministic core: `ll_executor`, mastery/unlock rules, `select_spec`, `error_analyzer`, the ZPD controller contract, scaffold clamp + closed-loop telemetry. `scaffold_level` from the client is clamped server-side (`game_master.clamp_scaffold`) — never trust client-computed telemetry.
+
+Frontend (Vitest, node environment — the Memory City heap interpreter and the home city's traffic):
+```bash
+cd frontend
+npm test
+```
+Parity of `heapInterpreter.runProgram` against `goalPattern` (computed by `ll_executor`), plus every wrong line the Phase 0 content can show (compile_error / runtime_error / ok, never "unsupported"). Data comes from `frontend/src/prototype/fixtures.json`. `city/traffic.test.js`: no rear-ending, never two directions inside one crossroads, nobody stuck, cars wait at red.
 
 ## Architecture
 
@@ -76,6 +85,7 @@ backend/
       tutor.py                # /api/ai/tutor — ReAct tutor (non-streaming + streaming)
       emotion.py              # /api/emotion — behavioral + self-report
       admin.py                # /api/admin — admin dashboard
+      city.py                 # /api/city — the student's home city (GET state, POST /place)
     services/
       game_master.py          # orchestrates the multi-agent loop
       claude_service.py       # calls Claude API, retries, fallback
@@ -88,6 +98,7 @@ backend/
       error_analyzer.py       # structured error diagnosis
       ll_executor.py          # simulates linked-list ops for goalPattern
       concept_graph.py        # concept dependency graph per operation
+      city.py                 # home city: buildings earned from mastery, placement on lots
     models/                   # SQLAlchemy ORM models
     schemas/                  # Pydantic request/response schemas
 ```
@@ -95,7 +106,15 @@ backend/
 ### Frontend Structure
 ```
 frontend/src/
-  App.jsx                     # state-machine router (no react-router)
+  App.jsx                     # state-machine router (no react-router); home = lazy 3D city
+  city/                       # 3D home city (React Three Fiber, Kenney CC0 models in city/models/)
+    CityHome.jsx              # home page: HUD, backpack, placement flow, "Enter the school"
+    HomeScene.jsx             # school, roads, empty lots, earned buildings
+    CityCanvas.jsx            # shared canvas: sky/lights, orbit + reset, quality, DOM labels, GL-failure fallback
+    homeLayout.js             # lot positions (must match backend LOT_COUNT), lake, mountains, camera, labels
+    HomeNature.jsx            # mountains, lake + campsite, instanced forests/meadows, birds (layout: countryside.js)
+    HomeTraffic.jsx           # cars + traffic lights, driven by traffic.js (pure, unit-tested)
+    Instanced.jsx             # one Kenney model drawn many times (forests, roads) as instanced meshes
   contexts/
     AuthContext.jsx            # user auth state + login/register/logout
     EmotionContext.jsx         # current emotion state
@@ -112,6 +131,17 @@ frontend/src/
     AuthPage.jsx              # login + register form
     AdminDashboard.jsx        # admin view
 ```
+
+## Home City (`city/`, `services/city.py`)
+
+Home is the student's 3D city: the school plus 8 empty lots. **Entering the school is the unchanged learning flow** (ModuleSelector → skill tree → AgenticSession); nothing in the lesson, tutor or scaffolding depends on the city.
+
+- **Earned is derived, never stored.** `city.BUILDINGS` maps a building to a module; it is earned when `mastery_summary` reports every op of that module mastered ("Mastered ✓", i.e. `perfect_pass`). Today: all 12 singly ops → Linked List Tower. Only the placement is stored (`city_buildings`, unique per user+building and per user+lot); placing an already-placed building moves it.
+- `homeLayout.LOTS` index i is backend lot i — change both together (`LOT_COUNT`).
+- three.js loads only in the lazy `CityHome` chunk. No WebGL, a failed chunk, or a lost GL context → home falls back to the plain ModuleSelector (`App.jsx` `cityOk`).
+- Labels are DOM spans projected in `useFrame` (`city/Labels.jsx`), not drei `<Html>` (React 19 unmount errors).
+- Scenery is decoration only and seeded (same land for every student). Anything placed many times goes through `Instanced.jsx` (~1,500 trees/props cost ~60 draw calls); animation (tree sway, traffic, birds) runs only on High quality — Low renders on demand.
+- **Windows resolves imports case-insensitively, `.js` before `.jsx`**: a data module must not share a component's name in another case (`homeNature.js` shadowed `HomeNature.jsx` → "no default export"; hence `countryside.js`).
 
 ## Tutor Agent (`tutor_agent.py`)
 
@@ -234,6 +264,7 @@ Always-visible hint button (no error threshold). Click → modal with a per-node
 | `question_attempts` | session_id, question_id, difficulty, passed, error_count, error_type, error_concept, **intra_difficulty, scaffold_level, emotion** (state-axis telemetry), **variant** (content-variant tag: `blanksN`/`bugN-sK`/`pool:<hash8>`, null for live-AI questions) |
 | `question_pool` | operation, question_type, intra_difficulty, payload (JSON), content_hash (unique, pedagogical identity — not node values), times_served — class-shared pre-generated AI questions; serving excludes only the student's own attempted question_ids |
 | `mastery` | user_id, operation, module_id, attempts, passes, consecutive_passes, perfect_pass, type_unlocked, **active_type_level** |
+| `city_buildings` | user_id, building_key, lot, placed_at — where the student put each earned building (earned-ness itself is derived from `mastery`) |
 | `concept_mastery` | user_id, concept, mastery (0–1 float), attempts — Bayesian-style per-concept posterior |
 | `mistakes` | user_id, question_id, source, title, your_answer (JSON), correct_answer (JSON), explanation, created_at |
 | `emotion_logs` | user_id, session_id (SET NULL on session delete), emotion, source, confidence, signals (JSON), action_taken, **outcome (JSON)** — closed-loop: the question result is written back onto interventions when the attempt is recorded; tutor_chat rows carry `signals.last_message_id` linking the label to the stored transcript |
