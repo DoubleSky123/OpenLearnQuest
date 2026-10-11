@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { Component, Suspense, lazy, useState, useCallback } from 'react';
 import { useAuth } from './contexts/AuthContext';
 import { useEmotion } from './contexts/EmotionContext';
 import { progressApi, emotionApi, authApi } from './services/api';
@@ -16,6 +16,26 @@ import Leaderboard from './components/Leaderboard';
 import EmotionCheckIn from './components/EmotionCheckIn';
 import AgenticSession from './components/AgenticSession';
 import AdminDashboard from './components/AdminDashboard';
+import { hasWebGL } from './city/webgl';
+
+// Home is the student's 3D city (three.js loads only here, after login).
+const CityHome = lazy(() => import('./city/CityHome'));
+
+// If the city can't load (chunk or GL failure), home falls back to the module menu.
+class CityBoundary extends Component {
+  constructor(props) { super(props); this.state = { failed: false }; }
+  static getDerivedStateFromError() { return { failed: true }; }
+  componentDidCatch() { this.props.onFail(); }
+  render() { return this.state.failed ? null : this.props.children; }
+}
+
+function CityLoading() {
+  return (
+    <div className="min-h-screen bg-sky-100 flex items-center justify-center">
+      <div className="text-sky-900 text-lg font-medium">Loading your city…</div>
+    </div>
+  );
+}
 
 export default function App() {
   const { user, loading, logout, updateXP, patchUser } = useAuth();
@@ -25,6 +45,10 @@ export default function App() {
   const [moduleId,          setModuleId]          = useState('singly');
   const [gameMode,          setGameMode]          = useState('stress-free');
   const [chosenOperation,   setChosenOperation]   = useState(null);
+  const [cityOk,            setCityOk]            = useState(hasWebGL);
+  const [mistakesBack,      setMistakesBack]      = useState('path');
+
+  const openMistakes = (from) => { setMistakesBack(from); setScreen('mistake-book'); };
 
   const handleXpGained = useCallback(async (amount) => {
     try {
@@ -70,7 +94,7 @@ export default function App() {
           markOnboardingDone(moduleId);
           setScreen('path');
         }}
-        onBack={() => setScreen('menu')}
+        onBack={() => setScreen('school')}
       />
     );
 
@@ -98,7 +122,7 @@ export default function App() {
     );
 
   if (screen === 'mistake-book')
-    return <MistakeBook onBack={() => setScreen('path')} />;
+    return <MistakeBook onBack={() => setScreen(mistakesBack)} />;
 
   if (screen === 'leaderboard')
     return <Leaderboard onBack={() => setScreen('path')} />;
@@ -117,9 +141,9 @@ export default function App() {
           setChosenOperation(operation);
           setScreen('session');
         }}
-        onBack={() => setScreen('menu')}
+        onBack={() => setScreen('school')}
         onDailyChallenge={moduleId === 'singly' ? () => setScreen('daily-challenge') : undefined}
-        onMistakeBook={() => setScreen('mistake-book')}
+        onMistakeBook={() => openMistakes('path')}
         onLeaderboard={() => setScreen('leaderboard')}
       />
     );
@@ -138,14 +162,32 @@ export default function App() {
       />
     );
 
-  // Default: module selector
-  return (
+  // The school: the module menu, i.e. the original learning flow
+  const school = (
     <ModuleSelector
       xp={user.xp}
       username={user.username}
       onSelect={(mod) => { setModuleId(mod); setScreen(isOnboardingDone(mod) ? 'path' : 'module-welcome'); }}
-      onMistakeBook={() => setScreen('mistake-book')}
+      onMistakeBook={() => openMistakes(cityOk ? 'school' : 'menu')}
       onLogout={logout}
+      onBack={cityOk ? () => setScreen('menu') : undefined}
     />
+  );
+  if (screen === 'school' || !cityOk) return school;
+
+  // Default: home, the student's city
+  return (
+    <CityBoundary onFail={() => setCityOk(false)}>
+      <Suspense fallback={<CityLoading />}>
+        <CityHome
+          username={user.username}
+          xp={user.xp}
+          onEnterSchool={() => setScreen('school')}
+          onMistakeBook={() => openMistakes('menu')}
+          onLogout={logout}
+          onFail={() => setCityOk(false)}
+        />
+      </Suspense>
+    </CityBoundary>
   );
 }

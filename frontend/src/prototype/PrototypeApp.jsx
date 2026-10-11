@@ -3,6 +3,7 @@ import fixtures from './fixtures.json';
 import { predictionAnswer, runProgram } from '../services/heapInterpreter';
 import HeapView2D from './HeapView2D';
 import CityView3D from './CityView3D';
+import CityHub from './CityHub';
 
 /**
  * Memory City Phase 0 prototype: predict-then-step on six programs a "classmate"
@@ -264,7 +265,7 @@ function ItemScreen({ item, assignedView, webglOk, onWebglFail, position, total,
                 </button>
               )}
             </div>
-            <div className="relative h-[380px]">
+            <div className="relative h-[460px]">
               {(result.outcome === 'compile_error' || result.outcome === 'unsupported') && (
                 <div className="absolute inset-x-4 top-3 z-10 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
                   {result.outcome === 'compile_error'
@@ -407,6 +408,13 @@ export default function PrototypeApp() {
       <EndScreen session={session} webglOk={webglOk}
         onPrefer={(p) => setSession(s => ({ ...s, preference: p, finishedAt: new Date().toISOString() }))}
         onNewParticipant={() => { store.clear(); setSession(null); }} />
+    );
+
+  // the city first (3D only — on a machine without WebGL the session goes straight to class)
+  if (webglOk && session.index === 0 && !session.enteredSchool)
+    return (
+      <CityHub participant={session.participant} onWebglFail={onWebglFail}
+        onEnter={() => setSession(s => ({ ...s, enteredSchool: true }))} />
     );
 
   const planned = session.plan[session.index];
