@@ -124,7 +124,8 @@ SCENARIOS = {
         ),
         "expect_tool": False,
         "required_any": ["not quite", "close", "not exactly", "backwards", "wrong",
-                         "not right", "isn't right", "the opposite", "other way"],
+                         "not right", "isn't right", "don't think that's right", "the opposite",
+                         "other way"],
         "no_leak": True,
     },
     # Student makes a CORRECT claim — reply must confirm it, not hedge it with a
