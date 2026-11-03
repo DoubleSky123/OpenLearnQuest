@@ -4,9 +4,9 @@ A building is EARNED by learning — never stored as earned: it is derived from
 mastery every time, so it can't drift from what the skill tree shows. Only the
 student's placement choice is stored (city_buildings).
 
-For now there is one building: master every singly-linked-list operation
-("Mastered ✓" on the skill tree, i.e. mastery_summary's `mastered`) and the
-Linked List Tower goes into the inventory, ready to place on an empty lot.
+For now there is one building: master every unit of the singly-linked-list
+curriculum (services/curriculum.py — mastery_summary's `units_mastered`) and
+the Linked List Tower goes into the inventory, ready to place on an empty lot.
 """
 from sqlalchemy.orm import Session
 
@@ -33,9 +33,9 @@ def _progress(db: Session, user_id: str) -> dict[str, dict]:
         summary = gm.mastery_summary(gm.get_mastery_map(db, user_id, spec["module_id"]), spec["module_id"])
         out[key] = {
             "title": spec["title"],
-            "mastered": summary["total_mastered"],
-            "total": summary["total_ops"],
-            "earned": summary["total_mastered"] >= summary["total_ops"],
+            "mastered": summary["units_mastered"],
+            "total": summary["total_units"],
+            "earned": summary["units_mastered"] >= summary["total_units"],
         }
     return out
 

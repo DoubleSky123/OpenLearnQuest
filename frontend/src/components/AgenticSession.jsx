@@ -16,6 +16,8 @@ import NodeClassComment from './shared/NodeClassComment';
 import CelebrationBurst from './shared/CelebrationBurst';
 import GameTimer from './GameTimer';
 import TutorChat from './TutorChat';
+import FinalHintCard from './FinalHintCard';
+import { finalHintFor } from '../services/finalHint';
 import ConceptMasteryPanel from './ConceptMasteryPanel';
 import SessionSummaryOverlay from './SessionSummaryOverlay';
 import { LinkedListVisualiser } from './GoalPattern';
@@ -47,6 +49,7 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
   // fill_blank / find_bug board state lifted for the tutor ({lines, note}) —
   // without it the tutor only saw the ordering board's assembly
   const [boardState,    setBoardState]    = useState(null);
+  const [finalHintOpenId, setFinalHintOpenId] = useState(null);  // which step's final hint the student opened
   const [orderingHint,  setOrderingHint]  = useState(null);  // step-hint decision chain output (ordering)
   const [showOpHint,    setShowOpHint]    = useState(false); // LC-style collapsed hint (Advanced ops only)
   const boardStateRef   = useRef(null);      // ref mirrors for effects with stale closures
@@ -111,7 +114,7 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
   const sessionStartedRef  = useRef(false);   // guard: start the session exactly once (StrictMode-safe)
 
   const {
-    emotion, setEmotion, initSession,
+    emotion, boardEmotion, setEmotion, initSession,
     recordQuestion, recordReset, markUsedTutor, getSignalsSnapshot,
   } = useEmotion();
 
@@ -119,10 +122,12 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
   // emotion sets the baseline, each error climbs one level, mastery caps the ceiling.
   // TODO: pass per-operation mastery once backend returns it; null = full support (cap 4).
   const scaffold = useScaffold(emotion, errorCount, null);
+  // the final hint counts board mistakes and board-side emotion only (see countsForFinalHint)
+  const finalHintReady = useScaffold(boardEmotion, errorCount, null).finalHint;
 
-  // ── Proactive tutor push — fires once when scaffold level reaches the Socratic band (≥2) ──
-  // Trigger point is now emotion-aware: a confused/frustrated student gets the push sooner
-  // (higher baseline), an engaged student only after more errors. See useScaffold.
+  // ── Support order on a question: 1st mistake → the animation opens, 2nd → the tutor ──
+  // The animation comes first and the tutor never pops while it is open (and the
+  // animation never pops over an open chat): one interrupts the other otherwise.
   const PROACTIVE_INIT_BY_TYPE = {
     fill_blank: "[PROACTIVE_INIT] The student is stuck on this fill-in-the-blank step. Without asking what they need help with, consider the blank they are on and ask one targeted Socratic question about the value that belongs there.",
     find_bug:   "[PROACTIVE_INIT] The student is struggling to find the bug. Without asking what they need help with, consider the line they suspect and ask one targeted Socratic question about what that line does.",
@@ -130,8 +135,9 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
   };
 
   useEffect(() => {
-    // Need scaffold ≥2 AND at least one error on THIS question (avoid pushing on an empty board).
-    if (scaffold.level < 2 || errorCountRef.current < 1 || proactiveTriggeredRef.current || showTutor) return;
+    // Socratic band (scaffold ≥2) AND a second mistake on THIS question: the first
+    // mistake belongs to the animation. Waits while the animation is still open.
+    if (scaffold.level < 2 || errorCountRef.current < 2 || proactiveTriggeredRef.current || showTutor || showHintAnim) return;
     const q = qRef.current;
     if (!q || !sessionId) return;
     proactiveTriggeredRef.current = true;
@@ -149,12 +155,14 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
       {
         session_id:      sessionId,   // persists the proactive exchange into memory
         question_title:  q.title,
+        question_id:     q.id ?? null,
         operation:       q.operation,
         question_type:   qType,
         your_answer:     qType === 'ordering'
           ? assemblyToText(assemblyAreaRef.current ?? [], q.pseudocode, q.distractors)
           : (boardStateRef.current?.lines ?? []),
         board_note:      boardStateRef.current?.note ?? null,
+        board_phase:     boardStateRef.current?.focus?.kind ?? null,
         correct_answer:  correctAnswer,
         error_count:     errorCountRef.current,
         messages:        [],
@@ -173,15 +181,16 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
       },
       (err) => console.warn("[proactive tutor failed]", err),
     );
-  }, [scaffold.level]); // eslint-disable-line
+  }, [scaffold.level, errorCount, showHintAnim]); // eslint-disable-line
 
-  // ── Animation auto-opens once when scaffold level reaches 3 ──────────────────
+  // ── Animation auto-opens once, on the first mistake of the question ──────────
+  // Not over an open tutor chat: then it waits for a mistake made with the chat closed.
   useEffect(() => {
     if (scaffold.level > maxScaffoldRef.current) maxScaffoldRef.current = scaffold.level;
-    if (scaffold.level < 3 || animAutoOpenedRef.current || showHintAnim) return;
+    if (errorCountRef.current < 1 || animAutoOpenedRef.current || showHintAnim || showTutor) return;
     animAutoOpenedRef.current = true;
     setShowHintAnim(true);
-  }, [scaffold.level]); // eslint-disable-line
+  }, [scaffold.level, errorCount]); // eslint-disable-line
 
   // ── Pre-fetch next AI question in background ─────────────────────────────────
   const startPrefetch = useCallback((sid, lastOp, currentEmotion, currentQid = null) => {
@@ -323,7 +332,7 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
     gameMasterApi.recordResult(
       sessionId, q.operation, q.id, questionNumber,
       true, boardErrors, timeMs,
-      { intraDifficulty: q.intra_difficulty ?? null, scaffoldLevel: maxScaffoldRef.current, emotion, variant: q.variant ?? null },
+      { intraDifficulty: q.intra_difficulty ?? null, scaffoldLevel: maxScaffoldRef.current, emotion, variant: q.variant ?? null, questionType: q.question_type ?? null, purpose: q.purpose ?? null },
     ).then(data => {
       resultRecordedRef.current = true;
       // Mastery delta for the analysis card: before (ref) vs after (response)
@@ -346,19 +355,31 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
     });
   }, [sessionId, questionNumber, onXpGained, recordQuestion, startPrefetch, inferEmotion, emotion]);
 
-  const handleBoardError = useCallback(() => {
+  // pick = { line, picked, answer } from the board: WHICH wrong option was chosen.
+  // Item analysis (distractor choice rates) needs it; the tutor's [STUDENT HISTORY]
+  // shows it as "line 3: curr.next.next". Join to question_attempts on question_id.
+  // kind 'suspect' (find_bug): a correct line was taken for the bug — no option
+  // was picked, so there is nothing for misconception diagnosis to tag.
+  const handleBoardError = useCallback((pick) => {
     const next = errorCountRef.current + 1;
     setErrorCount(next);
     errorCountRef.current = next;
     const q = qRef.current;
     if (q) {
+      const suspect = pick?.kind === 'suspect';
+      const yourAnswer = !pick ? []
+        : suspect ? [`suspected line ${pick.line + 1}, which is fine: ${pick.picked}`]
+        : [`line ${pick.line + 1}: ${pick.picked}`];
       progressApi.addMistake({
         question_id: q.id ?? q.title,
         source: 'agentic',
         title: q.title,
-        your_answer: [],
-        correct_answer: [],
+        your_answer: yourAnswer,
+        correct_answer: pick ? [String(pick.answer)] : [],
         explanation: q.hint,
+        // misconception diagnosis: the server tags this pick from the item it served
+        pick_line: pick && !suspect ? pick.line : null,
+        pick_option: pick && !suspect ? String(pick.picked) : null,
       }).catch(() => {});
     }
   }, []);
@@ -455,7 +476,7 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
     gameMasterApi.recordResult(
       sessionId, q.operation, q.id, questionNumber,
       true, errorCountRef.current, timeMs,
-      { intraDifficulty: q.intra_difficulty ?? null, scaffoldLevel: maxScaffoldRef.current, emotion, variant: q.variant ?? null },
+      { intraDifficulty: q.intra_difficulty ?? null, scaffoldLevel: maxScaffoldRef.current, emotion, variant: q.variant ?? null, questionType: q.question_type ?? null, purpose: q.purpose ?? null },
     ).then(data => {
       resultRecordedRef.current = true;
       // Mastery delta for the analysis card: before (ref) vs after (response)
@@ -499,7 +520,7 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
       prefetchRef.current = null;
       // Capture the just-finished question's telemetry BEFORE initBoard swaps it out
       const recordedId        = qRef.current.id;
-      const recordedTelemetry = { intraDifficulty: qRef.current.intra_difficulty ?? null, scaffoldLevel: maxScaffoldRef.current, questionType: qRef.current.question_type ?? 'ordering', variant: qRef.current.variant ?? null };
+      const recordedTelemetry = { intraDifficulty: qRef.current.intra_difficulty ?? null, scaffoldLevel: maxScaffoldRef.current, questionType: qRef.current.question_type ?? 'ordering', variant: qRef.current.variant ?? null, purpose: qRef.current.purpose ?? null, prefetched: true };
       setQuestionNumber(nextNum);
       setOperation(pre.operation);
       initBoard(pre.question);
@@ -523,7 +544,7 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
       const data = await gameMasterApi.nextQuestion(
         sessionId, operation, qRef.current.id,
         questionNumber, true, errorCountRef.current, timeMs, emotion, skipRecord, planned, chosenOperation,
-        { intraDifficulty: qRef.current.intra_difficulty ?? null, scaffoldLevel: maxScaffoldRef.current, questionType: qRef.current.question_type ?? 'ordering', variant: qRef.current.variant ?? null },
+        { intraDifficulty: qRef.current.intra_difficulty ?? null, scaffoldLevel: maxScaffoldRef.current, questionType: qRef.current.question_type ?? 'ordering', variant: qRef.current.variant ?? null, purpose: qRef.current.purpose ?? null },
       );
       if (data.mastery_summary) setMasteryData(data.mastery_summary);
       if (data.concept_mastery) setConceptMastery(data.concept_mastery);
@@ -550,6 +571,18 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
   const q              = question;
   const currentPattern = getCurrentPattern(nodes);
   const livesArr       = Array.from({ length: MAX_LIVES }, (_, i) => i < lives);
+
+  // Final hint (scaffold level 4): the answer for the step they are on, on request.
+  // Its id names the question AND the step, so opening it covers that step only.
+  const isOrderingQ = !q?.question_type || q.question_type === 'ordering';
+  const orderingNow = q && isOrderingQ ? assemblyToText(assemblyArea, q.pseudocode, q.distractors) : [];
+  const finalHint   = q && finalHintReady && !showSuccess
+    ? finalHintFor({
+        question: q, focus: boardState?.focus ?? null, attempt: orderingNow,
+        correct: isOrderingQ ? closestCorrectLines(q, orderingNow) : [],
+      })
+    : null;
+  const finalHintId = finalHint ? `${q.id}:${finalHint.label}` : null;
 
   // ── Block click handlers ──────────────────────────────────────────────────────
   const onPoolBlockClick = (i) => {
@@ -638,6 +671,22 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
             {/* Col 1: Info panel */}
             <div className="flex flex-col gap-4">
               <div className="bg-white rounded-xl border border-gray-200 p-4">
+                {/* why this op now (backend game_master.plan_next) */}
+                {q.purpose === 'review' && (
+                  <p className="text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1 mb-2 inline-block">
+                    🔁 Quick review — something you mastered earlier. It doesn't affect your progress.
+                  </p>
+                )}
+                {q.purpose === 'detour' && (
+                  <p className="text-xs font-semibold text-sky-700 bg-sky-50 border border-sky-200 rounded-lg px-2.5 py-1 mb-2 inline-block">
+                    🔀 Same idea, different operation — a fresh angle before you go back.
+                  </p>
+                )}
+                {q.purpose === 'remediate' && (
+                  <p className="text-xs font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1 mb-2 inline-block">
+                    🎯 A second look at something that tripped you up before — this time on a different list.
+                  </p>
+                )}
                 <h2 className="text-base font-semibold text-gray-900 mb-1">{q.title}</h2>
                 {questionInstruction(q) && (
                   <p className="text-sm text-indigo-600 font-medium mb-2">
@@ -683,9 +732,16 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
                 <div className="bg-gray-50 rounded-lg p-2.5">
                   <p className="text-gray-400 text-xs font-medium mb-1">Goal state</p>
                   {q.operation === 'detectCycle' ? (
-                    <p className="text-sm text-amber-800">
-                      return <span className="font-mono font-bold">true</span> — the tail points back into the list, so a cycle exists
-                    </p>
+                    // half the boards have a cycle, half end at NULL (static_questions._cycle_extra)
+                    q.cycleTo != null ? (
+                      <p className="text-sm text-amber-800">
+                        return <span className="font-mono font-bold">true</span> — the tail points back into the list, so a cycle exists
+                      </p>
+                    ) : (
+                      <p className="text-sm text-amber-800">
+                        return <span className="font-mono font-bold">false</span> — the list ends at NULL, so there is no cycle
+                      </p>
+                    )
                   ) : (
                     <LinkedListVisualiser values={q.goalPattern} emptyLabel="Empty list" nodeColor="bg-amber-50 border-amber-300 text-amber-800" />
                   )}
@@ -786,6 +842,13 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
                   </p>
                 </div>
               )}
+              {finalHint && (
+                <FinalHintCard
+                  hint={finalHint}
+                  open={finalHintOpenId === finalHintId}
+                  onOpen={() => setFinalHintOpenId(finalHintId)}
+                />
+              )}
             </div>
 
             {/* Col 3: Concept mastery + Tutor (pet/XP layer parked — no research value) */}
@@ -820,6 +883,9 @@ export default function AgenticSession({ moduleId, xp: initialXp, mode, operatio
                   initialMessages={proactiveHistory}
                   initialInput={tutorSeed}
                   phase={tutorPhase}
+                  finalHint={!!finalHint}
+                  finalHintStep={finalHint}
+                  questionId={q.id ?? null}
                   onClose={() => { setShowTutor(false); setTutorSeed(null); setTutorPhase('solving'); }}
                 />
               )}

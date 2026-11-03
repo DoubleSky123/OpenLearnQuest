@@ -16,19 +16,18 @@ import logging
 import uuid
 from datetime import datetime
 
-from anthropic import Anthropic
+from .anthropic_client import get_client
+from . import anthropic_client
 from sqlalchemy.orm import Session
 
-from ..config import settings
 from ..database import SessionLocal
 from ..models.concept_mastery import ConceptMastery
 from ..models.tutor_conversation import TutorConversation, TutorMessage
 from .concept_graph import CONCEPTS, concepts_for_op
 
 logger = logging.getLogger(__name__)
-_client = Anthropic(api_key=settings.anthropic_api_key)
+_client = get_client("background")
 
-_MODEL = "claude-haiku-4-5"
 
 COMPACT_THRESHOLD = 20   # uncompacted messages that trigger a view compaction
 KEEP_VERBATIM = 8        # most recent messages always sent verbatim
@@ -307,8 +306,8 @@ def _age(dt: datetime | None) -> str:
 
 def _call_model(prompt: str, max_tokens: int = 300) -> str:
     msg = _client.messages.create(
-        model=_MODEL,
-        max_tokens=max_tokens,
+        **anthropic_client.options("background"),
+        max_tokens=max_tokens + anthropic_client.THINKING_HEADROOM,
         messages=[{"role": "user", "content": prompt}],
     )
-    return msg.content[0].text
+    return anthropic_client.text_of(msg)

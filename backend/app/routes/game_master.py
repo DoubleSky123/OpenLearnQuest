@@ -43,6 +43,8 @@ class RecordResultRequest(BaseModel):
     scaffold_level: int | None = None
     emotion: str | None = None
     variant: str | None = None
+    question_type: str | None = None   # clamped server-side (game_master.played_level)
+    purpose: str | None = None         # practice | detour | review — a review never changes mastery
 
 
 class NextQuestionRequest(BaseModel):
@@ -61,6 +63,9 @@ class NextQuestionRequest(BaseModel):
     scaffold_level: int | None = None
     question_type: str | None = None
     variant: str | None = None
+    purpose: str | None = None
+    # the client already shows a prefetched question: record + state, no new question
+    prefetched: bool = False
 
 
 class PrefetchRequest(BaseModel):
@@ -140,6 +145,8 @@ def record_result(
         scaffold_level=body.scaffold_level,
         emotion=body.emotion,
         variant=body.variant,
+        question_type=body.question_type,
+        purpose=body.purpose,
     )
 
 
@@ -178,6 +185,8 @@ def next_question(
             scaffold_level=body.scaffold_level,
             question_type=body.question_type,
             variant=body.variant,
+            purpose=body.purpose,
+            prefetched=body.prefetched,
         )
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))

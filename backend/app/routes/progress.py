@@ -10,6 +10,7 @@ from ..models.game_session import GameSession
 from ..models.question_attempt import QuestionAttempt
 from ..models.mistake import Mistake
 from ..dependencies import get_current_user
+from ..services import misconception_model
 from datetime import datetime
 
 router = APIRouter(prefix="/api/progress", tags=["progress"])
@@ -101,10 +102,18 @@ def get_mistakes(
 
 @router.post("/mistakes", response_model=MistakeOut)
 def add_mistake(body: MistakeCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    mistake = Mistake(user_id=current_user.id, **body.model_dump())
+    mistake = Mistake(user_id=current_user.id, **body.model_dump(exclude={"pick_line", "pick_option"}))
     db.add(mistake)
     db.commit()
     db.refresh(mistake)
+    if body.source == "agentic":
+        # misconception evidence: tagged server-side from the served item (never
+        # from the client); a no-op when MISCONCEPTION_MODE is off
+        line, option = body.pick_line, body.pick_option
+        if line is None:
+            line, option = misconception_model.parse_pick(body.your_answer)
+        misconception_model.record_pick(db, current_user.id, body.question_id, line=line, option=option,
+                                        assembly=body.your_answer if line is None else None)
     return mistake
 
 

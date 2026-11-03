@@ -85,6 +85,9 @@ export default function TutorChat({
   initialMessages = null,
   initialInput = null,   // pre-typed question (e.g. the analysis card's "Consider")
   phase = "solving",     // "reviewing" once the answer is on screen — lets the tutor explain it
+  finalHint = false,     // scaffold level 4: the tutor may state the answer for the current step
+  finalHintStep = null,  // {stepNo, answer} the FinalHintCard shows — the server guard allows exactly this
+  questionId = null,     // q.id — joins tutor telemetry to the question attempt
   onClose,
 }) {
   const { setEmotion } = useEmotion();
@@ -127,21 +130,28 @@ export default function TutorChat({
     setStreaming(true);
     setStreamingText("");
     accumulatedRef.current = "";
+    let noticed = false;
 
     cancelRef.current = streamTutorChat(
       {
         session_id:      sessionId,   // conversation memory key (backend persists by it)
         question_title:  questionTitle,
+        question_id:     questionId,
         operation,
         question_type:   questionType,
         your_answer:     yourAnswer,
         board_note:      boardNote,
+        board_phase:     boardFocus?.kind ?? null,
         correct_answer:  correctAnswer,
         error_count:     errorCount,
-        messages:        messages,   // legacy fallback; DB history is authoritative
+        messages:        messages.filter(m => m.role !== "notice"),   // legacy fallback; DB history is authoritative
         user_message:    text.trim(),
         error_diagnosis: messages.length === 0 ? errorDiagnosis : null,
         phase,
+        final_hint:      finalHint,
+        final_hint_step: finalHint && finalHintStep
+          ? { stepNo: finalHintStep.stepNo, answer: finalHintStep.answer }
+          : null,
       },
       (token) => {
         accumulatedRef.current += token;
@@ -150,13 +160,19 @@ export default function TutorChat({
       () => {
         const finalText = accumulatedRef.current;
         accumulatedRef.current = "";
+        if (noticed || !finalText) {
+          // a notice or an error ended the turn: there is no tutor reply to add
+          setStreamingText("");
+          setStreaming(false);
+          return;
+        }
         setMessages((m) => {
           const next = [...m, { role: "assistant", content: finalText }];
           // Infer emotion from chat text after each exchange (LLM, async).
           // question_title makes the backend read the persisted conversation.
           if (sessionId) {
             emotionApi.inferChat(sessionId, next, questionTitle)
-              .then(res => setEmotion(res.emotion, 'llm'))
+              .then(res => setEmotion(res.emotion, 'chat'))   // 'chat': never moves the final hint
               .catch(e => console.warn('[inferChat failed]', e));
           }
           return next;
@@ -171,6 +187,13 @@ export default function TutorChat({
         ]);
         setStreaming(false);
         setStreamingText("");
+      },
+      (notice) => {
+        // e.g. rate limited: the message never reached the tutor (not stored), so
+        // take it back out of the chat and put it in the box to send again later
+        noticed = true;
+        setMessages((m) => [...m.slice(0, -1), { role: "notice", content: notice }]);
+        setInput(text.trim());
       }
     );
   }
@@ -185,25 +208,26 @@ export default function TutorChat({
   }
 
   return (
-    <div className="fixed bottom-6 right-6 w-96 max-h-[600px] flex flex-col bg-white rounded-2xl shadow-2xl border border-gray-200 z-[60] overflow-hidden">
+    // full viewport height, wider, larger type (teacher feedback: the panel was too small to read)
+    <div className="fixed top-4 bottom-4 right-4 w-[32rem] max-w-[calc(100vw-2rem)] flex flex-col bg-white rounded-2xl shadow-2xl border border-gray-200 z-[60] overflow-hidden">
 
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-indigo-600 to-violet-600 shrink-0">
-        <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-lg">🧑‍🏫</div>
-        <div className="flex-1">
-          <p className="text-white font-semibold text-sm">Algorithm Tutor</p>
-          <p className="text-white/70 text-xs truncate">{questionTitle}</p>
+      <div className="flex items-center gap-3 px-5 py-3.5 bg-gradient-to-r from-indigo-600 to-violet-600 shrink-0">
+        <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-xl">🧑‍🏫</div>
+        <div className="flex-1 min-w-0">
+          <p className="text-white font-semibold text-lg">Algorithm Tutor</p>
+          <p className="text-white/70 text-sm truncate">{questionTitle}</p>
         </div>
         <button
           onClick={onClose}
-          className="text-white/60 hover:text-white transition-colors text-xl leading-none"
+          className="text-white/60 hover:text-white transition-colors text-2xl leading-none"
         >
           ×
         </button>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 min-h-0">
+      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 min-h-0">
         {messages
           .filter(m => !(m.role === "user" && m.content.startsWith("[PROACTIVE_INIT]")))
           .map((msg, i) => (
@@ -221,7 +245,7 @@ export default function TutorChat({
       </div>
 
       {/* Input */}
-      <form onSubmit={handleSubmit} className="shrink-0 border-t border-gray-100 flex gap-2 px-3 py-2.5">
+      <form onSubmit={handleSubmit} className="shrink-0 border-t border-gray-100 flex gap-2 px-4 py-3">
         <textarea
           ref={inputRef}
           rows={1}
@@ -229,13 +253,13 @@ export default function TutorChat({
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Ask tutor... (Enter to send)"
-          className="flex-1 resize-none rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-gray-50"
+          className="flex-1 resize-none rounded-xl border border-gray-200 px-3.5 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-gray-50"
           disabled={streaming}
         />
         <button
           type="submit"
           disabled={streaming || !input.trim()}
-          className="shrink-0 w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center hover:bg-indigo-700 disabled:opacity-40 transition-colors"
+          className="shrink-0 w-11 h-11 rounded-xl bg-indigo-600 text-white text-lg flex items-center justify-center hover:bg-indigo-700 disabled:opacity-40 transition-colors"
         >
           ↑
         </button>
@@ -260,10 +284,10 @@ function renderContent(text) {
         href={url}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex items-center gap-1.5 bg-red-50 border border-red-200 text-red-700 rounded-lg px-2.5 py-1 my-1 text-xs font-semibold hover:bg-red-100 transition-colors no-underline"
+        className="inline-flex items-center gap-1.5 bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-1.5 my-1 text-sm font-semibold hover:bg-red-100 transition-colors no-underline"
         style={{ display: 'inline-flex' }}
       >
-        <span style={{ fontSize: 11 }}>▶</span>
+        <span style={{ fontSize: 13 }}>▶</span>
         Watch on YouTube ↗
       </a>
     );
@@ -274,18 +298,21 @@ function renderContent(text) {
 }
 
 function Bubble({ role, content, streaming }) {
+  if (role === "notice") {
+    return <p className="text-center text-sm italic text-gray-500 px-6">{content}</p>;
+  }
   const isUser = role === "user";
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
       <div
-        className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
+        className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-base leading-relaxed whitespace-pre-wrap ${
           isUser
             ? "bg-indigo-600 text-white rounded-br-sm"
             : "bg-gray-100 text-gray-800 rounded-bl-sm"
         } ${streaming ? "opacity-90" : ""}`}
       >
         {isUser ? content : renderContent(content)}
-        {streaming && <span className="inline-block w-1 h-3 bg-indigo-400 ml-0.5 animate-pulse rounded" />}
+        {streaming && <span className="inline-block w-1 h-4 bg-indigo-400 ml-0.5 animate-pulse rounded" />}
       </div>
     </div>
   );

@@ -33,13 +33,68 @@ def _seed_pool(db, n=3, intra=2, **kw):
     return rows
 
 
+_REAL_IS_CURRENT = question_pool.is_current
+_REAL_SANITIZE = question_pool._sanitize
+
+
 @pytest.fixture(autouse=True)
 def _no_refill_threads(monkeypatch):
-    """Self-heal spawns threads + hits the API; capture instead."""
+    """Self-heal spawns threads + hits the API; capture instead. These tests
+    exercise serving MECHANICS with placeholder payloads, so the content checks
+    (template drift + item harness) are off here and tested below on real ones."""
     calls = []
     monkeypatch.setattr(question_pool, "_maybe_refill_async",
                         lambda *a: calls.append(a))
+    monkeypatch.setattr(question_pool, "is_current", lambda row: True)
+    monkeypatch.setattr(question_pool, "_sanitize", lambda q: q)
     yield calls
+
+
+def _real_find_bug(op="removeAtHead", buggy="free(head);", line=2,
+                   wrong=("free(head.next);", "free(temp.next);")):
+    from app.services.static_questions import TEMPLATES
+    steps = list(TEMPLATES[op]["pseudocode"])
+    fix = steps[line]
+    steps[line] = buggy
+    return {"operation": op, "question_type": "find_bug", "title": op, "pseudocode": steps,
+            "bug_line": line, "fix": fix, "options": [fix, *wrong], "difficulty": 1,
+            "initialNodes": [{"id": 1, "value": 5, "next": 2}, {"id": 2, "value": 8, "next": 3},
+                             {"id": 3, "value": 9, "next": None}],
+            "operationValue": None, "operationPosition": None}
+
+
+def test_stale_template_rows_are_never_served(db, monkeypatch):
+    """A row built on an older template (here: detectCycle's old 4-step version,
+    whose meeting check sat outside the loop) must not reach a student."""
+    monkeypatch.setattr(question_pool, "is_current", _REAL_IS_CURRENT)
+    stale = {"operation": "detectCycle", "question_type": "find_bug", "title": "x", "bug_line": 2,
+             "pseudocode": ["slow = head; fast = head;",
+                            "while (fast != NULL && fast.next != NULL) { slow = slow.next; fast = fast.next.next; }",
+                            "if (slow == fast) return false;", "return false;"]}
+    question_pool.insert_question(db, stale, 2)
+    assert question_pool.serve(db, _mk_user(db).id, "detectCycle", "find_bug", 2) is None
+
+
+def test_sanitize_drops_a_wrong_fix_that_is_actually_correct():
+    q = _real_find_bug(op="removeAtHead", buggy="head = head;", line=1,
+                       wrong=("head = temp.next;", "head = NULL;"))   # temp == head: temp.next works
+    out = _REAL_SANITIZE(q)
+    assert "head = temp.next;" not in out["options"] and "head = NULL;" in out["options"]
+
+
+def test_sanitize_rejects_a_bug_that_is_not_a_bug():
+    q = _real_find_bug(op="removeAtHead", buggy="head = temp.next;", line=1)
+    assert _REAL_SANITIZE(q) is None
+
+
+def test_sanitize_recomputes_ordering_valid_orders():
+    from app.services.static_questions import TEMPLATES
+    q = {"operation": "reverseList", "question_type": "ordering",
+         "pseudocode": TEMPLATES["reverseList"]["pseudocode"],
+         "distractors": ["head = curr;", "newNode = createNode(5);"], "validOrders": [[0, 1, 2, 3]]}
+    out = _REAL_SANITIZE(q)
+    assert [1, 0, 2, 3] in out["validOrders"]
+    assert out["distractors"] == ["head = curr;"]   # newNode isn't in this program
 
 
 def test_insert_dedupes_on_content_hash(db):
@@ -47,6 +102,28 @@ def test_insert_dedupes_on_content_hash(db):
     assert question_pool.insert_question(db, q, 2) is not None
     assert question_pool.insert_question(db, dict(q), 2) is None
     assert db.query(QuestionPool).count() == 1
+
+
+def test_rehash_restores_dedup_for_rows_hashed_by_an_old_formula(db):
+    """A row whose stored hash came from an older formula no longer dedups: the
+    same question could be pooled twice. --rehash fixes the key, never the payload."""
+    row = question_pool.insert_question(db, _mk_q(qtype="ordering"), 2)
+    row.content_hash = "old-formula"
+    db.commit()
+    assert question_pool.insert_question(db, _mk_q(qtype="ordering", tag="B"), 2) is not None
+    assert question_pool.rehash_existing(db) == (1, 0)
+    assert question_pool.insert_question(db, _mk_q(qtype="ordering"), 2) is None   # dedups again
+    assert question_pool.rehash_existing(db) == (0, 0)
+
+
+def test_rehash_never_takes_an_identity_another_row_holds(db):
+    keep = question_pool.insert_question(db, _mk_q(qtype="ordering"), 2)
+    twin = QuestionPool(operation=keep.operation, question_type="ordering", intra_difficulty=2,
+                        payload=dict(keep.payload), content_hash="old-formula", times_served=0)
+    db.add(twin)
+    db.commit()
+    assert question_pool.rehash_existing(db) == (0, 1)
+    assert twin.content_hash == "old-formula"
 
 
 def test_content_hash_ignores_build_randomness():

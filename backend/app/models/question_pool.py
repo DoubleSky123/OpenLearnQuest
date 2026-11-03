@@ -24,4 +24,7 @@ class QuestionPool(Base):
     # NOT the whole payload — node values vary per build and must not defeat dedup.
     content_hash: Mapped[str] = mapped_column(String, nullable=False, unique=True)
     times_served: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # the misconception the item's bug / a distractor shows, decided by execution
+    # (misconceptions.classify_program); null = untagged. Targeted serving filters on it.
+    misconception_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

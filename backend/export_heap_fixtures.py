@@ -168,9 +168,13 @@ def _wrong() -> list[dict]:
                 prog = list(tmpl)
                 prog[bug["line"]] = text
                 add(kind, bug["line"], prog)
+        # The ordering board has exactly len(tmpl) slots, so a distractor can only
+        # take a real step's place (the item harness checks every such order).
         for d in TEMPLATES[op]["distractors"]:
-            add("distractor_start", 0, [d] + list(tmpl))
-            add("distractor_end", len(tmpl), list(tmpl) + [d])
+            for k in range(len(tmpl)):
+                prog = list(tmpl)
+                prog[k] = d
+                add("distractor", k, prog)
     return out
 
 

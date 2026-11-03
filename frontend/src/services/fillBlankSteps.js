@@ -23,10 +23,11 @@ export function computeStepStates(operation, initialValues, value, position) {
         { values: out, cursor: 0,    hi: null,                      note: 'head = newNode ✓' },
       ];
     }
+    // insertIntoEmpty / insertAtTail have no `newNode.next = NULL` step: createNode
+    // already sets it (see NodeClassComment), so the line was a no-op.
     case 'insertIntoEmpty': {
       return [
         { values: [v], cursor: null, hi: { value: v, kind: 'new' }, note: `newNode = createNode(${v})` },
-        { values: [v], cursor: null, hi: { value: v, kind: 'new' }, note: 'newNode.next = NULL' },
         { values: [v], cursor: 0,    hi: null,                      note: 'head = newNode ✓' },
       ];
     }
@@ -36,8 +37,7 @@ export function computeStepStates(operation, initialValues, value, position) {
         { values: init, cursor: 0,                       hi: null,                      note: 'curr = head' },
         { values: init, cursor: last >= 0 ? last : null, hi: null,                      note: 'traverse to tail' },
         { values: out,  cursor: last >= 0 ? last : null, hi: { value: v, kind: 'new' }, note: `newNode = createNode(${v})` },
-        { values: out,  cursor: last >= 0 ? last : null, hi: { value: v, kind: 'new' }, note: 'curr.next = newNode' },
-        { values: out,  cursor: null,                    hi: null,                      note: 'newNode.next = NULL ✓' },
+        { values: out,  cursor: null,                    hi: null,                      note: 'curr.next = newNode ✓' },
       ];
     }
     case 'removeAtHead': {

@@ -79,6 +79,9 @@ export const gameMasterApi = {
       scaffold_level: telemetry.scaffoldLevel ?? null,
       emotion: telemetry.emotion ?? null,
       variant: telemetry.variant ?? null,
+      // the server clamps this to the type it served (mastery = a perfect ordering pass)
+      question_type: telemetry.questionType ?? null,
+      purpose: telemetry.purpose ?? null,      // a review never changes mastery
     }),
 
   nextQuestion: (sessionId, operation, questionId, questionNumber, passed, errorCount, timeMs, emotion, skipRecord = false, plannedQuestions = 3, pinnedOperation = null, telemetry = {}) =>
@@ -91,6 +94,9 @@ export const gameMasterApi = {
       scaffold_level: telemetry.scaffoldLevel ?? null,
       question_type: telemetry.questionType ?? null,
       variant: telemetry.variant ?? null,
+      purpose: telemetry.purpose ?? null,
+      // the client already shows a prefetched question: the server records, no new question
+      prefetched: telemetry.prefetched ?? false,
     }),
 
   prefetchNext: (sessionId, lastOperation, emotion, pinnedOperation = null, currentQuestionId = null) =>
@@ -112,6 +118,16 @@ export const cityApi = {
   place: (building_key, lot) => request("POST", "/api/city/place", { building_key, lot }),
 };
 
+// Teach Quinn — the elective where the student teaches an AI classmate (/api/npc)
+export const npcApi = {
+  status: () => request("GET", "/api/npc/status"),
+  current: () => request("GET", "/api/npc/case"),
+  start: (fresh = false) => request("POST", "/api/npc/case", { fresh }),
+  test: (caseId, board) => request("POST", `/api/npc/case/${caseId}/test`, board),
+  explain: (caseId, body) => request("POST", `/api/npc/case/${caseId}/explain`, body),
+  coach: (caseId) => request("POST", `/api/npc/case/${caseId}/coach`),
+};
+
 // Admin
 export const adminApi = {
   getOverview: () => request("GET", "/api/admin/overview"),
@@ -131,7 +147,9 @@ export const tutorApi = {
 };
 
 // Tutor agent (streaming)
-export function streamTutorChat(data, onToken, onDone, onError) {
+// onNotice: a system message from the server (e.g. rate limited) — not a tutor
+// reply, nothing was stored; the stream still ends with onDone.
+export function streamTutorChat(data, onToken, onDone, onError, onNotice = null) {
   const token = getToken();
   const ctrl = new AbortController();
 
@@ -163,6 +181,7 @@ export function streamTutorChat(data, onToken, onDone, onError) {
             const obj = JSON.parse(payload);
             if (obj.token) onToken(obj.token);
             if (obj.error) onError(obj.error);
+            if (obj.notice) onNotice?.(obj.notice);
           } catch { /* ignore malformed SSE line */ }
         }
       }

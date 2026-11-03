@@ -9,12 +9,13 @@ import ModuleSelector from './components/ModuleSelector';
 import ModuleWelcomePage from './components/ModuleWelcomePage';
 import TutorialIntroPage from './components/TutorialIntroPage';
 import ModeSelector from './components/ModeSelector';
-import OperationSkillTree from './components/OperationSkillTree';
+import UnitPath from './components/UnitPath';
 import DailyChallenge from './components/DailyChallenge';
 import MistakeBook from './components/MistakeBook';
 import Leaderboard from './components/Leaderboard';
 import EmotionCheckIn from './components/EmotionCheckIn';
 import AgenticSession from './components/AgenticSession';
+import TeachSession from './components/TeachSession';
 import AdminDashboard from './components/AdminDashboard';
 import { hasWebGL } from './city/webgl';
 
@@ -130,10 +131,10 @@ export default function App() {
   if (screen === 'daily-challenge')
     return <DailyChallenge xp={user.xp} onBack={() => setScreen('path')} />;
 
-  // Operation skill tree (choose operation + mode)
+  // Unit path (choose a unit + mode; the curriculum picks the operation)
   if (screen === 'path')
     return (
-      <OperationSkillTree
+      <UnitPath
         moduleId={moduleId}
         xp={user.xp}
         onStart={(mode, operation) => {
@@ -145,8 +146,13 @@ export default function App() {
         onDailyChallenge={moduleId === 'singly' ? () => setScreen('daily-challenge') : undefined}
         onMistakeBook={() => openMistakes('path')}
         onLeaderboard={() => setScreen('leaderboard')}
+        onTeach={moduleId === 'singly' ? () => setScreen('teach') : undefined}
       />
     );
+
+  // Teach Quinn — the elective (shown on the path only when the server enables it)
+  if (screen === 'teach')
+    return <TeachSession onBack={() => setScreen('path')} />;
 
   // AI-driven game session
   if (screen === 'session')

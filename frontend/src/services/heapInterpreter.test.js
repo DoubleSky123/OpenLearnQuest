@@ -21,11 +21,11 @@ describe('parity with ll_executor', () => {
 
 // Lines that are wrong as answers but genuinely harmless on their input: an extra
 // traversal appended after a correct insertAtPosition changes nothing.
-const HARMLESS = new Set(['insertAtPosition|distractor_end|while (curr.next != NULL) curr = curr.next;']);
-
 describe('wrong lines', () => {
   it('covers every distinct wrong line in the Phase 0 content', () => {
-    expect(new Set(fixtures.wrong.map(w => w.text)).size).toBeGreaterThanOrEqual(71);
+    // floor = the distinct wrong lines the content had when last re-exported
+    // (fewer than before the item harness: junk distractors were removed)
+    expect(new Set(fixtures.wrong.map(w => w.text)).size).toBeGreaterThanOrEqual(40);
   });
 
   it.each(fixtures.wrong.map(w => [w.id, w.text, w]))('%s %s', (_id, _text, w) => {
@@ -33,7 +33,7 @@ describe('wrong lines', () => {
     expect(['compile_error', 'runtime_error', 'ok']).toContain(r.outcome);
     expect(run(w)).toEqual(r);   // deterministic
     if (r.outcome === 'compile_error') expect(r.steps).toEqual([]);   // nothing is built
-    if (r.outcome === 'ok' && !HARMLESS.has(`${w.operation}|${w.kind}|${w.text}`)) {
+    if (r.outcome === 'ok') {
       // a wrong answer must never quietly reproduce the correct city
       const looksCorrect = r.final.matchesGoal && r.final.leaked.length === 0 && !r.final.dangling;
       expect(looksCorrect).toBe(false);

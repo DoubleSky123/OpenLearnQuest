@@ -28,6 +28,14 @@ class QuestionAttempt(Base):
     emotion: Mapped[str | None] = mapped_column(String, nullable=True)             # emotion when answering
     # Content-variant tag ("blanks2", "bug1-s3"); null for AI-generated questions
     variant: Mapped[str | None] = mapped_column(String, nullable=True)
+    # fill_blank | find_bug | ordering — server-clamped (never above the type the
+    # server would serve); item analysis and mastery both key on it
+    question_type: Mapped[str | None] = mapped_column(String, nullable=True)
+    # practice | detour | review (curriculum.plan_next). A review is a forgetting
+    # check on a mastered op: recorded here, never applied to mastery.
+    purpose: Mapped[str | None] = mapped_column(String, nullable=True)
+    # remediate: the misconception the item targeted (misconceptions.CATALOG id)
+    target_misconception: Mapped[str | None] = mapped_column(String, nullable=True)
     completed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     session: Mapped["GameSession"] = relationship("GameSession", back_populates="attempts")

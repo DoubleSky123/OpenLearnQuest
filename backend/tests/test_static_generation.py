@@ -21,7 +21,7 @@ def test_fill_blank_assembles_for_every_operation(op):
         # payload lines arrive PRE-BLANKED; the answer must be a substring of the
         # CANONICAL template line (the str.replace convention) and the payload
         # line must actually carry the hole
-        canonical = TEMPLATES[op]["pseudocode"][b["line"]]
+        canonical = TEMPLATES[op]["pseudocode"][b["line"]].replace("{value}", str(q["operationValue"]))
         assert b["answer"] in canonical, f"{op}: blank answer '{b['answer']}' not in canonical line"
         assert "___" in q["pseudocode"][b["line"]], f"{op}: payload line {b['line']} missing the blank"
         assert b["answer"] in b["options"]
@@ -99,19 +99,30 @@ def test_merge_ai_find_bug_carries_both_lists_and_goal():
 
 @pytest.mark.parametrize("qtype,level", [("fill_blank", 1), ("find_bug", 2), ("ordering", 3)])
 def test_detect_cycle_static_carries_cycle_metadata(qtype, level):
+    """Half the boards have a cycle (tail -> index 1), half end at NULL: a board
+    that always loops teaches "the answer is always true"."""
     spec = select_spec("detectCycle", "engaged", type_unlocked=level)
-    q = get_handler(qtype).build_static("detectCycle", spec)
-    assert q["cycleTo"] == 1
+    seen = set()
+    for _ in range(40):
+        q = get_handler(qtype).build_static("detectCycle", spec)
+        assert q.get("cycleTo") in (1, None)
+        seen.add(q.get("cycleTo"))
+    # find_bug picks the board that makes ITS bug visible (an "answers true too
+    # eagerly" bug only shows on a list without a cycle), so it doesn't vary
+    assert seen == {1, None} if qtype != "find_bug" else len(seen) == 1
 
 
 def test_detect_cycle_ai_find_bug_carries_cycle_and_goal():
     import json
+    loop = "while (fast != NULL && fast.next != NULL) { slow = slow.next; fast = fast.next.next; if (slow == fast) return %s; }"
     payload = json.dumps({
-        "bug_line": 2, "buggy_line": "if (slow == fast) return false;",
-        "wrong_options": ["if (slow != fast) return true;", "if (fast == NULL) return true;"],
+        "bug_line": 1, "buggy_line": loop % "false",
+        "wrong_options": [loop.replace("slow == fast", "slow != fast") % "true",
+                          loop.replace("slow == fast", "fast == NULL") % "true"],
         "bug_explanation": "inverts the answer", "hint": "what does the pointers meeting prove?",
     })
     q = get_handler("find_bug").validate(payload, "detectCycle", OP_META["detectCycle"])
+    # this bug only shows on a list that HAS a cycle, so the board must have one
     assert q["cycleTo"] == 1
     assert q["goalPattern"] == [n["value"] for n in q["initialNodes"]]
 
@@ -130,7 +141,7 @@ def test_sort_list_ai_find_bug_has_sorted_goal():
 def test_insert_into_empty_ai_validate_has_no_initial_nodes():
     import json
     payload = json.dumps({
-        "bug_line": 2, "buggy_line": "head = NULL;",
+        "bug_line": 1, "buggy_line": "head = NULL;",
         "wrong_options": ["head = newNode.next;", "newNode = head;"],
         "bug_explanation": "discards the new node", "hint": "who should head point to?",
     })
@@ -156,3 +167,35 @@ def test_heap_fixtures_match_current_templates():
     assert ehf.FIXTURES_PATH.read_text(encoding="utf-8") == expected, (
         "fixtures.json is stale — from backend/ run: "
         "d:/openLearnquest/venv/Scripts/python.exe export_heap_fixtures.py")
+
+
+def _boards_drawn(monkeypatch):
+    """Make every distractor / wrong fix 'work' on every board, and count boards."""
+    from app.services import item_quality, static_questions
+    drawn = []
+    real_build = static_questions._build_nodes_and_goal
+    monkeypatch.setattr(static_questions, "_build_nodes_and_goal",
+                        lambda *a, **kw: drawn.append(1) or real_build(*a, **kw))
+    monkeypatch.setattr(item_quality, "wrong_on_board", lambda *a, **kw: False)
+    return drawn
+
+
+def test_a_fill_blank_with_nothing_to_ask_is_never_served(monkeypatch):
+    """If no board leaves a blank with a failing distractor, every blank set is
+    tried, then it is an error (the client retries) — never a question with no
+    blank, which would be a free clean pass."""
+    from app.services import static_questions
+    drawn = _boards_drawn(monkeypatch)
+    spec = select_spec("removeAtTail", "engaged", type_unlocked=1)
+    with pytest.raises(RuntimeError, match="no askable fill_blank"):
+        static_questions.generate_fill_blank_question("removeAtTail", spec)
+    assert len(drawn) == 6 * len(_BLANKS["removeAtTail"])
+
+
+def test_a_find_bug_with_an_invisible_bug_or_one_option_is_never_served(monkeypatch):
+    from app.services import static_questions
+    drawn = _boards_drawn(monkeypatch)
+    spec = select_spec("removeAtTail", "engaged", type_unlocked=2)
+    with pytest.raises(RuntimeError, match="no askable find_bug"):
+        static_questions.generate_find_bug_question("removeAtTail", spec)
+    assert len(drawn) == 12 * len(_BUGS["removeAtTail"])

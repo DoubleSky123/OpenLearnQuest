@@ -1,17 +1,30 @@
 """
 Socratic tutoring agent with ReAct (Reason + Act) loop.
 
-Design principles:
-- NEVER reveal the answer, even if the student asks directly or repeatedly.
-- Guide with leading questions that help the student discover the mistake themselves.
-- Use lookup_resource tool when student is stuck 2+ turns or error_count >= 2.
-- Always stay encouraging and patient.
+Three modes (system_prompt_for):
+- solving     exercise open: teach the idea, never hand over this exercise's answer
+- final hint  still open, but the student has been stuck long enough that the game
+              offers the answer for their current step (scaffold level 4); the
+              tutor may state that step's answer too
+- reviewing   exercise finished, answer on screen: explain it outright
+
+Video (lookup_resource) is the model's call, but the timing nudge and the link
+itself are enforced in code: the per-turn nudge only appears once the tutor has
+replied twice, and a fetched video's link is appended if the reply leaves it out.
 """
 
-from anthropic import Anthropic
-from ..config import settings
+import re
 
-_client = Anthropic(api_key=settings.anthropic_api_key)
+from .anthropic_client import get_client
+from . import anthropic_client
+
+_client = get_client("interactive")
+
+# Model is server config, never client input. TUTOR_VERSION / ARM are stamped on
+# every tutor_turns row, so bump the version whenever tutor behaviour changes.
+TUTOR_MODEL = anthropic_client.MODEL   # Claude Haiku 5.5 since 2026-10-27
+TUTOR_VERSION = "2026-11-03.2"   # route: mid-stream overload retried, final hint needs server-seen mistakes, proactive pushes capped
+ARM = "A0"
 
 # Design note: keep these prompts SHORT and principled — "a simple Socratic
 # guide, plus a video when guiding stalls". An earlier version grew a rule for
@@ -51,6 +64,10 @@ The student has already finished this exercise. The answer and the explanation a
 
 Answer whatever they ask, directly and in full. Walk through the steps, name the pointers, use the reference solution, trace a small concrete list if that makes it clearer. If they raise an edge case, say what actually happens and what the code would need in order to handle it. You do not need to end with a question — a clear answer is a good reply on its own."""
 
+_FINAL_HINT_PROMPT = f"""{_TUTOR_ROLE}
+
+The student has been stuck on this exercise through several tries, so the game now offers them a final hint: the answer for the step they are on, in a card next to this chat. That step's answer is no longer something to hold back. If they ask for it or are still lost, say it plainly, explain in a sentence or two why it is right, and let them put it in. The steps after that one are still theirs to work out."""
+
 # Kept as the module-level default so existing importers keep working.
 TUTOR_SYSTEM_PROMPT = _SOLVING_PROMPT
 
@@ -59,8 +76,20 @@ TUTOR_SYSTEM_PROMPT = _SOLVING_PROMPT
 # is nothing left to protect. Anything unknown falls back to the strict prompt.
 _PHASE_PROMPTS = {"solving": _SOLVING_PROMPT, "reviewing": _REVIEWING_PROMPT}
 
+# Final hint = scaffold level 4 (useScaffold.js): only after this many mistakes
+# on the question — the animation (1st) and the tutor (2nd) came first.
+FINAL_HINT_MIN_ERRORS = 3
 
-def system_prompt_for(phase: str | None) -> str:
+
+def final_hint_allowed(phase: str | None, final_hint: bool, error_count: int) -> bool:
+    """The client says the final hint is on; honour it only while the exercise is
+    open and only once the student really has made that many mistakes."""
+    return bool(final_hint) and phase != "reviewing" and (error_count or 0) >= FINAL_HINT_MIN_ERRORS
+
+
+def system_prompt_for(phase: str | None, final_hint: bool = False) -> str:
+    if phase != "reviewing" and final_hint:
+        return _FINAL_HINT_PROMPT
     return _PHASE_PROMPTS.get(phase or "solving", _SOLVING_PROMPT)
 
 
@@ -184,6 +213,24 @@ def _execute_tool(name: str, input_data: dict) -> str:
     return f"Unknown tool: {name}"
 
 
+_VIDEO_URL = re.compile(r"https?://(?:www\.)?youtube\.com/watch\?v=[\w-]+")
+_RESOURCE_LINE = re.compile(r"^- (.+?): (https?://\S+)$", re.M)
+
+
+def missing_video_link(reply: str, tool_outputs: list[str]) -> str:
+    """The chat only shows a video that the reply TEXT links to (TutorChat turns
+    the URL into a button), and the model sometimes fetches one and then writes
+    "the first one is perfect for this" without the link. Returns the line to
+    append so a fetched video always reaches the student; '' when none is missing."""
+    if not tool_outputs or _VIDEO_URL.search(reply):
+        return ""
+    for out in tool_outputs:
+        for title, url in _RESOURCE_LINE.findall(out):
+            if _VIDEO_URL.match(url):
+                return f"\n\n🎬 {title}: {url}"
+    return ""
+
+
 # ── Error analysis (text version for context block) ───────────────────────────
 
 def analyze_error(your_answer: list[str], correct_answer: list[str]) -> str:
@@ -275,6 +322,23 @@ _ATTEMPT_LABEL  = {"fill_blank": "Student's current attempt", "find_bug": "Stude
 _SOLUTION_LABEL = {"fill_blank": "Reference tokens",          "find_bug": "Reference solution",         "ordering": "Correct order"}
 
 
+# Restated on EVERY turn, not just the first: the first-turn context is
+# forgotten by turn 3, which is when a student who kept saying "I don't know"
+# used to get the answer anyway. Naming the final hint gives the tutor something
+# true to say instead of caving: keep trying, the game will show you this step.
+_SOLVING_NOTE = (
+    "[PHASE] The exercise is still OPEN. Explain ideas freely, but do not hand over this "
+    "exercise's answer — not in code and not in plain English. If they stay stuck, the "
+    "game gives them a final hint with the answer for their step after a few more tries ON "
+    "THE BOARD; saying \"I don't know\" here does not count, so invite them to try something there."
+)
+_FINAL_HINT_NOTE = (
+    "[FINAL HINT] The student has been stuck long enough that the game now shows them "
+    "the answer for the step they are on. You may state that step's answer plainly and "
+    "say why it is right; the steps after it are still theirs."
+)
+
+
 def build_context_block(
     question_title: str,
     operation: str,
@@ -286,6 +350,7 @@ def build_context_block(
     question_type: str | None = None,
     board_note: str | None = None,
     phase: str | None = None,
+    final_hint: bool = False,
 ) -> str:
     """Injects question context + error analysis + cross-session history into the first user message."""
     error_analysis = analyze_error(your_answer, correct_answer)
@@ -325,16 +390,21 @@ confidence:    {conf}
 {student_history}
 [Use this to recognise recurring patterns. If the student repeats a past mistake, acknowledge it warmly.]"""
 
-    phase_block = (
-        "\n[PHASE] The student has ALREADY FINISHED this exercise — the answer and "
-        "explanation are on screen next to this chat. The reference solution below is "
-        "no longer a secret: use it freely to explain. They are most likely following "
-        "up on the 'Consider' question from the analysis card, so answer that question."
-        if reviewing else
-        "\n[PHASE] The exercise is still OPEN — the student has not solved it yet. "
-        "Explain ideas freely, but do not hand over this exercise's answer."
-    )
-    solution_note = "" if reviewing else " (DO NOT reveal — use it to judge their claims)"
+    final_hint = final_hint and not reviewing
+    if reviewing:
+        phase_block = (
+            "\n[PHASE] The student has ALREADY FINISHED this exercise — the answer and "
+            "explanation are on screen next to this chat. The reference solution below is "
+            "no longer a secret: use it freely to explain. They are most likely following "
+            "up on the 'Consider' question from the analysis card, so answer that question."
+        )
+        solution_note = ""
+    elif final_hint:
+        phase_block = f"\n{_FINAL_HINT_NOTE}"
+        solution_note = " (the answer for their CURRENT step may be stated; later steps stay theirs)"
+    else:
+        phase_block = f"\n{_SOLVING_NOTE}"
+        solution_note = " (DO NOT reveal — use it to judge their claims)"
 
     return f"""[TUTOR CONTEXT — background for you, never quote verbatim to the student]
 Operation: {question_title} ({operation}){phase_block}
@@ -366,6 +436,7 @@ def build_api_messages(
     question_type: str | None = None,
     board_note: str | None = None,
     phase: str | None = None,
+    final_hint: bool = False,
 ) -> list[dict]:
     """Build the messages list for the Claude API call."""
     api_messages: list[dict] = []
@@ -374,7 +445,7 @@ def build_api_messages(
         context_block = build_context_block(
             question_title, operation, your_answer, correct_answer,
             error_count, error_diagnosis, student_history, question_type, board_note,
-            phase,
+            phase, final_hint,
         )
         api_messages.append({
             "role": "user",
@@ -388,9 +459,12 @@ def build_api_messages(
         # alone gets forgotten by turn 3
         questions_asked = sum(1 for m in messages if m.get("role") == "assistant")
         video_shared = any("youtube.com" in m.get("content", "") for m in messages if m.get("role") == "assistant")
-        if video_shared or phase == "reviewing":
+        if video_shared or phase == "reviewing" or questions_asked < 2:
             # reviewing: the student is discussing a finished exercise, so counting
-            # "questions asked" and pushing a video is beside the point
+            # "questions asked" and pushing a video is beside the point.
+            # < 2 replies: enforced HERE rather than in the prompt. With the nudge on
+            # from the first follow-up, a student who only said "I don't get it" to
+            # the opener got a bare video before any explanation.
             tool_note = ""
         else:
             # Tool use is the one place that needs an imperative: models reliably
@@ -403,10 +477,13 @@ def build_api_messages(
                 "plus the video, not a third paragraph. If they are making progress, skip the video."
             )
         board_line = f"\nWhere the student is RIGHT NOW: {board_note}" if board_note else ""
+        phase_line = "" if phase == "reviewing" else f"\n{_FINAL_HINT_NOTE if final_hint else _SOLVING_NOTE}"
+        # Order matters, measured: with the phase note BEFORE the video nudge the stuck
+        # student got the video 3/6 times, with it after 6/6 (tutor_sim third_turn_video).
         context_refresh = (
             f"[Context refresh — errors: {error_count}, "
             f"current attempt: {' → '.join(your_answer) if your_answer else 'nothing'}{board_line}\n"
-            f"Updated error analysis:\n{fresh_analysis}{tool_note}]\n"
+            f"Updated error analysis:\n{fresh_analysis}{tool_note}{phase_line}]\n"
         )
         api_messages.append({"role": "user", "content": context_refresh + user_message})
 
@@ -414,6 +491,21 @@ def build_api_messages(
 
 
 # ── ReAct chat loop ───────────────────────────────────────────────────────────
+
+def request_kwargs(system: str, messages: list, model: str | None = None) -> dict:
+    """Everything one tutor model call sends. chat() and the stream route
+    (routes/tutor._stream_react) both use it, so they can't drift apart."""
+    return dict(
+        model=model or TUTOR_MODEL,
+        output_config={"effort": anthropic_client.EFFORT["interactive"]},
+        # reviewing mode explains at length; solving stays short by prompt.
+        # No temperature: Haiku 5.5 rejects it — consistency comes from the prompt.
+        max_tokens=600 + anthropic_client.THINKING_HEADROOM,
+        system=system,
+        messages=messages,
+        tools=_TOOLS,
+    )
+
 
 def chat(
     question_title: str,
@@ -429,6 +521,7 @@ def chat(
     question_type: str | None = None,
     board_note: str | None = None,
     phase: str | None = None,
+    final_hint: bool = False,
 ) -> str:
     """
     Send one turn to the tutor agent and return its reply.
@@ -439,26 +532,19 @@ def chat(
     api_messages = build_api_messages(
         question_title, operation, your_answer, correct_answer,
         error_count, messages, user_message, error_diagnosis, student_history,
-        question_type, board_note, phase,
+        question_type, board_note, phase, final_hint,
     )
 
-    _model = model or "claude-haiku-4-5"
+    _model = model or TUTOR_MODEL
+    tool_outputs: list[str] = []
 
     for _ in range(3):  # max 3 iterations (reason → tool → respond)
         response = _client.messages.create(
-            model=_model,
-            max_tokens=600,   # reviewing mode explains at length; solving stays short by prompt
-            temperature=0.3,   # rule-bound agent: consistency over creativity
-            system=system_prompt_for(phase),
-            messages=api_messages,
-            tools=_TOOLS,
-        )
+            **request_kwargs(system_prompt_for(phase, final_hint), api_messages, _model))
 
-        if response.stop_reason == "end_turn":
-            for block in response.content:
-                if hasattr(block, "text"):
-                    return block.text.strip()
-            return ""
+        if response.stop_reason in ("end_turn", "refusal"):
+            text = anthropic_client.text_of(response)   # raises RefusedError on a refusal
+            return text + missing_video_link(text, tool_outputs)
 
         if response.stop_reason == "tool_use":
             # Append assistant response (with tool_use blocks) to history
@@ -469,6 +555,7 @@ def chat(
             for block in response.content:
                 if block.type == "tool_use":
                     result = _execute_tool(block.name, block.input)
+                    tool_outputs.append(result)
                     tool_results.append({
                         "type": "tool_result",
                         "tool_use_id": block.id,

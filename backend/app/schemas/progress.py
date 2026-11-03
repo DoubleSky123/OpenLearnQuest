@@ -13,6 +13,11 @@ class MistakeCreate(BaseModel):
     your_answer: list[str]
     correct_answer: list[str]
     explanation: str
+    # the wrong pick itself (fill_blank / find_bug): 0-based line + the option text.
+    # Misconception diagnosis tags it server-side from the served item; ordering
+    # uses your_answer (the assembled lines). Not stored on the mistake row.
+    pick_line: int | None = None
+    pick_option: str | None = None
 
 
 class MistakeOut(BaseModel):

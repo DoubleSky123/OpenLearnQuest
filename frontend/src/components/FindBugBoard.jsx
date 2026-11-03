@@ -66,7 +66,9 @@ export default function FindBugBoard({ question, onComplete, onError, onStateCha
       setWrongLine(lineIdx);
       const next = errors + 1;
       setErrors(next);
-      onError();
+      // kind 'suspect': a correct line was taken for the bug (no option was chosen)
+      onError({ kind: 'suspect', line: lineIdx, picked: question.pseudocode[lineIdx],
+                answer: `line ${question.bug_line + 1}` });
     }
   };
 
@@ -92,7 +94,7 @@ export default function FindBugBoard({ question, onComplete, onError, onStateCha
       setWrongFix(fix);
       const next = errors + 1;
       setErrors(next);
-      onError();
+      onError({ line: question.bug_line, picked: fix, answer: question.fix });
     }
   };
 

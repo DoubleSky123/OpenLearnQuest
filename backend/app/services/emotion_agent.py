@@ -12,12 +12,12 @@ Rule design rationale:
 """
 import json
 import logging
-from anthropic import Anthropic
-from ..config import settings
+from .anthropic_client import get_client
+from . import anthropic_client
 
 logger = logging.getLogger(__name__)
 
-_client = Anthropic(api_key=settings.anthropic_api_key)
+_client = get_client("interactive")
 
 EMOTIONS = ("engaged", "confused", "frustrated", "bored")
 ACTIONS  = ("none", "reduce_difficulty", "increase_difficulty", "show_hint", "encourage")
@@ -124,11 +124,11 @@ def infer_from_chat(messages: list[dict]) -> dict:
 
 def _call_claude_for_chat(prompt: str) -> dict:
     response = _client.messages.create(
-        model="claude-haiku-4-5",
-        max_tokens=150,
+        **anthropic_client.options("interactive"),
+        max_tokens=150 + anthropic_client.THINKING_HEADROOM,
         messages=[{"role": "user", "content": prompt}],
     )
-    raw = response.content[0].text.strip()
+    raw = anthropic_client.text_of(response)
     start, end = raw.find("{"), raw.rfind("}") + 1
     if start == -1 or end == 0:
         raise ValueError(f"No JSON in response: {raw}")
