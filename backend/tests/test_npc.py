@@ -488,3 +488,40 @@ def test_another_students_case_is_not_found(db, user, monkeypatch):
         assert client.post(f"/api/npc/case/{case.id}/coach").status_code == 404
     finally:
         app.dependency_overrides.clear()
+
+
+# Value: protects=explain with no choice and blank text is a 422 that never reaches the model or logs an event; fails_when=route stops validating and sends "" to translate; why_new=HTTP tests only send a choice_id; seam=none; no_claim=free-text adjudication quality
+def test_an_empty_explanation_is_rejected_before_the_model(db, user, fake, monkeypatch):
+    monkeypatch.setattr(settings, "npc_enabled", True)
+    case = _case(db, user.id, "removeAtHead", ["forget-free"])
+    _break(db, case)
+    before = db.query(NpcEvent).filter(NpcEvent.case_id == case.id, NpcEvent.kind == "explain").count()
+    client, app = _http(db, user)
+    try:
+        for body in ({}, {"text": "   "}, {"choice_id": None, "text": ""}):
+            r = client.post(f"/api/npc/case/{case.id}/explain", json=body)
+            assert r.status_code == 422
+    finally:
+        app.dependency_overrides.clear()
+    assert fake.calls == []
+    assert db.query(NpcEvent).filter(NpcEvent.case_id == case.id, NpcEvent.kind == "explain").count() == before
+
+
+# Value: protects=an unexpected NPC failure returns 500 GENERIC_ERROR, never the exception text; fails_when=_run leaks str(e) or lets the exception escape; why_new=only BoardError (422) is tested over HTTP; seam=none; no_claim=logging content
+def test_an_unexpected_failure_shows_only_the_generic_error(db, user, monkeypatch):
+    monkeypatch.setattr(settings, "npc_enabled", True)
+    case = _case(db, user.id, "removeAtHead", ["forget-free"])
+
+    def boom(*a, **k):
+        raise RuntimeError("secret internal detail")
+
+    monkeypatch.setattr(npc, "coach", boom)
+    client, app = _http(db, user)
+    try:
+        r = client.post(f"/api/npc/case/{case.id}/coach")
+    finally:
+        app.dependency_overrides.clear()
+    assert r.status_code == 500
+    from app.routes import npc as npc_route
+    assert r.json()["detail"] == npc_route.GENERIC_ERROR
+    assert "secret" not in r.text
