@@ -29,11 +29,12 @@ def _seed_session(db):
     return user, sess
 
 
-def _record(db, user, sess, scaffold_level=None, passed=True, error_count=0, variant=None):
+def _record(db, user, sess, scaffold_level=None, passed=True, error_count=0, variant=None, question_id="q1"):
+    # a different question needs a different id: recording is idempotent per (session, question)
     return record_result(
         db=db, user_id=user.id, module_id="singly", session_id=sess.id,
         operation="insertAtHead", passed=passed, error_count=error_count,
-        time_ms=10000, question_id="q1", question_number=1,
+        time_ms=10000, question_id=question_id, question_number=1,
         intra_difficulty=2, scaffold_level=scaffold_level, emotion="engaged",
         variant=variant,
     )
@@ -43,7 +44,7 @@ def test_variant_tag_persisted_on_attempt(db):
     from app.models.question_attempt import QuestionAttempt
     user, sess = _seed_session(db)
     _record(db, user, sess, variant="bug1-s3")
-    _record(db, user, sess)   # AI-generated question: no variant tag
+    _record(db, user, sess, question_id="q2")   # AI-generated question: no variant tag
     variants = [a.variant for a in db.query(QuestionAttempt)
                 .filter(QuestionAttempt.session_id == sess.id)
                 .order_by(QuestionAttempt.completed_at).all()]
@@ -91,6 +92,6 @@ def test_outcome_written_once_not_overwritten(db):
     user, sess = _seed_session(db)
     log = _intervention(db, user, sess)
     _record(db, user, sess, passed=True, error_count=1)
-    _record(db, user, sess, passed=True, error_count=0)   # next question
+    _record(db, user, sess, passed=True, error_count=0, question_id="q2")   # next question
     db.refresh(log)
     assert log.outcome["error_count"] == 1           # still the FIRST question's outcome

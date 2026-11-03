@@ -199,3 +199,28 @@ def test_a_find_bug_with_an_invisible_bug_or_one_option_is_never_served(monkeypa
     with pytest.raises(RuntimeError, match="no askable find_bug"):
         static_questions.generate_find_bug_question("removeAtTail", spec)
     assert len(drawn) == 12 * len(_BUGS["removeAtTail"])
+
+
+def test_a_model_failure_falls_back_to_the_same_question_type(monkeypatch):
+    """A refusal is one more failed attempt; an API error skips straight to the
+    authored item. Either way a find_bug student gets a find_bug question: the
+    exception used to escape the loop, and the caller's fallback built ordering."""
+    from app.services import anthropic_client, claude_service
+    calls = []
+
+    def refuse(prompt):
+        calls.append(1)
+        raise anthropic_client.RefusedError("declined")
+    monkeypatch.setattr(claude_service, "_call_model", refuse)
+    q = claude_service.generate_question("removeAtTail", type_unlocked=2, intra_difficulty=2)
+    assert q["question_type"] == "find_bug" and q["bug_line"] is not None
+    assert len(calls) == claude_service.MAX_RETRIES
+
+    calls.clear()
+
+    def down(prompt):
+        calls.append(1)
+        raise ConnectionError("network down")
+    monkeypatch.setattr(claude_service, "_call_model", down)
+    q = claude_service.generate_question("removeAtTail", type_unlocked=2, intra_difficulty=2)
+    assert q["question_type"] == "find_bug" and len(calls) == 1

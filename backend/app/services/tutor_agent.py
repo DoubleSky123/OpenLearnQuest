@@ -23,7 +23,7 @@ _client = get_client("interactive")
 # Model is server config, never client input. TUTOR_VERSION / ARM are stamped on
 # every tutor_turns row, so bump the version whenever tutor behaviour changes.
 TUTOR_MODEL = anthropic_client.MODEL   # Claude Haiku 5.5 since 2026-10-27
-TUTOR_VERSION = "2026-11-03.2"   # route: mid-stream overload retried, final hint needs server-seen mistakes, proactive pushes capped
+TUTOR_VERSION = "2026-11-03.3"   # route: reviewing needs a recorded attempt, final hint counts this question only, no route retry on 429
 ARM = "A0"
 
 # Design note: keep these prompts SHORT and principled — "a simple Socratic

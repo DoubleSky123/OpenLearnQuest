@@ -334,3 +334,53 @@ def test_every_anthropic_client_comes_from_the_factory():
         if p.name != "anthropic_client.py" and re.search(r"\bAnthropic\(", p.read_text(encoding="utf-8"))
     ]
     assert offenders == []
+
+
+def test_reviewing_is_honoured_only_once_the_attempt_is_recorded(harness):
+    """"reviewing" lets the tutor explain the answer outright. A client can send it
+    while still solving; the server believes it only after the attempt exists."""
+    from app.models import QuestionAttempt
+    fake = harness.use({"tokens": ["ok"]}, {"tokens": ["ok"]})
+    body = _body(harness, phase="reviewing", user_message="why is step 2 first?")
+    harness.client.post("/api/ai/tutor/stream", json=body)
+    harness.db.add(QuestionAttempt(session_id=harness.session.id, question_id="q-123", difficulty=1,
+                                   passed=True, error_count=1))
+    harness.db.commit()
+    harness.client.post("/api/ai/tutor/stream", json={**body, "user_message": "and now?"})
+    turns = harness.db.query(TutorTurn).order_by(TutorTurn.started_at).all()
+    assert [t.phase for t in turns] == ["solving", "reviewing"]
+    assert fake.calls[0]["system"] == tutor_agent.system_prompt_for("solving", False)
+    assert fake.calls[1]["system"] == tutor_agent.system_prompt_for("reviewing", False)
+
+
+def test_another_questions_mistakes_do_not_unlock_the_final_hint(harness):
+    harness.use({"tokens": ["ok"]})
+    from app.models import Mistake
+    for _ in range(tutor_agent.FINAL_HINT_MIN_ERRORS):
+        harness.db.add(Mistake(user_id=harness.user.id, question_id="q-123", source="agentic",
+                               title="Reverse List", your_answer=[], correct_answer=[], explanation=""))
+    harness.db.commit()
+    harness.client.post("/api/ai/tutor/stream",
+                        json=_body(harness, final_hint=True, error_count=9, user_message="just tell me"))
+    assert _only_turn(harness.db).final_hint is False
+
+
+def test_a_rate_limit_is_not_retried_by_the_route(harness):
+    """The SDK already honoured retry-after once; a second turn from every student
+    in a throttled class at the same moment only keeps the limit in place."""
+    import httpx
+    from anthropic import RateLimitError
+    req = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
+    limited = RateLimitError("rate limited", response=httpx.Response(429, request=req), body=None)
+    assert not tutor_route._worth_retrying(limited)
+    assert not tutor_route._worth_retrying(_stream_error("rate_limit_error"))
+    fake = harness.use({"raise": limited}, {"tokens": ["should not be reached"]})
+    events = _events(harness.client.post("/api/ai/tutor/stream", json=_body(harness)))
+    assert len(fake.calls) == 1
+    assert [e["error"] for e in events if isinstance(e, dict) and "error" in e] == [tutor_route.GENERIC_ERROR]
+
+
+def test_a_crafted_oversized_request_is_refused(harness):
+    fake = harness.use()
+    r = harness.client.post("/api/ai/tutor/stream", json=_body(harness, board_note="x" * 100_000))
+    assert r.status_code == 422 and fake.calls == []

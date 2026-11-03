@@ -1,11 +1,12 @@
 import json
+from typing import Annotated
 import logging
 import time
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from anthropic import APIStatusError
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from ..services.anthropic_client import get_client
@@ -17,6 +18,8 @@ from ..database import get_db
 from ..models.user import User
 from ..models.mistake import Mistake
 from ..models.mastery import Mastery
+from ..models.game_session import GameSession
+from ..models.question_attempt import QuestionAttempt
 from ..models.tutor_conversation import TutorConversation
 
 logger = logging.getLogger(__name__)
@@ -47,43 +50,49 @@ class _TurnDeadline(Exception):
 
 
 # Error types (APIStatusError.type) that a second try can get past.
-_TRANSIENT_TYPES = {"overloaded_error", "api_error", "rate_limit_error", "timeout_error"}
+_TRANSIENT_TYPES = {"overloaded_error", "api_error", "timeout_error"}
 
 
 def _worth_retrying(e: Exception) -> bool:
     """A 4xx won't succeed on a second try (bad request, auth, no credit) — only
-    overload, 5xx, 408/409/429, timeouts and dropped connections are transient.
+    overload, 5xx, 408/409, timeouts and dropped connections are transient.
     An error event in the middle of a stream arrives on the 200 response
-    (status_code == 200), so it is judged by its error type instead."""
+    (status_code == 200), so it is judged by its error type instead.
+    Not a 429: the SDK already waited out its retry-after once, and an immediate
+    second turn from every student in a throttled class only prolongs the limit."""
     if isinstance(e, APIStatusError):
+        if e.status_code == 429 or e.type == "rate_limit_error":
+            return False
         if e.type in _TRANSIENT_TYPES:
             return True
-        return e.status_code >= 500 or e.status_code in (408, 409, 429)
+        return e.status_code >= 500 or e.status_code in (408, 409)
     # a refusal is the same request declined again — not worth a second try
     return not isinstance(e, (_TurnDeadline, anthropic_client.RefusedError))
 
 
+# Caps on what the client sends: these fields are stored (tutor_turns) and go into
+# the prompt, so a crafted request must not carry megabytes.
 class TutorMessage(BaseModel):
-    role: str   # "user" | "assistant"
-    content: str
+    role: str = Field(max_length=20)   # "user" | "assistant"
+    content: str = Field(max_length=8000)
 
 
 class TutorRequest(BaseModel):
-    session_id: str | None = None   # links the conversation to the game session (memory)
-    question_title: str
-    operation: str
+    session_id: str | None = Field(default=None, max_length=64)   # links the conversation to the game session (memory)
+    question_title: str = Field(max_length=200)
+    operation: str = Field(max_length=40)
     # the question being worked on (q.id) — joins tutor_turns to question_attempts
-    question_id: str | None = None
-    your_answer: list[str] = []
-    board_note: str | None = None   # "where the student is right now" (fill_blank/find_bug boards)
+    question_id: str | None = Field(default=None, max_length=200)
+    your_answer: list[Annotated[str, Field(max_length=400)]] = Field(default=[], max_length=20)
+    board_note: str | None = Field(default=None, max_length=2000)   # "where the student is right now" (fill_blank/find_bug boards)
     # structured board focus (boardFocus.kind), e.g. find_bug: hunting the line vs choosing the fix
-    board_phase: str | None = None
-    correct_answer: list[str] = []
+    board_phase: str | None = Field(default=None, max_length=40)
+    correct_answer: list[Annotated[str, Field(max_length=400)]] = Field(default=[], max_length=20)
     error_count: int = 0
     # legacy client-held history — ignored when a persisted conversation exists
     # (the DB is authoritative; see tutor_memory.model_view)
-    messages: list[TutorMessage] = []
-    user_message: str
+    messages: list[TutorMessage] = Field(default=[], max_length=60)
+    user_message: str = Field(max_length=4000)
     error_diagnosis: dict | None = None
     question_type: str | None = None
     # "solving" = exercise still open (strict: no answer reveal).
@@ -101,16 +110,31 @@ class TutorRequest(BaseModel):
     # one are fine — pydantic ignores unknown fields.)
 
 
-def _board_mistakes(db: Session, user_id: str, question_id: str | None) -> int:
+def _board_mistakes(db: Session, user_id: str, question_id: str | None, title: str) -> int:
     """Board mistakes on this question as the server saw them: every wrong board
     try posts a Mistake row (AgenticSession). Question ids are per-serve uuids or
-    pool ids a student is never served twice, so this is this attempt's count."""
+    pool ids a student is never served twice, so this is this attempt's count.
+    The title must match too, so an old question's id can't unlock a new one's hint."""
     if not question_id:
         return 0
     return (db.query(Mistake)
             .filter(Mistake.user_id == user_id, Mistake.question_id == str(question_id),
-                    Mistake.source == "agentic")
+                    Mistake.title == title, Mistake.source == "agentic")
             .count())
+
+
+def _honoured_phase(db: Session, user_id: str, body: "TutorRequest") -> str:
+    """"reviewing" lets the tutor explain the answer outright, so it is honoured
+    only once this question's attempt is recorded (the analysis card appears after
+    /session/record). Anything else is "solving"."""
+    if body.phase != "reviewing" or not body.session_id or not body.question_id:
+        return "solving"
+    done = (db.query(QuestionAttempt.id)
+            .join(GameSession, QuestionAttempt.session_id == GameSession.id)
+            .filter(GameSession.user_id == user_id, QuestionAttempt.session_id == body.session_id,
+                    QuestionAttempt.question_id == str(body.question_id))
+            .first())
+    return "reviewing" if done else "solving"
 
 
 def _final_hint(db: Session, user_id: str, body: "TutorRequest") -> bool:
@@ -118,7 +142,7 @@ def _final_hint(db: Session, user_id: str, body: "TutorRequest") -> bool:
     (never trust client-computed counts — a claim above what was posted is capped)."""
     if not body.final_hint:
         return False
-    errors = min(body.error_count, _board_mistakes(db, user_id, body.question_id))
+    errors = min(body.error_count, _board_mistakes(db, user_id, body.question_id, body.question_title))
     return tutor_agent.final_hint_allowed(body.phase, body.final_hint, errors)
 
 
@@ -229,6 +253,7 @@ def tutor_chat(
     conv = tutor_memory.get_or_create_conversation(
         db, current_user.id, body.session_id, body.question_title, body.operation,
     )
+    body.phase = _honoured_phase(db, current_user.id, body)
     final_hint = _final_hint(db, current_user.id, body)
     if _rate_limited(db, current_user.id, body):
         tutor_telemetry.start_turn(db, current_user.id, conv, _turn_fields(body, final_hint), status="rate_limited")
@@ -332,6 +357,7 @@ def tutor_chat_stream(
     conv = tutor_memory.get_or_create_conversation(
         db, current_user.id, body.session_id, body.question_title, body.operation,
     )
+    body.phase = _honoured_phase(db, current_user.id, body)
     final_hint = _final_hint(db, current_user.id, body)
 
     if _rate_limited(db, current_user.id, body):

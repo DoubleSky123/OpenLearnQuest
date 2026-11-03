@@ -264,6 +264,35 @@ def test_a_locked_unit_cannot_be_reached_by_sending_its_op(db):
     assert st.answer("insertAtHead")[0] == "insertAtHead"            # unit 1 untouched
 
 
+def test_a_look_alike_email_does_not_inherit_the_test_account(db, monkeypatch):
+    """Registration keeps an email's case, so 'Shi.Kun@…' is a different account
+    from 'shi.kun@…'. The allowlist must match the stored address exactly."""
+    from app.config import settings
+    from app.models import User
+    real, twin = Student(db), Student(db)
+    addr = db.get(User, real.uid).email
+    db.get(User, twin.uid).email = addr.upper()
+    db.commit()
+    monkeypatch.setattr(type(settings), "unlock_all_emails", property(lambda self: {addr}))
+    assert mm(db, real.uid).unlock_all is True
+    assert mm(db, twin.uid).unlock_all is False
+
+
+def test_a_result_sent_twice_is_recorded_once(db):
+    """/session/next re-sends a result whose /session/record landed but whose reply
+    was lost. Counting it twice would turn one clean answer into two."""
+    from app.models import QuestionAttempt
+    from app.services.game_master import _record_attempt
+    st = Student(db)
+    qid = UID()
+    for _ in range(2):
+        _record_attempt(db, st.uid, "singly", st.session.id, "insertAtHead", True, 0, 3000, qid,
+                        2, 0, "engaged", None, "fill_blank", None)
+    assert db.query(QuestionAttempt).filter_by(question_id=qid).count() == 1
+    r = record(db, st.uid, "insertAtHead")
+    assert (r.attempts, r.consecutive_passes) == (1, 1)
+
+
 def test_unpinned_sessions_are_not_planned(db):
     assert plan_next(db, UID(), "singly", None, {}) is None
     assert plan_next(db, UID(), "singly", "nonsense", {}) is None

@@ -28,7 +28,9 @@ class Settings(BaseSettings):
 
     @property
     def unlock_all_emails(self) -> set[str]:
-        return {e.strip().lower() for e in self.unlock_all_units_for.split(",") if e.strip()}
+        # exact addresses, matched exactly: registration keeps an email's case, so a
+        # case-insensitive match would let "Shi.Kun@..." inherit the test account's units
+        return {e.strip() for e in self.unlock_all_units_for.split(",") if e.strip()}
 
 
 settings = Settings()

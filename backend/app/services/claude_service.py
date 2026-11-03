@@ -39,7 +39,7 @@ def _call_model(prompt: str) -> str:
         max_tokens=1200 + anthropic_client.THINKING_HEADROOM,
         messages=[{"role": "user", "content": prompt}],
     )
-    return anthropic_client.text_of(msg)   # a RefusedError is one more failed attempt
+    return anthropic_client.text_of(msg)   # raises RefusedError on a refusal (generate_question retries it)
 
 
 def run_generation_test(operation: str, n: int = 10, emotion: str = "engaged") -> dict:
@@ -105,7 +105,15 @@ def generate_question(
         prompt = handler.build_prompt(operation, meta, spec)
         if last_error:
             prompt += f"\n\nPrevious attempt failed: {last_error}\nReturn valid JSON only."
-        raw = _call_model(prompt)
+        try:
+            raw = _call_model(prompt)
+        except anthropic_client.RefusedError:
+            last_error = "the request was declined; produce the JSON the prompt asks for"
+            logger.warning("generate_question attempt %d/%d: model declined", attempt, MAX_RETRIES)
+            continue
+        except Exception as e:   # API error / timeout: the same call fails again, so take the static item now
+            logger.warning("generate_question: model call failed (%s), using static fallback", type(e).__name__)
+            break
         try:
             q = handler.validate(raw, operation, meta)
             if target_misconception:

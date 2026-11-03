@@ -271,7 +271,7 @@ def _events(db: Session, user_id: str, question_id: str, kind: str) -> list[Misc
                     MisconceptionEvent.kind == kind).all())
 
 
-_LINE_PICK = re.compile(r"^line (\d+): (.*)$", re.S)
+_LINE_PICK = re.compile(r"^line (\d{1,3}): (.*)$", re.S)
 
 
 def parse_pick(your_answer: list[str] | None) -> tuple[int | None, str | None]:
@@ -299,6 +299,13 @@ def record_pick(db: Session, user_id: str, question_id: str, *, line: int | None
             if not assembly:
                 return []
             prog = [_sym(s, val) for s in assembly]
+            # only a board the student could have built: exactly the slots of the
+            # item, filled from its own steps and distractors. A client can send any
+            # lines; running made-up ones would credit misconceptions never offered.
+            from .static_questions import TEMPLATES
+            offered = set(TEMPLATES[op]["pseudocode"]) | set((item.tags or {}).get("distractors") or {})
+            if len(prog) != len(TEMPLATES[op]["pseudocode"]) or not set(prog) <= offered:
+                return []
             mids = sorted(mc.classify_program(op, prog))
             stored, line = "\n".join(prog), None
         else:

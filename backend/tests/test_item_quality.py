@@ -164,3 +164,25 @@ def test_served_find_bug_is_visible_on_the_shown_board(op):
             board = iq.board_of(op, q["initialNodes"], q["operationValue"], q["operationPosition"], q)
             sym = lambda s: iq.symbolic(s, q["operationValue"])
             assert iq.wrong_on_board(op, [sym(s) for s in q["pseudocode"]], board), (op, seed, intra)
+
+
+# ── the interpreter never crashes its caller ───────────────────────────────────
+
+def test_a_value_of_the_wrong_kind_is_a_runtime_error_not_a_crash():
+    """A pointer used as a for-counter (or merging non-numbers) is a wrong
+    program. It must fail like one: an uncaught TypeError in serve-time
+    sanitising used to turn one bad pool row into a 500 for the whole class."""
+    inst = px.Instance((10, 20, 30))
+    r = px.run("reverseList", ["for (i = head; i != NULL; i++) curr = head;"], inst)
+    assert r.outcome == "runtime_error"
+
+
+def test_oversized_programs_are_refused_before_they_are_read():
+    """Clients send board lines; reading must stay cheap on any input
+    (tokenising used to be quadratic in the line length)."""
+    import time
+    inst = px.Instance((10, 20, 30))
+    t0 = time.perf_counter()
+    assert px.run("removeAtTail", ["curr = head;" * 100_000], inst).outcome == "compile_error"
+    assert px.run("removeAtTail", ["curr = head;"] * (px.MAX_LINES + 1), inst).outcome == "compile_error"
+    assert time.perf_counter() - t0 < 1.0   # gstack-timing-ok: a 1.2 MB line was ~20 s before the cap

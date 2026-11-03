@@ -169,7 +169,11 @@ def _candidates(db: Session, user_id: str, operation: str, qtype: str, intra: in
 
 def _servable(row: QuestionPool, misconception: str | None) -> dict | None:
     """The sanitised copy serve() would hand out, or None if this row can't be used."""
-    q = _sanitize(copy.deepcopy(row.payload))
+    try:
+        q = _sanitize(copy.deepcopy(row.payload))
+    except Exception:   # noqa: BLE001 — one malformed row must not fail serving for the class
+        logger.exception("pool row %s could not be sanitised; skipped", row.id)
+        return None
     if q is None or (misconception and not _shows(q, misconception)):
         return None
     return q

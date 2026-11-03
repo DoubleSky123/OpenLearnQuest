@@ -90,7 +90,7 @@ def get_mastery_map(db: Session, user_id: str, module_id: str) -> dict[str, dict
     allow = settings.unlock_all_emails
     if allow:   # testing accounts only (config UNLOCK_ALL_UNITS_FOR)
         email = db.query(User.email).filter(User.id == user_id).scalar()
-        out.unlock_all = (email or "").lower() in allow
+        out.unlock_all = email in allow
     return out
 
 
@@ -446,11 +446,22 @@ def record_result(
         # for the post-question analysis card
         "xp_gained":          attempt.xp_gained,
         "concepts_exercised": concepts_for_op(operation),
-        "peer":               _peer_stats(db, operation, attempt.id, time_ms),
+        "peer":               _after_record("peer stats", lambda: _peer_stats(db, operation, attempt.id, time_ms), None),
         # "what your choice did" — only for students who get remediation
-        "misconception_feedback": misconception_model.feedback_for(db, user_id, question_id)
+        "misconception_feedback": _after_record(
+            "misconception feedback", lambda: misconception_model.feedback_for(db, user_id, question_id), [])
                                   if misconception_model.targeting(user_id) else [],
     }
+
+
+def _after_record(what: str, fn, fallback):
+    """Analysis-card extras computed after the attempt is committed: a failure here
+    must not fail the request (the client would resend the result via /next)."""
+    try:
+        return fn()
+    except Exception:   # noqa: BLE001
+        logger.exception("%s failed after the attempt was recorded", what)
+        return fallback
 
 
 def _record_attempt(
@@ -463,7 +474,15 @@ def _record_attempt(
     MASTERED op, always ordering) is recorded but never applied to mastery; a
     client claiming 'review' for anything else is treated as practice. A
     'remediate' claim is accepted only if the server served this student a
-    targeted item under that id; it counts as practice for mastery."""
+    targeted item under that id; it counts as practice for mastery.
+    Idempotent per (session, question): /session/next re-sends a result whose
+    /session/record landed but whose reply was lost — recording it twice would
+    apply mastery twice (one clean answer counting as two)."""
+    existing = (db.query(QuestionAttempt)
+                .filter(QuestionAttempt.session_id == session_id, QuestionAttempt.question_id == question_id)
+                .first())
+    if existing is not None:
+        return existing
     mastery_map = get_mastery_map(db, user_id, module_id)
     item = misconception_model.served(db, user_id, question_id) if misconception_model.recording() else None
     target = None

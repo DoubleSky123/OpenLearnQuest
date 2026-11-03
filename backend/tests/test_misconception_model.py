@@ -165,6 +165,48 @@ def test_an_ordering_assembly_is_classified_as_a_whole(db, mode):
     assert mm.record_pick(db, st.uid, q["id"], assembly=wrong_order) == ["move-before-link"]
 
 
+def test_an_assembly_the_student_could_not_have_built_is_not_evidence(db, mode):
+    """The client sends the assembled lines; only a board of the item's own steps
+    and distractors, filling exactly its slots, is diagnosed. Made-up lines would
+    otherwise credit misconceptions the item never offered (and get executed)."""
+    st = _student(db)
+    q = generate_static_question("insertAtHead", intra_level=2)
+    q["question_type"] = "ordering"
+    mm.record_served(db, st.uid, q)
+    steps = q["pseudocode"]
+    forged = [steps[0], "head = NULL;", steps[1]]                 # a line the item never showed
+    assert mm.record_pick(db, st.uid, q["id"], assembly=forged) == []
+    assert mm.record_pick(db, st.uid, q["id"], assembly=steps + [steps[0]]) == []   # extra slot
+    assert db.query(MisconceptionEvent).filter_by(user_id=st.uid, kind="picked").count() == 0
+
+
+def test_the_mistakes_route_caps_what_a_client_can_send(db, mode):
+    from fastapi.testclient import TestClient
+    from app.database import get_db
+    from app.dependencies import get_current_user
+    from app.main import app
+    from app.models import Mistake, User
+
+    st = _student(db)
+    user = db.query(User).filter_by(id=st.uid).one()
+    app.dependency_overrides[get_db] = lambda: db
+    app.dependency_overrides[get_current_user] = lambda: user
+    base = {"question_id": "q", "source": "agentic", "title": "Insert at Head",
+            "correct_answer": [], "explanation": "h"}
+    try:
+        client = TestClient(app)
+        assert client.post("/api/progress/mistakes", json={**base, "your_answer": ["x" * 5000]}).status_code == 422
+        assert client.post("/api/progress/mistakes", json={**base, "your_answer": ["a;"] * 500}).status_code == 422
+        # an absurd line number in an old-style pick is just not a pick
+        r = client.post("/api/progress/mistakes", json={**base, "your_answer": ["line " + "9" * 5000 + ": x"]})
+        assert r.status_code == 422
+    finally:
+        app.dependency_overrides.clear()
+    assert db.query(Mistake).count() == 0
+    assert mm.parse_pick(["line 99999: x"]) == (None, None)   # int() on a huge number used to 500
+    assert mm.parse_pick(["line 3: curr.next"]) == (2, "curr.next")
+
+
 def test_feedback_runs_the_pick_on_the_board_the_student_saw(db, mode):
     st = _student(db)
     q = _remove_at_position_item()

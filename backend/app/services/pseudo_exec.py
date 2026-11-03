@@ -66,16 +66,20 @@ class _Node:
 
 # ── Tokenizer + parser ─────────────────────────────────────────────────────────
 
-_TOKEN = re.compile(r"\s*(?:(\d+)|([A-Za-z_]\w*)|(==|!=|<=|>=|&&|\|\||\+\+|[-+<>=;(){}.,?:!*]))")
+_LEXEME = re.compile(r"\s*(?:(\d+)|([A-Za-z_]\w*)|(==|!=|<=|>=|&&|\|\||\+\+|[-+<>=;(){}.,?:!*]))")
+
+
+MAX_LINE_CHARS = 400   # longest program line read (template lines are under 120)
+MAX_LINES = 40         # longest program run (templates have at most 8 steps)
 
 
 def _tokenize(src: str) -> list[str]:
+    if len(src) > MAX_LINE_CHARS:
+        raise CompileError("line too long")
     src = src.replace("{value}", "__value").replace("{index}", "__index")
-    out, pos = [], 0
-    while pos < len(src):
-        if src[pos:].strip() == "":
-            break
-        m = _TOKEN.match(src, pos)
+    out, pos, end = [], 0, len(src.rstrip())
+    while pos < end:
+        m = _LEXEME.match(src, pos)
         if not m or m.end() == pos:
             raise CompileError(f"cannot read {src[pos:pos + 12]!r}")
         out.append(m.group(m.lastindex))
@@ -531,6 +535,8 @@ def run(operation: str, lines: list[str], inst: Instance) -> RunResult:
     """Execute `lines` as the body of `operation` on `inst`."""
     params, funcs = _signature(operation, inst)
     try:
+        if len(lines) > MAX_LINES:
+            raise CompileError("program too long")
         stmts = parse(lines)
         _static_check(stmts, params, funcs)
     except CompileError as e:
@@ -553,6 +559,11 @@ def run(operation: str, lines: list[str], inst: Instance) -> RunResult:
         returned = m.call(env)
     except RuntimeFault as e:
         return RunResult("runtime_error", str(e))
+    except (TypeError, ValueError, ZeroDivisionError) as e:
+        # a value of the wrong kind where arithmetic or a comparison needs a
+        # number (a pointer as a for-counter, merging non-numbers): the program
+        # is wrong, so it fails like one instead of crashing the caller
+        return RunResult("runtime_error", f"wrong kind of value ({type(e).__name__})")
 
     if operation == "detectCycle":
         return RunResult("ok", returned=returned, reached=m.reached)
