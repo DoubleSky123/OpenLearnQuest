@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session
 from ..dependencies import get_current_user, get_db
 from ..models.user import User
@@ -7,7 +7,7 @@ from ..models.emotion_log import EmotionLog
 from ..models.tutor_conversation import TutorConversation, TutorMessage
 from ..services import emotion_agent, tutor_memory
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 
 router = APIRouter(prefix="/api/emotion", tags=["emotion"])
 
@@ -24,10 +24,26 @@ class BehaviorSignals(BaseModel):
     initial_emotion: str = "ok"   # self-reported at session start
 
 
+# infer-chat is a paid model call made after each tutor reply: per student, at most
+# this many per minute (the tutor itself allows 6 messages + a few proactive pushes)
+CHAT_INFER_MAX = 8
+CHAT_INFER_WINDOW_S = 60
+_NEUTRAL = {"emotion": "engaged", "confidence": 0.3, "action": "none"}
+
+
 class ChatMessages(BaseModel):
     session_id: str | None = None
     question_title: str | None = None   # with session_id, selects the persisted conversation
     messages: list[dict] = []           # legacy fallback when no persisted conversation exists
+
+    @field_validator("messages", mode="before")
+    @classmethod
+    def _recent(cls, v):
+        # the model only needs the recent turns; never send it a crafted megabyte
+        if not isinstance(v, list):
+            return v
+        return [{"role": str(m.get("role", ""))[:20], "content": str(m.get("content", ""))[:8000]}
+                for m in v[-40:] if isinstance(m, dict)]
 
 
 class EmotionResult(BaseModel):
@@ -53,6 +69,14 @@ def infer_chat(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    since = datetime.utcnow() - timedelta(seconds=CHAT_INFER_WINDOW_S)
+    recent = (db.query(EmotionLog)
+              .filter(EmotionLog.user_id == current_user.id, EmotionLog.source == "tutor_chat",
+                      EmotionLog.timestamp >= since)
+              .count())
+    if recent >= CHAT_INFER_MAX:
+        return _NEUTRAL      # over the limit: no model call, nothing logged
+
     # Prefer the persisted conversation (DB is authoritative) — the label becomes
     # traceable to the exact stored messages it was inferred from.
     messages = body.messages

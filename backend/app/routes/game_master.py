@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..dependencies import get_current_user
+from .admin import require_admin
 from ..models.user import User
 from ..services.claude_service import run_generation_test, OP_META
 from ..services import game_master as gm
@@ -257,7 +258,7 @@ def get_mastery(
 @router.post("/test-generation")
 def test_generation(
     body: TestRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),   # up to 60 paid model calls: admins only
 ):
     """Sprint-1 quality test: generate N questions, report pass rate."""
     if body.operation not in OP_META:

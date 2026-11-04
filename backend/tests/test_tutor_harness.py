@@ -384,3 +384,40 @@ def test_a_crafted_oversized_request_is_refused(harness):
     fake = harness.use()
     r = harness.client.post("/api/ai/tutor/stream", json=_body(harness, board_note="x" * 100_000))
     assert r.status_code == 422 and fake.calls == []
+
+
+def test_a_long_conversation_keeps_working(harness):
+    """TutorChat resends the whole restored conversation every turn. A cap that
+    rejected it locked the heaviest tutor users out for the rest of the session;
+    the server keeps the recent tail instead."""
+    harness.use({"tokens": ["Still here."]})
+    history = [{"role": "user" if i % 2 == 0 else "assistant", "content": f"turn {i}"} for i in range(90)]
+    events = _events(harness.client.post("/api/ai/tutor/stream", json=_body(harness, messages=history)))
+    assert _streamed_text(events) == "Still here."
+
+
+def test_an_oversized_free_form_field_is_refused(harness):
+    fake = harness.use()
+    r = harness.client.post("/api/ai/tutor/stream",
+                            json=_body(harness, error_diagnosis={"error_type": "x", "detail": "x" * 100_000}))
+    assert r.status_code == 422 and fake.calls == []
+
+
+def test_chat_emotion_inference_is_rate_limited(harness, monkeypatch):
+    """Each infer-chat is a paid model call; a looping client gets the neutral
+    label without one."""
+    from app.routes import emotion as emotion_route
+    from app.services import emotion_agent
+    calls = []
+    monkeypatch.setattr(emotion_agent, "infer_from_chat",
+                        lambda messages: calls.append(1) or {"emotion": "confused", "confidence": 0.8, "action": "none"})
+    for _ in range(emotion_route.CHAT_INFER_MAX + 5):
+        r = harness.client.post("/api/emotion/infer-chat", json={"messages": [{"role": "user", "content": "x"}]})
+        assert r.status_code == 200
+    assert len(calls) == emotion_route.CHAT_INFER_MAX
+
+
+def test_the_generation_self_test_is_for_admins_only(harness):
+    """Up to 20 questions x 3 model attempts per request: not a student endpoint."""
+    r = harness.client.post("/api/gm/test-generation", json={"operation": "insertAtHead", "n": 20})
+    assert r.status_code == 403

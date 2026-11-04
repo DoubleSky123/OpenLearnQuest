@@ -112,7 +112,8 @@ def generate_question(
             logger.warning("generate_question attempt %d/%d: model declined", attempt, MAX_RETRIES)
             continue
         except Exception as e:   # API error / timeout: the same call fails again, so take the static item now
-            logger.warning("generate_question: model call failed (%s), using static fallback", type(e).__name__)
+            logger.warning("generate_question: model call failed (%s: %s), using static fallback",
+                           type(e).__name__, e)
             break
         try:
             q = handler.validate(raw, operation, meta)

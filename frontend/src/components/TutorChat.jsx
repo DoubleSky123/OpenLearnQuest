@@ -144,7 +144,8 @@ export default function TutorChat({
         board_phase:     boardFocus?.kind ?? null,
         correct_answer:  correctAnswer,
         error_count:     errorCount,
-        messages:        messages.filter(m => m.role !== "notice"),   // legacy fallback; DB history is authoritative
+        // legacy fallback (the DB history is authoritative); the server keeps the last 40 anyway
+        messages:        messages.filter(m => m.role !== "notice").slice(-40),
         user_message:    text.trim(),
         error_diagnosis: messages.length === 0 ? errorDiagnosis : null,
         phase,
@@ -252,6 +253,7 @@ export default function TutorChat({
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
+          maxLength={4000}
           placeholder="Ask tutor... (Enter to send)"
           className="flex-1 resize-none rounded-xl border border-gray-200 px-3.5 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-gray-50"
           disabled={streaming}

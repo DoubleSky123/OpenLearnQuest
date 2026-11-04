@@ -6,7 +6,7 @@ import time
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from anthropic import APIStatusError
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
 from ..services.anthropic_client import get_client
@@ -71,10 +71,28 @@ def _worth_retrying(e: Exception) -> bool:
 
 
 # Caps on what the client sends: these fields are stored (tutor_turns) and go into
-# the prompt, so a crafted request must not carry megabytes.
+# the prompt, so a crafted request must not carry megabytes. The legacy history is
+# trimmed, never rejected: TutorChat resends the whole restored conversation every
+# turn, and a long one must keep working.
+HISTORY_KEEP = 40          # legacy client history: the most recent messages kept
+HISTORY_CHARS = 8000       # ... each clipped to this
+FREE_DICT_CHARS = 4000     # error_diagnosis / final_hint_step, serialised
+
+
 class TutorMessage(BaseModel):
     role: str = Field(max_length=20)   # "user" | "assistant"
-    content: str = Field(max_length=8000)
+    content: str
+
+    @field_validator("content")
+    @classmethod
+    def _clip(cls, v: str) -> str:
+        return v[:HISTORY_CHARS]
+
+
+def _small_dict(v):
+    if v is not None and len(json.dumps(v, default=str)) > FREE_DICT_CHARS:
+        raise ValueError("too large")
+    return v
 
 
 class TutorRequest(BaseModel):
@@ -91,15 +109,15 @@ class TutorRequest(BaseModel):
     error_count: int = 0
     # legacy client-held history — ignored when a persisted conversation exists
     # (the DB is authoritative; see tutor_memory.model_view)
-    messages: list[TutorMessage] = Field(default=[], max_length=60)
+    messages: list[TutorMessage] = []
     user_message: str = Field(max_length=4000)
     error_diagnosis: dict | None = None
-    question_type: str | None = None
+    question_type: str | None = Field(default=None, max_length=40)
     # "solving" = exercise still open (strict: no answer reveal).
     # "reviewing" = analysis card is up, so the answer is already on the student's
     # screen and the tutor may explain it outright. Unknown values fall back to
     # "solving" — a stale client can never accidentally unlock answer reveal.
-    phase: str | None = None
+    phase: str | None = Field(default=None, max_length=20)
     # the board's final hint (scaffold level 4) is on: the tutor may state the
     # answer for the current step. Honoured only with enough real mistakes
     # (tutor_agent.final_hint_allowed), never in "reviewing".
@@ -108,6 +126,16 @@ class TutorRequest(BaseModel):
     final_hint_step: dict | None = None
     # (no `model` field: the model is server config. Old clients that still send
     # one are fine — pydantic ignores unknown fields.)
+
+    @field_validator("messages", mode="before")
+    @classmethod
+    def _recent_history(cls, v):
+        return v[-HISTORY_KEEP:] if isinstance(v, list) else v
+
+    @field_validator("error_diagnosis", "final_hint_step")
+    @classmethod
+    def _bounded(cls, v):
+        return _small_dict(v)
 
 
 def _board_mistakes(db: Session, user_id: str, question_id: str | None, title: str) -> int:
