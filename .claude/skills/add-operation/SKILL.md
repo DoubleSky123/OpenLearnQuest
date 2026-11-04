@@ -26,8 +26,9 @@ Before editing anything, pin down with the user (or infer and state):
 1. **`TEMPLATES`** (top of file): full entry with `title`, `pseudocode`, `correctOrder`, `hint`, **`step_hints` (one Socratic line per pseudocode step — parallel array, enforced by `tests/test_step_hints.py`)**, `distractors` (3 near-miss lines that use ONLY names the program has and break the list wherever they are placed), `crux` (the steps that carry the big idea — blanked first), `needsValue`, `needsPosition`, `minNodes`. **Never** hand-write `validOrders`: they are computed by running every permutation (`static_questions.valid_orders_for`). The template must itself run correctly in `pseudo_exec` (fields are `value`/`next` only; `createNode` already sets `next = NULL`, so no `newNode.next = NULL;` no-op step).
 2. **`_BLANKS`**: 4 blank sets; each set has one `{"a": answer, "w": [strongest wrong, wrong2]}` (or `None`) per pseudocode step. **Constraints**: each `"a"` must be an exact substring of the same-index step (`str.replace(a, "___", 1)` must hit its FIRST occurrence), and every blank must pass the item harness (CLAUDE.md "Item harness"): a semantic slot — never a new variable's name, a field, a function or the payload — exactly one correct option, every distractor failing for a linked-list reason.
 3. **`_BUGS`**: 3 entries (subtlety 1/2/3) `{subtlety, line, buggy, fix, explanation, options}` — `line` is the 0-indexed step to corrupt, `options` includes the fix plus 2 wrong candidates. The bug must really break the program when run (and be visible on some served board); every wrong fix must really fail.
-4. **Check it**: `python item_report.py --all --ops <op>` shows what every option does; `pytest tests/test_item_quality.py` must pass.
 4. **`CONSIDER`**: 1–2 post-question extension questions (shown on the analysis card; "Ask the tutor" seeds the chat with one). Falls back to a generic question if missing, but write real ones.
+
+**Check it**: `python item_report.py --all --ops <op>` shows what every option does; `pytest tests/test_item_quality.py` must pass.
 
 ### 1b. `backend/app/services/claude_service.py` — `OP_META`
 
@@ -53,7 +54,7 @@ Teach Quinn (`backend/app/services/npc_agent.py`): add the op to `_LENGTHS` (the
 
 ### 1e'. `backend/app/services/curriculum.py` — `UNITS`
 
-Put `<op>` in the unit whose IDEA it practises (`ops`), and decide its group: alone (required) or sharing a group with a variant of the same idea (either one masters it). A genuinely new idea is a new unit — write its `big_idea` and `watch_for` as a teacher would. `test_every_operation_is_taught_exactly_once` fails until it is placed.
+Put `<op>` in the unit whose IDEA it practises (`ops`), and decide its place in `groups`: its own group (a primary that climbs the full ladder) or a variant in the group of an op with the same idea (it joins once that primary is mastered and starts at the unit's `transfer_start`). Every op in a unit is required: the unit is mastered only when all of them are. A genuinely new idea is a new unit — write its `big_idea` and `watch_for` as a teacher would. `test_every_operation_is_taught_exactly_once` fails until it is placed.
 
 ### 1f. `backend/app/services/question_registry.py` — special-case sets (check, may be no-op)
 
@@ -85,7 +86,7 @@ Add the one-line per-op explanation string to the dict near the top if the op be
 
 ## Step 3 — Docs
 
-- `CLAUDE.md` → "Supported Operations" section: add `<op>` and bump the count.
+- `CLAUDE.md` → "Supported Operations" section: add `<op>` and bump the count; add it to its unit's row in the Curriculum table and update the full-course question count there (`test_the_whole_course`).
 - `README.md` → both operation lists (search for `insertAtHead` to find them).
 
 ## Step 4 — Verify

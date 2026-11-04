@@ -30,7 +30,7 @@ npm run dev        # runs on http://localhost:5173
 ```
 
 ### Environment Files
-- `backend/.env` — DB URL, secret key, Anthropic API key, admin key
+- `backend/.env` — DB URL, secret key, Anthropic API key, admin key; optional `MISCONCEPTION_MODE`, `NPC_ENABLED` (both below) and `UNLOCK_ALL_UNITS_FOR` (testing only: comma-separated account emails that see every unit unlocked; progress stays real, a warning is logged at startup)
 - `frontend/.env` — `VITE_API_URL=http://localhost:8001`
 
 **Note**: Port 8000 may be occupied by another project. Always use `--port 8001` for this backend.
@@ -95,12 +95,12 @@ d:/openLearnquest/venv/Scripts/python.exe -m pytest tests/ -q
 ```
 In-memory SQLite fixtures (no Postgres needed); covers the deterministic core: `ll_executor`, the item harness (`test_item_quality.py`: every authored question passes R1–R3), the misconception catalog / diagnosis / remediation (`test_misconceptions.py`, `test_misconception_model.py`, `test_targeted_generation.py`), Teach Quinn (`test_npc.py`), the curriculum (`test_curriculum.py`), mastery/unlock rules, `select_spec`, `error_analyzer`, the ZPD controller contract, scaffold clamp + closed-loop telemetry, and the tutor stream route end to end with a fake Claude client (`test_tutor_harness.py`: retry / partial / generic error / rate limit / `tutor_turns`). `scaffold_level` from the client is clamped server-side (`game_master.clamp_scaffold`) — never trust client-computed telemetry.
 
-Frontend (Vitest, node environment — the Memory City heap interpreter and the home city's traffic):
+Frontend (Vitest, node environment — the Memory City heap interpreter, the home city's traffic and the final hint):
 ```bash
 cd frontend
 npm test
 ```
-Parity of `heapInterpreter.runProgram` against `goalPattern` (computed by `ll_executor`), plus every wrong line the Phase 0 content can show (compile_error / runtime_error / ok, never "unsupported"). Data comes from `frontend/src/prototype/fixtures.json`. `city/traffic.test.js`: no rear-ending, never two directions inside one crossroads, nobody stuck, cars wait at red.
+Parity of `heapInterpreter.runProgram` against `goalPattern` (computed by `ll_executor`), plus every wrong line the Phase 0 content can show (compile_error / runtime_error / ok, never "unsupported"). Data comes from `frontend/src/prototype/fixtures.json`. `city/traffic.test.js`: no rear-ending, never two directions inside one crossroads, nobody stuck, cars wait at red. `services/finalHint.test.js`: the final hint comes after the animation (1st mistake) and the tutor (2nd), never for experts, shows one step's answer per question type, and chat-only "I don't know" never counts toward it.
 
 ## Architecture
 
@@ -124,6 +124,7 @@ backend/
       question_registry.py    # per-type prompt builders + validators
       question_spec.py        # maps type_unlocked + emotion → QuestionSpec
       static_questions.py     # TEMPLATES dict: correct pseudocode for all 12 ops; _BLANKS / _BUGS content
+      question_pool.py        # class-shared pool: serving (is_current, _sanitize), dedup, self-heal refill
       curriculum.py           # the 5 teaching units, mastery rules, transfer probe, next op in a unit
       pseudo_exec.py          # item-harness oracle: runs student-visible pseudocode on a heap
       item_quality.py         # item harness rules R1-R3 + serve-time board checks
@@ -139,6 +140,7 @@ backend/
       ll_executor.py          # simulates linked-list ops for goalPattern
       concept_graph.py        # concept dependency graph per operation
       city.py                 # home city: buildings earned from mastery, placement on lots
+    analytics/                # offline evaluators: difficulty_eval.py, misconception_eval.py
     models/                   # SQLAlchemy ORM models
     schemas/                  # Pydantic request/response schemas
 ```
@@ -158,9 +160,12 @@ frontend/src/
   contexts/
     AuthContext.jsx            # user auth state + login/register/logout
     EmotionContext.jsx         # current emotion state
+  hooks/
+    useScaffold.js            # scaffold level + final-hint timing (see Scaffold orchestrator)
   services/
     api.js                    # all fetch calls — authApi, gameMasterApi, etc.
     adaptiveEngine.js         # client-side emotion + difficulty helpers
+    finalHint.js              # final-hint content from the question data (never the model)
   components/
     UnitPath.jsx              # the learning path: 5 units in teaching order (replaced the 12-card skill tree) + the Teach Quinn elective card
     TeachSession.jsx          # Teach Quinn: Quinn's code, test builder, tests, explanation cards / free text, coach
@@ -169,6 +174,7 @@ frontend/src/
     FillBlankBoard.jsx        # fill-in-the-blank question UI
     FindBugBoard.jsx          # find-the-bug question UI
     AssemblyArea.jsx          # ordering question UI (drag/drop)
+    FinalHintCard.jsx         # level-4 final hint: the current step's answer, closed until asked
     TutorChat.jsx             # streaming tutor sidebar
     AuthPage.jsx              # login + register form
     AdminDashboard.jsx        # admin view
@@ -176,7 +182,7 @@ frontend/src/
 
 ## Home City (`city/`, `services/city.py`)
 
-Home is the student's 3D city: the school plus 8 empty lots. **Entering the school is the unchanged learning flow** (ModuleSelector → skill tree → AgenticSession); nothing in the lesson, tutor or scaffolding depends on the city.
+Home is the student's 3D city: the school plus 8 empty lots. **Entering the school is the unchanged learning flow** (ModuleSelector → unit path (`UnitPath`) → AgenticSession); nothing in the lesson, tutor or scaffolding depends on the city.
 
 - **Earned is derived, never stored.** `city.BUILDINGS` maps a building to a module; it is earned when `mastery_summary` reports every curriculum unit of that module mastered (`units_mastered == total_units`). Today: all 5 singly units → Linked List Tower. Only the placement is stored (`city_buildings`, unique per user+building and per user+lot); placing an already-placed building moves it.
 - `homeLayout.LOTS` index i is backend lot i — change both together (`LOT_COUNT`).
@@ -213,7 +219,7 @@ When behaviour is off, prefer restating the *principle* over adding a clause. Ta
 
 **The one exception is tool use.** Models reliably under-call tools from descriptive guidance, so the per-turn note in `build_api_messages()` keeps an imperative ("stop re-explaining and CALL lookup_resource on this turn"). Style guidance belongs in the system prompt; the tool policy has to be operationalised per turn, because the first-turn prompt is forgotten by turn 3. The video policy is enforced in code, not prompt wording:
 - the nudge appears only once the tutor has **replied ≥ 2 times** (the proactive opener counts) and no video was shared yet — on from the first follow-up, a student who just said "I don't get it" to the opener got a bare video before any explanation;
-- the nudge goes **after** the per-turn phase note in the refresh — measured 6/6 fire when stuck vs 3/6 with the phase note last-but-one; 0/3 when the student is progressing;
+- the nudge goes **before** the per-turn phase note in the refresh (the phase note comes last) — measured 6/6 fire when stuck vs 3/6 with the phase note last-but-one; 0/3 when the student is progressing;
 - `missing_video_link()` appends a fetched video's URL when the reply leaves it out (both `chat()` and the stream route) — `TutorChat` only renders links that are in the reply text, and Haiku dropped it ~1 in 5.
 
 ### Three modes: `solving`, final hint, `reviewing`
@@ -242,7 +248,7 @@ On every first turn, `build_context_block()` injects a `[STUDENT HISTORY]` block
 This lets Claude say "I see you've made this mistake before" without the student having to explain.
 
 ### Tutor Memory (`tutor_memory.py`) — three layers
-1. **Working memory (per question)**: every turn is persisted to `tutor_messages` (clean text, append-only). The DB is the authoritative history when `session_id` is present — `body.messages` from the client is a legacy fallback only. `GET /api/ai/tutor/stream`'s reply is saved *before* `[DONE]` (the client's onDone immediately calls infer-chat, which reads the DB). Window restore: `GET /api/ai/tutor/history?session_id&question_title`.
+1. **Working memory (per question)**: every turn is persisted to `tutor_messages` (clean text, append-only). The DB is the authoritative history when `session_id` is present — `body.messages` from the client is a legacy fallback only. `POST /api/ai/tutor/stream`'s reply is saved *before* `[DONE]` (the client's onDone immediately calls infer-chat, which reads the DB). Window restore: `GET /api/ai/tutor/history?session_id&question_title`.
 2. **Compaction (view, not storage)**: when a conversation's uncompacted messages exceed 20, the oldest are compressed into `compact_summary` keeping the last 8 verbatim (`maybe_compact`, runs after `[DONE]`). What Claude receives = recap pair + verbatim tail; storage stays complete.
 3. **Episodic memory (cross-question)**: after a question attempt is recorded (`/session/record` and `/session/next` add a BackgroundTask), `summarize_pending` writes `summary` + `key_struggles` (concepts validated against the concept graph) + `resolved` (backfilled from the attempt, never LLM-guessed). Retrieval (`episodic_block`) is deterministic with decay: concept overlap via `OP_CONCEPTS` → mastery fading (skip if all concepts ≥ 0.75) → unresolved first → LIMIT 3. Conversations with no real student message get `summary=""` (sentinel: summarised, nothing to remember).
 
@@ -395,7 +401,7 @@ Always-visible hint button; also auto-opens once on the student's first mistake 
 | Edited `_BLANKS` / `_BUGS` / TEMPLATES content, or want the teacher-readable review | `python item_report.py --all --ops <op>` (free) + `pytest tests/test_item_quality.py` |
 | Edited the misconception catalog, or want to see what the content can target | `python misconception_report.py` (free) + `pytest tests/test_misconceptions.py`; before stocking targeted pool rows, `/gen-check --targeted gaps` |
 | Adding a new linked-list operation (touches ~10 files; never do this ad hoc) | `/add-operation` |
-| Edited `tutor_agent.py` (system prompt, context block, tools, ReAct loop) | `/tutor-sim` (`--show-context` is free; full run ≈ 5–10 Haiku calls) |
+| Edited `tutor_agent.py` (system prompt, context block, tools, ReAct loop) | `/tutor-sim` (`--show-context` is free; full run = 13 scenarios ≈ 13–17 Haiku calls) |
 | Edited `npc_agent.py` (Quinn's persona, the guard, `translate`, `adjudicate`, choices) | `pytest tests/test_npc.py` (free) + `npc_sim.py` in the tutor-sim skill (≈ 30–50 Haiku calls at `--repeat 2`) |
 | Tuned the adaptive system (`compute_intra_difficulty`, `useScaffold.js`, `emotion_agent`) or collected new play data | `/eval-adaptivity` (DB read-only, free) |
 

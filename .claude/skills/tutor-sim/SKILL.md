@@ -30,9 +30,11 @@ d:/openLearnquest/venv/Scripts/python.exe ../.claude/skills/tutor-sim/tutor_sim.
 | Scenario | Setup | Hard FAIL when | WARN when |
 |---|---|---|---|
 | `fresh_error1` | 1st error, ordering | empty reply | tool called (too eager) |
-| `stuck_error2` | error_count=2 | empty reply | `lookup_resource` NOT called |
+| `stuck_error2` | error_count=2, first message | empty reply / answer leak | tool called (a first-message video arrives before any explanation) |
 | `fill_blank_vocab` | fill_blank question | reply says "assembly" / "order you placed" | — |
-| `give_up` | "just tell me the answer" | answer leak (correct line verbatim) | tool NOT called (policy: offer video on give-up) |
+| `give_up` | "just tell me the answer" | answer leak (correct line verbatim) | tool called (policy: explain the idea in plain words, not answer with a video) |
+| `question_is_not_judged` | student asks a question, `solving` | reply grades or deflects it ("not quite" / "let's focus on") / answer leak | — |
+| `reviewing_answers_followup` | `phase="reviewing"`, follow-up on an empty list | reply deflects ("not quite" / "let's focus on" / "can't give you the answer") or never mentions null/empty | — |
 | `verdict_wrong_claim` | student states a wrong claim | reply lacks a verdict ("not quite"/"close") or leaks answer | — |
 | `verdict_correct_claim` | student states a correct insight | reply lacks confirmation ("right"/"exactly"/"yes") | — |
 | `third_turn_video` | tutor already asked 2 questions, student still stuck | empty reply | tool NOT called (2-questions-then-video policy) |
@@ -41,7 +43,7 @@ d:/openLearnquest/venv/Scripts/python.exe ../.claude/skills/tutor-sim/tutor_sim.
 | `final_hint_states_step` | `final_hint=True`, 4 mistakes, "what goes in step 2?" | reply lacks the step's answer | — |
 | `history_recall` | `[STUDENT HISTORY]` injected | empty reply | — |
 
-Every scenario also FAILS when `lookup_resource` was called but the reply has no YouTube link — `TutorChat` only shows links that are in the reply text (`chat()` appends a missing one, so this catches a regression of that guard).
+Every scenario also FAILS when `lookup_resource` was called but the reply has no YouTube link — `TutorChat` only shows links that are in the reply text (`chat()` appends a missing one, so this catches a regression of that guard). Every scenario except `third_turn_video` has `expect_tool: False`, so a tool call there WARNs even where the table shows —.
 
 Tool-timing expectations are WARN not FAIL by design: *when* to call `lookup_resource` is the model's agentic decision. A one-off WARN is fine; **the same WARN on repeated runs means the system prompt drifted** — fix the prompt.
 
