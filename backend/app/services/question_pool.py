@@ -54,26 +54,96 @@ def content_hash(q: dict, intra_difficulty: int) -> str:
     qtype = q.get("question_type")
     if qtype == "find_bug":
         core = "\n".join(q.get("pseudocode", []))          # contains the buggy line
-    else:  # ordering — correct steps are fixed; the distractor set is the identity
-        core = "\n".join(sorted(q.get("distractors", [])))
+    else:  # ordering — the distractor set is the identity, under ITS template
+        # (steps included so a row built on an old template can't block a
+        # fresh one with the same distractors via dedup)
+        core = "\n".join(q.get("pseudocode", []) + sorted(q.get("distractors", [])))
     core = _PAYLOAD_LITERAL.sub("createNode(_)", core)
     key = f"{q.get('operation')}|{qtype}|i{intra_difficulty}|{core}"
     return hashlib.sha256(key.encode("utf-8")).hexdigest()
 
 
-def serve(db: Session, user_id: str, operation: str, qtype: str,
-          intra_difficulty: int | None, exclude_qid: str | None = None) -> dict | None:
-    """Return the least-served pool question this student hasn't attempted,
-    or None (caller falls back to live generation). Triggers self-heal when
-    the combo is at/below the low-water mark.
+def is_current(row: QuestionPool) -> bool:
+    """Template-drift guard. Payloads embed TEMPLATES pseudocode at generation
+    time; a row built on an older template (e.g. detectCycle before its meeting
+    check moved inside the loop, or a 5-step insertAtTail) teaches code that no
+    longer exists — or was wrong. Such rows are never served and don't count
+    toward the low-water mark, so self-heal replaces them. Rows stay in the
+    table (`refill_pool.py --purge` removes them)."""
+    from .static_questions import TEMPLATES
+    from .item_quality import symbolic
+    p = row.payload or {}
+    tmpl = TEMPLATES.get(row.operation, {}).get("pseudocode")
+    steps = [symbolic(s, p.get("operationValue")) for s in p.get("pseudocode", [])]
+    if not tmpl or len(steps) != len(tmpl):
+        return False
+    if row.question_type == "find_bug":
+        line = p.get("bug_line")
+        return all(s == t for i, (s, t) in enumerate(zip(steps, tmpl)) if i != line)
+    return steps == tmpl
 
-    exclude_qid: the question currently ON SCREEN — prefetch fires before it
-    is answered, so the attempted-filter alone can hand back the very same
-    pool row as the "next" question."""
-    if qtype not in POOLED_TYPES:
+
+def _sanitize(q: dict) -> dict | None:
+    """Serve-time item harness for rows generated before it existed (the 2026-10
+    audit found wrong fixes that are actually correct, `.val` options, and
+    ordering distractors that can stand in for a real step). Drops the bad
+    options; returns None if the question itself is not worth asking. Rows are
+    never edited — only the served copy."""
+    from . import item_quality as iq
+    from .static_questions import TEMPLATES, valid_orders_for
+    op = q.get("operation")
+    steps = TEMPLATES[op]["pseudocode"]
+    v = q.get("operationValue")
+    if q.get("question_type") == "ordering":
+        q["distractors"] = [d for d in q.get("distractors", [])
+                            if iq.ordering_distractor_ok(op, iq.symbolic(d, v))]
+        q["validOrders"] = valid_orders_for(op)
+        return q
+    line = q.get("bug_line")
+    fix = q.get("fix")
+    if not isinstance(line, int) or fix is None:
         return None
-    intra = intra_difficulty if intra_difficulty in (1, 2, 3) else 2
+    sym = lambda s: iq.symbolic(s, v)
+    buggy = sym(q["pseudocode"][line])
+    rep = iq.lint_bug(op, steps, line, buggy, sym(fix),
+                      [sym(o) for o in q.get("options", []) if o != fix])
+    bug = rep.options[0]
+    if bug.correct or bug.outcome == "compile_error":
+        return None
+    board = iq.board_of(op, q.get("initialNodes") or [], v, q.get("operationPosition"), q)
+    if not iq.wrong_on_board(op, [sym(s) for s in q["pseudocode"]], board):
+        return None
+    good = set(iq.usable_wrong_fixes(rep, op))
+    wrong = [o for o in q.get("options", []) if o != fix and sym(o) in good]
+    if not wrong:
+        return None
+    q["options"] = [o for o in q["options"] if o == fix or o in wrong]
+    return q
 
+
+def row_misconception(q: dict) -> str | None:
+    """The misconception a pooled item shows, decided by execution: an explicit
+    target (it passed R4), else its bug (find_bug) or first tagged distractor."""
+    from .misconception_model import item_tags
+    if q.get("target_misconception"):
+        return q["target_misconception"]
+    tags = item_tags(q)
+    if q.get("question_type") == "find_bug":
+        return (tags.get("bug") or [None])[0]
+    for ms in (tags.get("distractors") or {}).values():
+        if ms:
+            return ms[0]
+    return None
+
+
+def _shows(q: dict, misconception: str) -> bool:
+    from .misconception_model import available, item_tags
+    return misconception in available(item_tags(q))
+
+
+def _candidates(db: Session, user_id: str, operation: str, qtype: str, intra: int,
+                exclude_qid: str | None, misconception: str | None):
+    """(the combo's rows, the current ones this student may get, in serving order)."""
     attempted = (
         db.query(QuestionAttempt.question_id)
         .join(GameSession, QuestionAttempt.session_id == GameSession.id)
@@ -82,45 +152,146 @@ def serve(db: Session, user_id: str, operation: str, qtype: str,
     base = db.query(QuestionPool).filter(
         QuestionPool.operation == operation,
         QuestionPool.question_type == qtype,
-        QuestionPool.intra_difficulty == intra,
     )
+    base = base.filter(QuestionPool.misconception_id == misconception) if misconception \
+        else base.filter(QuestionPool.intra_difficulty == intra)
     pick = base.filter(~QuestionPool.id.in_(attempted.scalar_subquery()))
     if exclude_qid:
         pick = pick.filter(QuestionPool.id != exclude_qid)
-    candidates = (
-        pick.order_by(QuestionPool.times_served.asc(), QuestionPool.created_at.asc())
-        .limit(1).all()
-    )
+    candidates = [
+        r for r in pick.order_by(QuestionPool.times_served.asc(), QuestionPool.created_at.asc()).all()
+        if is_current(r)
+    ]
+    if misconception:
+        candidates.sort(key=lambda r: r.intra_difficulty != intra)      # stable: tier first
+    return base, candidates
 
-    if base.count() <= LOW_WATER:
-        _maybe_refill_async(operation, qtype, intra)
-    if not candidates:
+
+def _servable(row: QuestionPool, misconception: str | None) -> dict | None:
+    """The sanitised copy serve() would hand out, or None if this row can't be used."""
+    try:
+        q = _sanitize(copy.deepcopy(row.payload))
+    except Exception:   # noqa: BLE001 — one malformed row must not fail serving for the class
+        logger.exception("pool row %s could not be sanitised; skipped", row.id)
         return None
-
-    row = candidates[0]
-    row.times_served += 1
-    db.commit()
-    q = copy.deepcopy(row.payload)
-    q["id"] = row.id                                    # exclusion key for this student
-    q.setdefault("variant", f"pool:{row.content_hash[:8]}")   # telemetry: which content
+    if q is None or (misconception and not _shows(q, misconception)):
+        return None
     return q
 
 
+def can_serve_targeted(db: Session, user_id: str, operation: str, qtype: str, misconception: str) -> bool:
+    """serve(..., misconception=m) would return a row for this student: the same
+    filters (not attempted, current, survives _sanitize, still shows m). The
+    remediation planner asks this; a looser count (rows the student already did)
+    planned a remediation every question that could never be served."""
+    if qtype not in POOLED_TYPES:
+        return False
+    _, candidates = _candidates(db, user_id, operation, qtype, 2, None, misconception)
+    return any(_servable(r, misconception) is not None for r in candidates)
+
+
+def serve(db: Session, user_id: str, operation: str, qtype: str,
+          intra_difficulty: int | None, exclude_qid: str | None = None,
+          misconception: str | None = None) -> dict | None:
+    """Return the least-served pool question this student hasn't attempted,
+    or None (caller falls back to live generation). Triggers self-heal when
+    the combo is at/below the low-water mark.
+
+    exclude_qid: the question currently ON SCREEN — prefetch fires before it
+    is answered, so the attempted-filter alone can hand back the very same
+    pool row as the "next" question.
+    misconception: remediation — only rows tagged with it, any tier (the
+    requested tier first); no self-heal (targeted rows are refilled offline:
+    refill_pool.py --misconceptions)."""
+    if qtype not in POOLED_TYPES:
+        return None
+    intra = intra_difficulty if intra_difficulty in (1, 2, 3) else 2
+    base, candidates = _candidates(db, user_id, operation, qtype, intra, exclude_qid, misconception)
+    if not misconception and sum(1 for r in base.all() if is_current(r)) <= LOW_WATER:
+        _maybe_refill_async(operation, qtype, intra)
+
+    for row in candidates:
+        q = _servable(row, misconception)
+        if q is None:
+            continue
+        row.times_served += 1
+        db.commit()
+        q["id"] = row.id                                    # exclusion key for this student
+        q.setdefault("variant", f"pool:{row.content_hash[:8]}")   # telemetry: which content
+        if misconception:
+            q["target_misconception"] = misconception
+        return q
+    return None
+
+
+def count_tagged(db: Session, operation: str, qtype: str, misconception: str) -> int:
+    rows = db.query(QuestionPool).filter(
+        QuestionPool.operation == operation, QuestionPool.question_type == qtype,
+        QuestionPool.misconception_id == misconception).all()
+    return sum(1 for r in rows if is_current(r))
+
+
+def rehash_existing(db: Session) -> tuple[int, int]:
+    """Recompute content_hash on rows hashed by an older formula (ordering once
+    hashed its distractors only). A stale hash doesn't dedup, so the pool could
+    store the same question twice. Free. Rows whose identity another row already
+    holds are left alone (counted, never overwritten). Returns (rehashed, clashes)."""
+    rows = db.query(QuestionPool).all()
+    taken = {r.content_hash for r in rows}
+    n = clashes = 0
+    for row in rows:
+        h = content_hash({**(row.payload or {}), "question_type": row.question_type,
+                          "operation": row.operation}, row.intra_difficulty)
+        if h == row.content_hash:
+            continue
+        if h in taken:
+            clashes += 1
+            continue
+        taken.discard(row.content_hash)
+        taken.add(h)
+        row.content_hash = h
+        n += 1
+    db.commit()
+    return n, clashes
+
+
+def tag_existing(db: Session) -> int:
+    """Backfill misconception_id on rows inserted before tagging existed.
+    Free (execution only). Returns rows tagged."""
+    n = 0
+    for row in db.query(QuestionPool).filter(QuestionPool.misconception_id.is_(None)).all():
+        m = row_misconception(row.payload or {})
+        if m:
+            row.misconception_id = m
+            n += 1
+    db.commit()
+    return n
+
+
 def generate_validated(operation: str, qtype: str, intra_difficulty: int,
-                       variant_seed: int = 0, avoid: list[str] | None = None) -> dict:
+                       variant_seed: int = 0, avoid: list[str] | None = None,
+                       target_misconception: str | None = None) -> dict:
     """gen_check-style loop: build_prompt -> Haiku -> validate, retried, and
     RAISES on total failure (no static fallback — see module docstring).
 
     `avoid` lists content already in the pool for this combo (buggy lines for
     find_bug, distractors for ordering). Without it the model converges on the
-    same bug every call and the refill budget burns on content_hash dedup."""
+    same bug every call and the refill budget burns on content_hash dedup.
+    target_misconception: the item must show it (R4 in the validator)."""
     from .claude_service import OP_META, MAX_RETRIES, _call_model, _finalize
-    from .question_registry import get_handler
+    from .question_registry import ai_can_target, get_handler
     from .question_spec import select_spec
 
+    if target_misconception and not ai_can_target(operation, target_misconception):
+        raise RuntimeError(f"{target_misconception} has no one-line form on {operation}: "
+                           f"model output can never show it (authored content only)")
+
     type_unlocked = {"find_bug": 2, "ordering": 3}[qtype]
-    spec    = select_spec(operation, "engaged", type_unlocked, intra_difficulty, variant_seed)
+    spec    = select_spec(operation, "engaged", type_unlocked, intra_difficulty, variant_seed,
+                          target_misconception)
     meta    = OP_META[operation]
+    if target_misconception:
+        meta = {**meta, "target_misconception": target_misconception}
     handler = get_handler(spec.type)
 
     last_error = ""
@@ -135,7 +306,10 @@ def generate_validated(operation: str, qtype: str, intra_difficulty: int,
             prompt += f"\n\nPrevious attempt failed: {last_error}\nReturn valid JSON only."
         raw = _call_model(prompt)
         try:
-            return _finalize(handler.validate(raw, operation, meta), operation, spec)
+            q = handler.validate(raw, operation, meta)
+            if target_misconception:
+                q["target_misconception"] = target_misconception
+            return _finalize(q, operation, spec)
         except Exception as e:
             last_error = str(e)
     raise RuntimeError(f"generation failed after {MAX_RETRIES} attempts: {last_error}")
@@ -167,6 +341,7 @@ def insert_question(db: Session, q: dict, intra_difficulty: int) -> QuestionPool
     row = QuestionPool(
         operation=q["operation"], question_type=q["question_type"],
         intra_difficulty=intra_difficulty, payload=q, content_hash=h,
+        misconception_id=row_misconception(q),
     )
     db.add(row)
     db.flush()
@@ -181,11 +356,11 @@ def refill_combo(db: Session, operation: str, qtype: str, intra: int,
     Duplicates and failed generations count against max_calls (default 2x need).
     Existing pool content is fed back as an avoid-list so the model doesn't
     regenerate the same bug/distractors (dedup exhaustion)."""
-    existing = db.query(QuestionPool).filter(
+    existing = [r for r in db.query(QuestionPool).filter(
         QuestionPool.operation == operation,
         QuestionPool.question_type == qtype,
         QuestionPool.intra_difficulty == intra,
-    ).all()
+    ).all() if is_current(r)]
     have = len(existing)
     need = target - have
     if need <= 0:
@@ -207,6 +382,45 @@ def refill_combo(db: Session, operation: str, qtype: str, intra: int,
         if row:
             added += 1
             avoid = list(dict.fromkeys(avoid + _existing_content([row], qtype)))
+    return added
+
+
+def refill_targeted(db: Session, operation: str, qtype: str, misconception: str,
+                    target: int = 2, intra: int = 2, max_calls: int | None = None) -> int:
+    """Stock rows that show one misconception for a (operation, type) the
+    authored content cannot target. Returns rows added. Costs model calls."""
+    from .misconceptions import CATALOG, canonical
+    if misconception not in CATALOG or operation not in CATALOG[misconception].mutants:
+        return 0
+    if canonical(operation, misconception).kind != "replace":
+        return 0              # swaps are tested by any ordering item; deletes are authored-only
+    need = target - count_tagged(db, operation, qtype, misconception)
+    if need <= 0:
+        return 0
+    rows = db.query(QuestionPool).filter(QuestionPool.operation == operation,
+                                         QuestionPool.question_type == qtype).all()
+    avoid = _existing_content([r for r in rows if r.misconception_id == misconception and is_current(r)], qtype)
+    added = calls = 0
+    budget = max_calls if max_calls is not None else need * 3
+    while added < need and calls < budget:
+        calls += 1
+        try:
+            q = generate_validated(operation, qtype, intra, variant_seed=calls, avoid=avoid,
+                                   target_misconception=misconception)
+        except Exception as e:
+            logger.warning("targeted refill failed (%s/%s/%s): %s", operation, qtype, misconception, e)
+            continue
+        row = insert_question(db, q, intra)
+        if row is None:       # same content already pooled: make sure it carries the tag
+            h = content_hash(q, intra)
+            existing = db.query(QuestionPool).filter(QuestionPool.content_hash == h).first()
+            if existing and existing.misconception_id is None:
+                existing.misconception_id = misconception
+                db.commit()
+                added += 1
+            continue
+        added += 1
+        avoid = list(dict.fromkeys(avoid + _existing_content([row], qtype)))
     return added
 
 

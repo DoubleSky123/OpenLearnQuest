@@ -1,5 +1,44 @@
 import { useState, useEffect } from 'react';
-import { adminApi } from '../services/api';
+import { adminApi, studyApi } from '../services/api';
+
+// The classroom study at a glance (counts only, no student data). Hidden when
+// STUDY_ENABLED is off. Refresh with the button during class.
+function StudyPanel() {
+  const [s, setS] = useState(null);
+  const load = () => studyApi.summary().then(setS).catch(() => setS(null));
+  useEffect(() => { load(); }, []);
+  if (!s?.enabled) return null;
+  const arms = Object.entries(s.assigned || {});
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-4">
+      <div className="flex items-center mb-3">
+        <p className="text-xs font-semibold text-gray-400 uppercase">Study ({s.design})</p>
+        <button onClick={load} className="ml-auto text-xs text-indigo-700 font-semibold hover:underline">Refresh</button>
+      </div>
+      {s.consent_draft && (
+        <p className="text-xs text-red-700 mb-2">The consent text is still the draft: replace it before class.</p>
+      )}
+      {!s.bank_items && <p className="text-xs text-red-700 mb-2">No test bank: run build_quiz_bank.py.</p>}
+      <div className="grid grid-cols-3 gap-3 mb-3">
+        {[
+          { label: 'Consented', value: s.consented },
+          { label: 'Declined', value: s.declined },
+          { label: 'Not yet', value: s.participants - s.consented - s.declined },
+        ].map((x) => (
+          <div key={x.label} className="text-center">
+            <p className="text-2xl font-bold text-slate-800">{x.value}</p>
+            <p className="text-xs text-gray-400">{x.label}</p>
+          </div>
+        ))}
+      </div>
+      <p className="text-xs text-gray-500 mb-1">Assigned: {arms.length ? arms.map(([a, n]) => `${a} ${n}`).join(' · ') : 'none yet'}</p>
+      <p className="text-xs text-gray-500 mb-1">
+        Tests submitted: {['pre', 'post', 'delayed'].map((k) => `${k} ${s.tests_submitted?.[k] ?? 0}`).join(' · ')}
+      </p>
+      <p className="text-xs text-gray-500">Open: {s.tests_open.join(', ')}</p>
+    </div>
+  );
+}
 
 const EMOTION_META = {
   engaged:   { label: 'Engaged',    color: '#059669', bg: '#D1FAE5', dot: 'bg-emerald-500' },
@@ -131,6 +170,8 @@ export default function AdminDashboard({ onBack }) {
               </div>
             </div>
           )}
+
+          <StudyPanel />
 
           {/* Student list */}
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">

@@ -24,6 +24,7 @@ d:/openLearnquest/venv/Scripts/python.exe ../.claude/skills/gen-check/gen_check.
 - `--ops removeDuplicates` — single-op check (e.g. after `/add-operation`).
 - `--types ordering` — single-type check (e.g. after editing `_ordering_prompt` / `_ordering_validate`).
 - `fill_blank` is intentionally not covered: it is fully static (no AI call). If `static_questions.py` `_BLANKS` changed, verify via the executor/UI instead.
+- `--targeted gaps|all|<misconception ids>` — generation aimed at a misconception (`misconceptions.py`): each cell must also pass **R4** (the item shows the misconception when run). `gaps` = the (op, type, misconception) cells authored content cannot target, i.e. what `refill_pool.py --misconceptions gaps` will try to stock — run this first to see the R4 first-attempt rate before spending a refill. Only one-line (`replace`) misconceptions are generable.
 
 Exit code 0 = all combos validated within `MAX_RETRIES` (3); 1 = at least one combo failed all retries (the last validator error is printed per failure).
 
@@ -35,6 +36,7 @@ Exit code 0 = all combos validated within `MAX_RETRIES` (3); 1 = at least one co
 | One type's prompt or validator | `--types <type>` |
 | `question_spec.py`, `_sll_reject_reason`, shared helpers | `--ops all` |
 | New operation added | `--ops <newOp>` (both types) |
+| Targeted prompt / R4 (`_target_replace`, `_r4`) or the misconception catalog | `--targeted gaps` (scope with `--ops`) |
 
 ## Interpreting results
 

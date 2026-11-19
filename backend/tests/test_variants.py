@@ -30,13 +30,17 @@ def test_bug_subtlety_full_coverage(op):
 @pytest.mark.parametrize("op", ALL_OPS)
 def test_blank_sets_wellformed(op):
     """Ammo requirement: >=4 blank sets per op, each parallel to the pseudocode,
-    with the answer findable in its step (str.replace contract) and no dup options."""
+    with the answer findable in its step (str.replace contract) and no dup options.
+    None marks a step that set never blanks. Whether a blank is WORTH asking is
+    test_item_quality.py's job."""
     steps = TEMPLATES[op]["pseudocode"]
     sets = _BLANKS[op]
     assert len(sets) >= 4, f"{op}: needs >=4 blank sets, has {len(sets)}"
     for si, bset in enumerate(sets):
         assert len(bset) == len(steps), f"{op} set {si}: not parallel to pseudocode"
         for bd, step in zip(bset, steps):
+            if bd is None:
+                continue
             assert bd["a"] in step, f"{op} set {si}: answer {bd['a']!r} not in {step!r}"
             opts = [bd["a"], *bd["w"]]
             assert len(set(opts)) == len(opts), f"{op} set {si}: duplicate options {opts}"

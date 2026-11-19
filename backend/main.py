@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
-from app.routes import auth, progress, tutor, emotion, admin, game_master, city
+from app.routes import auth, progress, tutor, emotion, admin, game_master, city, npc, study
 
 app = FastAPI(title="OpenLearnQuest API", version="1.0.0")
 
@@ -20,6 +20,8 @@ app.include_router(emotion.router)
 app.include_router(admin.router)
 app.include_router(game_master.router)
 app.include_router(city.router)
+app.include_router(npc.router)
+app.include_router(study.router)
 
 
 @app.get("/health")

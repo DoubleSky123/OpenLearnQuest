@@ -94,6 +94,9 @@ class QuestionSpec:
     # operation — variant N = seed % n_variants, so consecutive plays of the
     # same operation never repeat the same blank set / static bug
     variant_seed: int = 0
+    # remediation: the misconception (misconceptions.CATALOG id) the item must
+    # show — authored content is picked for it, AI output is checked for it (R4)
+    target_misconception: str | None = None
 
 
 def select_spec(
@@ -102,6 +105,7 @@ def select_spec(
     type_unlocked: int = 1,     # 1=fill_blank, 2=find_bug, 3=ordering (only goes up)
     intra_difficulty: int | None = None,   # within-type difficulty from the ZPD controller
     variant_seed: int = 0,
+    target_misconception: str | None = None,
 ) -> QuestionSpec:
     """
     Two-axis spec:
@@ -126,4 +130,5 @@ def select_spec(
         emotion=emotion,
         intra_difficulty=intra,
         variant_seed=variant_seed,
+        target_misconception=target_misconception,
     )

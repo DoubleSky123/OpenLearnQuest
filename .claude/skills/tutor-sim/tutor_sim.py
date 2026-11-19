@@ -18,11 +18,31 @@ sys.stdout.reconfigure(encoding="utf-8")  # Windows console defaults to cp1252; 
 sys.path.insert(0, ".")  # expects cwd == backend/
 
 import app.services.tutor_agent as ta
+from app.services import anthropic_client
 
 INSERT_AT_HEAD = {
     "correct": ["newNode = createNode(value);", "newNode.next = head;", "head = newNode;"],
     "wrong":   ["newNode = createNode(value);", "head = newNode;", "newNode.next = head;"],
 }
+
+# A fill_blank on removeAtPosition where the student put `index` in the loop bound
+# (lands ON the node to remove), the same belief already shown on two earlier
+# questions. The note is built by the production formatter, so it stays in sync.
+from app.services import misconception_model as _mm  # noqa: E402
+
+_REMOVE_AT_POSITION = dict(
+    question_title="Remove at Position", operation="removeAtPosition",
+    your_answer=["curr = head;", "for (int i = 0; i < ___; i++) curr = curr.next;", "temp = curr.next;",
+                 "curr.next = temp.next;", "free(temp);"],
+    correct_answer=["curr = head;", "for (int i = 0; i < index-1; i++) curr = curr.next;", "temp = curr.next;",
+                    "curr.next = temp.next;", "free(temp);"],
+    error_count=2, messages=[], question_type="fill_blank",
+    board_note="Student is on the blank in step 2; last tried 'index' there — wrong.",
+)
+_EVIDENCE = _mm.tutor_note([{
+    "id": "stop-on-target", "where": "this_question", "line": 1, "option": "index",
+    "consequence": "the list ends up 42 -> 20 -> 84", "earlier_questions": 2,
+    "earlier_operations": ["removeAtTail", "insertAtPosition"]}])
 
 SCENARIOS = {
     # First mistake, first message — expect one Socratic question, no tool yet.
@@ -123,7 +143,8 @@ SCENARIOS = {
         ),
         "expect_tool": False,
         "required_any": ["not quite", "close", "not exactly", "backwards", "wrong",
-                         "not right", "isn't right", "the opposite", "other way"],
+                         "not right", "isn't right", "don't think that's right", "the opposite",
+                         "other way"],
         "no_leak": True,
     },
     # Student makes a CORRECT claim — reply must confirm it, not hedge it with a
@@ -179,6 +200,36 @@ SCENARIOS = {
         "expect_tool": False,
         "required_any": ["right", "exactly", "yes"],
     },
+    # Only the proactive opener so far, then "I don't get it": the code-level video
+    # nudge must NOT fire yet (it used to, and the student got a bare video before
+    # any explanation). Explanation first.
+    "no_video_after_opener_only": {
+        "kwargs": dict(
+            question_title="Insert at Head", operation="insertAtHead",
+            your_answer=INSERT_AT_HEAD["wrong"], correct_answer=INSERT_AT_HEAD["correct"],
+            error_count=2,
+            messages=[
+                {"role": "user", "content": "[PROACTIVE_INIT] The student is struggling on this step. Without asking what they need help with, observe their current step assembly and ask one targeted Socratic question."},
+                {"role": "assistant", "content": "When you do head = newNode first, what happens to the old head?"},
+            ],
+            user_message="I don't really get what you mean.",
+            question_type="ordering",
+        ),
+        "expect_tool": False,
+        "no_leak": True,
+    },
+    # Final hint (scaffold level 4): the game shows the answer for the current
+    # step, so the tutor must now be able to say it plainly.
+    "final_hint_states_step": {
+        "kwargs": dict(
+            question_title="Insert at Head", operation="insertAtHead",
+            your_answer=INSERT_AT_HEAD["wrong"], correct_answer=INSERT_AT_HEAD["correct"],
+            error_count=4, messages=[], user_message="I still don't get it. What goes in step 2?",
+            question_type="ordering", final_hint=True,
+        ),
+        "expect_tool": False,
+        "required_any": ["newNode.next = head"],
+    },
     # Cross-session history injection — the tutor should be able to reference it.
     "history_recall": {
         "kwargs": dict(
@@ -193,6 +244,31 @@ SCENARIOS = {
             ),
         ),
         "expect_tool": False,
+    },
+    # [MISCONCEPTION EVIDENCE] (the tutor channel of a misconception study): the
+    # tutor is told which belief the pick fits and that it recurred. It must aim at
+    # the belief WITHOUT naming or labelling it, and knowing the belief must not
+    # make it leak this blank's answer. Compare the reply with
+    # misconception_control (same student, no evidence) by reading both.
+    "misconception_evidence": {
+        "kwargs": dict(**_REMOVE_AT_POSITION, misconception_note=_EVIDENCE,
+                       user_message="Why is my loop wrong?"),
+        "expect_tool": False,
+        "no_leak": True,
+        "forbidden": ["index-1", "index - 1", "misconception", "stop-on-target", "you believe"],
+    },
+    "misconception_evidence_give_up": {
+        "kwargs": dict(**_REMOVE_AT_POSITION, misconception_note=_EVIDENCE,
+                       user_message="Just tell me what goes in the blank."),
+        "expect_tool": False,
+        "no_leak": True,
+        "forbidden": ["index-1", "index - 1", "misconception", "stop-on-target"],
+    },
+    "misconception_control": {
+        "kwargs": dict(**_REMOVE_AT_POSITION, user_message="Why is my loop wrong?"),
+        "expect_tool": False,
+        "no_leak": True,
+        "forbidden": ["index-1", "index - 1"],
     },
 }
 
@@ -237,6 +313,10 @@ def run_scenario(name: str, show_context: bool) -> list[str]:
     req = sc.get("required_any", [])
     if req and not any(w.lower() in reply.lower() for w in req):
         failures.append(f"verdict/feedback missing: expected one of {req} in the reply")
+    # TutorChat only shows a video the reply text links to; chat() appends a
+    # fetched link the model left out, so a missing link here is a real bug
+    if tool_calls and "youtube.com" not in reply:
+        failures.append("video fetched but its link is missing from the reply — the student would see no video")
     if sc["expect_tool"] and not tool_calls:
         warnings.append("expected lookup_resource, model did not call it (discretion — verify prompt if persistent)")
     if not sc["expect_tool"] and tool_calls:
@@ -285,7 +365,7 @@ def _conversation_config(operation: str, qtype: str, errors: int) -> dict:
         your_answer[j] = "___" + your_answer[j][your_answer[j].find(" "):] if " " in your_answer[j] else "___"
         board_note = f"Student is on the blank in step {j + 1}."
     else:  # find_bug
-        bug = _BUGS[operation]
+        bug = _BUGS[operation][0]          # _BUGS holds a list of subtlety-tagged variants
         your_answer = list(correct)
         your_answer[bug["line"]] = bug["buggy"]
         board_note = "Student is looking for the buggy line."
@@ -334,8 +414,8 @@ def auto_conversation(turns: int, persona: str, operation: str = "insertAtHead",
             if i == turns - 1:
                 break
             # Haiku plays the student for the next turn
-            sim = client.messages.create(
-                model="claude-haiku-4-5", max_tokens=120,
+            sim = client.messages.create(   # Haiku 5.5 (thinking on by default: read via text_of)
+                **anthropic_client.options("interactive"), max_tokens=120 + anthropic_client.THINKING_HEADROOM,
                 messages=[{"role": "user", "content":
                     f"You are role-playing a student in a linked-list tutoring session. "
                     f"Persona: {persona}. Your (wrong) attempt was: "
@@ -344,7 +424,7 @@ def auto_conversation(turns: int, persona: str, operation: str = "insertAtHead",
                     f"stay in character, do not solve it instantly).\n\n"
                     + "\n".join(f"{m['role']}: {m['content']}" for m in history)}],
             )
-            student_msg = sim.content[0].text.strip()
+            student_msg = anthropic_client.text_of(sim)
     finally:
         ta._execute_tool = orig
     print(f"=== transcript complete: {len(history) // 2} exchanges ===")

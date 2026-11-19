@@ -17,7 +17,11 @@ async function request(method, path, body) {
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: "Request failed" }));
-    throw new Error(err.detail || "Request failed");
+    // a 422 carries a list of field errors: show their messages, not "[object Object]"
+    const detail = Array.isArray(err.detail)
+      ? err.detail.map((d) => d?.msg).filter(Boolean).join("; ")
+      : err.detail;
+    throw new Error(detail || "Request failed");
   }
   return res.json();
 }
@@ -79,6 +83,9 @@ export const gameMasterApi = {
       scaffold_level: telemetry.scaffoldLevel ?? null,
       emotion: telemetry.emotion ?? null,
       variant: telemetry.variant ?? null,
+      // the server clamps this to the type it served (mastery = a perfect ordering pass)
+      question_type: telemetry.questionType ?? null,
+      purpose: telemetry.purpose ?? null,      // a review never changes mastery
     }),
 
   nextQuestion: (sessionId, operation, questionId, questionNumber, passed, errorCount, timeMs, emotion, skipRecord = false, plannedQuestions = 3, pinnedOperation = null, telemetry = {}) =>
@@ -91,6 +98,9 @@ export const gameMasterApi = {
       scaffold_level: telemetry.scaffoldLevel ?? null,
       question_type: telemetry.questionType ?? null,
       variant: telemetry.variant ?? null,
+      purpose: telemetry.purpose ?? null,
+      // the client already shows a prefetched question: the server records, no new question
+      prefetched: telemetry.prefetched ?? false,
     }),
 
   prefetchNext: (sessionId, lastOperation, emotion, pinnedOperation = null, currentQuestionId = null) =>
@@ -112,6 +122,28 @@ export const cityApi = {
   place: (building_key, lot) => request("POST", "/api/city/place", { building_key, lot }),
 };
 
+// Teach Quinn — the elective where the student teaches an AI classmate (/api/npc)
+export const npcApi = {
+  status: () => request("GET", "/api/npc/status"),
+  current: () => request("GET", "/api/npc/case"),
+  start: (fresh = false) => request("POST", "/api/npc/case", { fresh }),
+  test: (caseId, board) => request("POST", `/api/npc/case/${caseId}/test`, board),
+  explain: (caseId, body) => request("POST", `/api/npc/case/${caseId}/explain`, body),
+  coach: (caseId) => request("POST", `/api/npc/case/${caseId}/coach`),
+};
+
+// The classroom study (/api/study): consent, then the pre / post / delayed tests.
+// The server judges every answer; the client never learns which option is right.
+export const studyApi = {
+  status: () => request("GET", "/api/study/status"),
+  consent: (agreed, background = {}) => request("POST", "/api/study/consent", { agreed, background }),
+  startTest: (kind) => request("POST", `/api/study/test/${kind}/start`),
+  answer: (kind, itemId, optionId, timeMs) =>
+    request("POST", `/api/study/test/${kind}/answer`, { item_id: itemId, option_id: optionId, time_ms: timeMs }),
+  submit: (kind) => request("POST", `/api/study/test/${kind}/submit`),
+  summary: () => request("GET", "/api/study/admin/summary"),   // admins: counts only
+};
+
 // Admin
 export const adminApi = {
   getOverview: () => request("GET", "/api/admin/overview"),
@@ -131,7 +163,9 @@ export const tutorApi = {
 };
 
 // Tutor agent (streaming)
-export function streamTutorChat(data, onToken, onDone, onError) {
+// onNotice: a system message from the server (e.g. rate limited) — not a tutor
+// reply, nothing was stored; the stream still ends with onDone.
+export function streamTutorChat(data, onToken, onDone, onError, onNotice = null) {
   const token = getToken();
   const ctrl = new AbortController();
 
@@ -163,6 +197,7 @@ export function streamTutorChat(data, onToken, onDone, onError) {
             const obj = JSON.parse(payload);
             if (obj.token) onToken(obj.token);
             if (obj.error) onError(obj.error);
+            if (obj.notice) onNotice?.(obj.notice);
           } catch { /* ignore malformed SSE line */ }
         }
       }

@@ -8,18 +8,42 @@ POST /api/gm/test-generation  — Sprint-1 quality test
 GET  /api/gm/operations       — list all supported operations
 """
 
+import logging
+
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..dependencies import get_current_user
+from .admin import require_admin
 from ..models.user import User
 from ..services.claude_service import run_generation_test, OP_META
 from ..services import game_master as gm
+from ..services import study
 from ..services import tutor_memory
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/gm", tags=["game_master"])
+
+GENERIC_ERROR = "Something went wrong — please try again in a moment."
+STUDY_STEP_FIRST = "Please finish the step on the home screen first (the study consent or a short test)."
+
+
+def _unavailable() -> HTTPException:
+    """Call inside an except block: the real error goes to the log, the student
+    gets a generic message (internal text, e.g. a database error, never leaves)."""
+    logger.exception("game master request failed")
+    return HTTPException(status_code=503, detail=GENERIC_ERROR)
+
+
+def _study_gate(db: Session, user: User) -> None:
+    """In a study, practice waits for consent and any test that is due (the
+    pre-test decides the assignment). The client shows that step first; this is
+    the server's check."""
+    if study.blocks_practice(db, user):
+        raise HTTPException(status_code=409, detail=STUDY_STEP_FIRST)
 
 
 # ── Schemas ────────────────────────────────────────────────────────────────────
@@ -43,6 +67,8 @@ class RecordResultRequest(BaseModel):
     scaffold_level: int | None = None
     emotion: str | None = None
     variant: str | None = None
+    question_type: str | None = None   # clamped server-side (game_master.played_level)
+    purpose: str | None = None         # practice | detour | review — a review never changes mastery
 
 
 class NextQuestionRequest(BaseModel):
@@ -61,6 +87,9 @@ class NextQuestionRequest(BaseModel):
     scaffold_level: int | None = None
     question_type: str | None = None
     variant: str | None = None
+    purpose: str | None = None
+    # the client already shows a prefetched question: record + state, no new question
+    prefetched: bool = False
 
 
 class PrefetchRequest(BaseModel):
@@ -97,6 +126,7 @@ def start_session(
     Selects first operation based on mastery profile + emotion,
     generates first question via Question Agent.
     """
+    _study_gate(db, current_user)
     try:
         return gm.start_session(
             db=db,
@@ -106,8 +136,8 @@ def start_session(
             emotion=body.emotion,
             operation=body.operation,
         )
-    except RuntimeError as e:
-        raise HTTPException(status_code=503, detail=str(e))
+    except RuntimeError:
+        raise _unavailable() from None
 
 
 @router.post("/session/record")
@@ -140,6 +170,8 @@ def record_result(
         scaffold_level=body.scaffold_level,
         emotion=body.emotion,
         variant=body.variant,
+        question_type=body.question_type,
+        purpose=body.purpose,
     )
 
 
@@ -178,9 +210,11 @@ def next_question(
             scaffold_level=body.scaffold_level,
             question_type=body.question_type,
             variant=body.variant,
+            purpose=body.purpose,
+            prefetched=body.prefetched,
         )
-    except RuntimeError as e:
-        raise HTTPException(status_code=503, detail=str(e))
+    except RuntimeError:
+        raise _unavailable() from None
 
 
 @router.post("/session/prefetch")
@@ -205,8 +239,8 @@ def prefetch_next(
             session_id=body.session_id,
             current_question_id=body.current_question_id,
         )
-    except Exception as e:
-        raise HTTPException(status_code=503, detail=str(e))
+    except Exception:
+        raise _unavailable() from None
 
 
 @router.post("/session/level-up")
@@ -230,8 +264,8 @@ def level_up(
             operation=body.operation,
             emotion=body.emotion,
         )
-    except RuntimeError as e:
-        raise HTTPException(status_code=503, detail=str(e))
+    except RuntimeError:
+        raise _unavailable() from None
 
 
 @router.get("/mastery")
@@ -248,7 +282,7 @@ def get_mastery(
 @router.post("/test-generation")
 def test_generation(
     body: TestRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),   # up to 60 paid model calls: admins only
 ):
     """Sprint-1 quality test: generate N questions, report pass rate."""
     if body.operation not in OP_META:

@@ -21,6 +21,9 @@ class Mastery(Base):
     perfect_pass: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
     type_unlocked: Mapped[int] = mapped_column(Integer, default=1, nullable=False, server_default="1")   # competence ceiling (earned, monotonic)
     active_type_level: Mapped[int] = mapped_column(Integer, default=1, nullable=False, server_default="1")  # type the student chose to practice (<= type_unlocked)
+    # highest question type passed with zero errors (0 none, 1 fill_blank, 2 find_bug,
+    # 3 ordering). An op is mastered at 3 — see services/curriculum.py
+    best_perfect_type: Mapped[int] = mapped_column(Integer, default=0, nullable=False, server_default="0")
     last_seen: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     user: Mapped["User"] = relationship("User", back_populates="mastery_records")

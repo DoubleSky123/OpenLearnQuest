@@ -8,6 +8,9 @@ from app.models.game_session import GameSession
 from app.models.question_attempt import QuestionAttempt
 from app.models.emotion_log import EmotionLog
 from app.models.mistake import Mistake
+from app.models.tutor_turn import TutorTurn
+from app.models.misconception import MisconceptionEvent, MisconceptionState, ServedItem
+from app.models.npc import NpcCase, NpcEvent
 
 EMAIL = "shi.kun@northeastern.edu"
 DRY_RUN = "--apply" not in sys.argv
@@ -32,12 +35,26 @@ try:
     print(f"  ConceptMastery:  {db.query(ConceptMastery).filter(ConceptMastery.user_id == uid).count()}")
     print(f"  EmotionLog:      {db.query(EmotionLog).filter(EmotionLog.user_id == uid).count()}")
     print(f"  Mistake:         {db.query(Mistake).filter(Mistake.user_id == uid).count()}")
+    print(f"  TutorTurn:       {db.query(TutorTurn).filter(TutorTurn.user_id == uid).count()}")
+    print(f"  Misconceptions:  {db.query(MisconceptionState).filter(MisconceptionState.user_id == uid).count()} "
+          f"state, {db.query(MisconceptionEvent).filter(MisconceptionEvent.user_id == uid).count()} events, "
+          f"{db.query(ServedItem).filter(ServedItem.user_id == uid).count()} served items")
+    print(f"  Teach Quinn:     {db.query(NpcCase).filter(NpcCase.user_id == uid).count()} cases, "
+          f"{db.query(NpcEvent).filter(NpcEvent.user_id == uid).count()} events")
 
     if DRY_RUN:
         print("\nDry run — pass --apply to actually delete.")
         sys.exit(0)
 
-    # Delete in FK-safe order (children before parents)
+    # Delete in FK-safe order (children before parents). Tutor conversations are
+    # kept on purpose (memory belongs to the user); their telemetry is test noise.
+    db.query(TutorTurn).filter(TutorTurn.user_id == uid).delete(synchronize_session=False)
+    # misconception diagnosis: a fresh account starts with no evidence
+    db.query(MisconceptionEvent).filter(MisconceptionEvent.user_id == uid).delete(synchronize_session=False)
+    db.query(MisconceptionState).filter(MisconceptionState.user_id == uid).delete(synchronize_session=False)
+    db.query(ServedItem).filter(ServedItem.user_id == uid).delete(synchronize_session=False)
+    db.query(NpcEvent).filter(NpcEvent.user_id == uid).delete(synchronize_session=False)
+    db.query(NpcCase).filter(NpcCase.user_id == uid).delete(synchronize_session=False)
     if sids:
         db.query(QuestionAttempt).filter(QuestionAttempt.session_id.in_(sids)).delete(synchronize_session=False)
         db.query(EmotionLog).filter(EmotionLog.session_id.in_(sids)).delete(synchronize_session=False)

@@ -6,9 +6,9 @@ An AI-powered adaptive learning system for linked list data structures. Students
 
 ## Demo
 
-**Stack**: React 19 + FastAPI + PostgreSQL + Anthropic Claude Haiku 4.5
+**Stack**: React 19 + FastAPI + PostgreSQL + Anthropic Claude Haiku 5.5
 **Local dev**: backend on `http://localhost:8001`, frontend on `http://localhost:5173`
-**Tests**: 197 backend tests, in-memory SQLite fixtures, no Postgres required
+**Tests**: 782 backend tests, in-memory SQLite fixtures, no Postgres required
 
 ---
 
@@ -103,7 +103,7 @@ below LOW_WATER (3)?            → background daemon thread tops it up
 - **`fill_blank` is never pooled** — it is static and instant, so pooling would add nothing.
 - **Staleness rule**: pool payloads embed TEMPLATES content (pseudocode, step hints) at generation time. After editing an operation's template, regenerate: `refill_pool.py --ops <op> --purge`.
 
-**Built-in evaluation endpoint**: `POST /api/gm/test-generation?operation=insertAtHead&n=10` generates N questions and reports per-attempt pass/fail plus an overall pass rate. The `/gen-check` skill wraps this into a full sweep across operations × types.
+**Built-in evaluation endpoint** (admin-only, up to 60 model calls): `POST /api/gm/test-generation` with body `{"operation": "insertAtHead", "n": 10}` generates N questions and reports per-attempt pass/fail plus an overall pass rate. The `/gen-check` skill runs the same check across operations × types without the endpoint's silent static fallback.
 
 #### Content variants
 
@@ -141,16 +141,16 @@ Queries `CONCEPT_RESOURCE_LIBRARY` — curated beginner videos organised by **co
 
 **Claude decides when to call it** — that autonomy is the agentic part. Measured behaviour: fires 4/4 when the student is genuinely stuck, 0/3 when they are making progress. Capped at once per conversation.
 
-#### Two phases: `solving` vs `reviewing`
+#### Three modes: `solving`, final hint, `reviewing`
 
-`TutorRequest.phase` (client-sent; unknown values fall back to `solving`, so a stale client can never unlock answer reveal) selects the system prompt:
+`TutorRequest.phase` (client-sent; unknown values fall back to `solving`, so a stale client can never unlock answer reveal) plus `final_hint` select the system prompt. The server re-checks both: `reviewing` is honoured only once the question's attempt is recorded, and the final hint only after 3 board mistakes on this question (never in `reviewing`).
 
-| | `solving` (exercise open) | `reviewing` (analysis card up) |
-|---|---|---|
-| Concepts, tangents, casual chat | free | free |
-| This exercise's answer (step order / blank token / bug line) | withheld — **including in plain English**; "first create it, then connect it, then move head" leaks as much as the code | already on the student's screen, so explain it outright |
+| | `solving` (exercise open) | final hint (exercise open, scaffold level 4) | `reviewing` (analysis card up) |
+|---|---|---|---|
+| Concepts, tangents, casual chat | free | free | free |
+| This exercise's answer (step order / blank token / bug line) | withheld — **including in plain English**; "first create it, then connect it, then move head" leaks as much as the code | the answer for the **current step** may be stated (the board's final-hint card shows it too); later steps stay withheld | already on the student's screen, so explain it outright |
 
-Without the second phase the tutor answered the analysis card's own follow-up question with "let's focus on…" — withholding an answer the student could already read.
+Without the `reviewing` mode the tutor answered the analysis card's own follow-up question with "let's focus on…" — withholding an answer the student could already read.
 
 #### Prompt design rule: stay lean
 
@@ -257,7 +257,7 @@ Student clicks "Open Chat →" → TutorChat opens with the message pre-loaded
 
 The kick-off message is type-specific (`PROACTIVE_INIT_BY_TYPE`), so the tutor opens by asking about *the blank*, *the line*, or *the step order* rather than a generic "need help?".
 
-**Constraints**: fires exactly once per question, never while the tutor is already open, resets on every new question.
+**Constraints**: fires exactly once per question, on its second board mistake (the first one opens the animation hint), never while the tutor or the animation is open, resets on every new question.
 
 ---
 
@@ -277,7 +277,7 @@ Students **choose when to advance**. `type_unlocked` is the ceiling (what has be
 **State axis → within-type difficulty + scaffolding** (driven by inferred emotion)
 
 - **ZPD difficulty controller** (`_intra_from_history`, pure; `compute_intra_difficulty` is the DB wrapper): targets a ~25–30% error rate via **EMA + hysteresis** — dead zone 0.22–0.40, two consecutive confirmations, one level per move. This replaced a windowed-rate version that oscillated. Emotion only scales the control *gain* (frustrated eases sooner, bored ramps sooner, confused is neutral); the naïve "bored → harder / frustrated → easier" mapping is unsound. Output `intra_difficulty` ∈ {1,2,3} drives `select_spec` params and `INTRA_KNOBS` (node count, distractor count and similarity, number of blanks, bug subtlety).
-- **Scaffold orchestrator** (`useScaffold.js`): `scaffold_level = emotion baseline + per-error climb − mastery fading cap`, escalating error-highlight → Socratic hint / proactive push → animation → near-reveal. **Confused raises scaffolding but keeps difficulty; frustrated lowers difficulty** (D'Mello affect dynamics). The client-computed level is **clamped server-side** (`game_master.clamp_scaffold`) — never trust client telemetry.
+- **Scaffold orchestrator** (`useScaffold.js`): `scaffold_level = emotion baseline + per-error climb − mastery fading cap`. On a question: error-highlight always, the animation auto-opens on the 1st mistake, the proactive tutor push comes on the 2nd (level ≥ 2), and at level 4 with ≥ 3 board mistakes a final hint offers the current step's answer (built from the question data, never the model, and shown only when the student asks). **Confused raises scaffolding but keeps difficulty; frustrated lowers difficulty** (D'Mello affect dynamics). The client-computed level is **clamped server-side** (`game_master.clamp_scaffold`) — never trust client telemetry.
 
 Emotion is inferred **every question** (instant behavioural rules) and from tutor chat (LLM), each with a confidence that weights its influence. Per-question telemetry (`intra_difficulty` / `scaffold_level` / `emotion` / `variant`) is written to `question_attempts`, and interventions in `emotion_logs` get the question result written back onto them (`outcome`) to close the loop. `analytics/difficulty_eval.py` is the offline evaluator: intervention-success rate, emotion-transition matrix, difficulty-oscillation rate.
 
@@ -293,7 +293,7 @@ Emotion is inferred **every question** (instant behavioural rules) and from tuto
 
 **Step hints** — one authored hint table in `TEMPLATES`, shared by all three question types. For ordering, `selectOrderingHint` anchors on the first wrong position against the *closest* valid order and picks one of three responses: name a foreign distractor → escalate to an operation-level hint when the board is mostly wrong (chaos signals a concept gap, not a step slip) → otherwise the misplaced step's own hint.
 
-**Animation hint** (`LinkedListHintAnimation.jsx`) — always available, no error threshold, no AI. A per-node CSS transition walks the operation step-by-step with a `curr` cursor. In `fill_blank` the same primitives animate **each step as the student fills it** (`fillBlankSteps.js` → `computeStepStates`), rather than one animation at the end.
+**Animation hint** (`LinkedListHintAnimation.jsx`) — always available, no AI, and it auto-opens once on the first mistake of a question. A per-node CSS transition walks the operation step-by-step with a `curr` cursor. In `fill_blank` the same primitives animate **each step as the student fills it** (`fillBlankSteps.js` → `computeStepStates`), rather than one animation at the end.
 
 ---
 
@@ -342,7 +342,7 @@ Emotion is inferred **every question** (instant behavioural rules) and from tuto
 | Frontend | React 19, Vite, Tailwind CSS (state-machine navigation, no router) |
 | Backend | FastAPI, SQLAlchemy, Alembic |
 | Database | PostgreSQL |
-| AI | Anthropic Claude Haiku 4.5 |
+| AI | Anthropic Claude Haiku 5.5 (`claude-haiku-5-5`) |
 | Auth | JWT (python-jose) + bcrypt |
 | Tests | pytest, in-memory SQLite fixtures |
 
@@ -368,7 +368,7 @@ npm run dev     # http://localhost:5173
 ```
 
 ### Environment files
-- `backend/.env` — `DATABASE_URL`, `SECRET_KEY`, `ANTHROPIC_API_KEY`, `ADMIN_KEY`
+- `backend/.env` — `DATABASE_URL`, `SECRET_KEY`, `ANTHROPIC_API_KEY`, `ADMIN_KEY`; optional feature flags `MISCONCEPTION_MODE` (`off` / `shadow` / `ab` / `on`, default `off`) and `NPC_ENABLED` (Teach Quinn, default off)
 - `frontend/.env` — `VITE_API_URL=http://localhost:8001`
 
 > Port 8000 may be occupied by another project. Always use `--port 8001`.
@@ -383,9 +383,11 @@ Any edit to `app/models/` requires a migration in the same change: `alembic revi
 ### Tests
 ```bash
 cd backend
-d:/openLearnquest/venv/Scripts/python.exe -m pytest tests/ -q     # 197 passed
+d:/openLearnquest/venv/Scripts/python.exe -m pytest tests/ -q     # 782 passed
 ```
-Covers the deterministic core: `ll_executor`, mastery + unlock rules, `select_spec`, `error_analyzer`, the ZPD controller contract, the find-bug validator, pointer-naming conventions, content variants, question-pool dedup/serving, step hints, tutor context assembly, and scaffold-clamp / closed-loop telemetry integrity.
+Covers the deterministic core: `ll_executor`, mastery + unlock rules, the 5-unit curriculum, `select_spec`, `error_analyzer`, the ZPD controller contract, the find-bug validator, the item harness (every authored question passes R1–R3 when run), the misconception catalog / diagnosis / remediation, Teach Quinn (fake model), pointer-naming conventions, content variants, question-pool dedup/serving, step hints, tutor context assembly, the Haiku 5.5 model contract, the tutor stream route end to end with a fake Claude client, and scaffold-clamp / closed-loop telemetry integrity.
+
+Frontend (Vitest): `cd frontend && npm test` — the heap interpreter, the home city's traffic, and the final hint (when it appears, what it shows per question type).
 
 ### Fill the question pool
 ```bash
@@ -408,6 +410,9 @@ d:/openLearnquest/venv/Scripts/python.exe backend/clear_user_data.py --apply
 backend/
   main.py                      # uvicorn entry point (run from backend/)
   refill_pool.py               # offline question-pool filler
+  item_report.py               # teacher-readable item review: what every option does when run
+  misconception_report.py      # misconception tag coverage and gaps
+  load_test.py                 # classroom load test (Claude stubbed, throwaway DB)
   clear_user_data.py
   app/
     routes/                    # all prefixed /api/*
@@ -416,31 +421,44 @@ backend/
       progress.py              # /api/progress — XP, mistakes, stats, leaderboard
       tutor.py                 # /api/ai/tutor — ReAct tutor (streaming + history)
       emotion.py               # /api/emotion  — behavioral + chat + self-report
+      npc.py                   # /api/npc      — Teach Quinn (behind NPC_ENABLED)
       admin.py                 # /api/admin
     services/
       game_master.py           # orchestration, mastery update, ZPD controller, scaffold clamp
+      curriculum.py            # the 5 teaching units, mastery rules, what to practise next
       question_spec.py         # type_unlocked × emotion × intra → QuestionSpec
       question_registry.py     # per-type prompt builders + validators
       question_pool.py         # class-shared pool: serving, dedup, self-heal refill
       static_questions.py      # TEMPLATES: correct pseudocode + step hints for all 12 ops
+      pseudo_exec.py           # item-harness oracle: runs student-visible pseudocode on a heap
+      item_quality.py          # item harness rules R1–R3 + serve-time board checks
+      misconceptions.py        # misconception catalog: canonical mutants + execution fingerprints
+      misconception_model.py   # served-item tags, evidence, per-misconception diagnosis
+      npc_agent.py             # Teach Quinn: case state, tests, explanation adjudication, voice guard
       claude_service.py        # Claude API wrapper with retry
+      anthropic_client.py      # the only place Anthropic clients are built (timeout profiles)
       tutor_agent.py           # ReAct loop, tools, context engineering, phase prompts
       tutor_memory.py          # persistence, view compaction, episodic recall
+      tutor_telemetry.py       # tutor_turns telemetry + per-student rate limit
       error_analyzer.py        # deterministic error diagnosis
       ll_executor.py           # simulates operations for goal patterns
       concept_graph.py         # concept dependency graph per operation
       emotion_agent.py         # behavioral signal → emotion label
     analytics/
       difficulty_eval.py       # offline eval: transition matrix, intervention success, oscillation
+      misconception_eval.py    # offline eval: recurrence by arm, resolution, shadow plans
     models/ schemas/ alembic/
-  tests/                       # 197 tests, in-memory SQLite
+  tests/                       # 782 tests, in-memory SQLite
 
 frontend/src/
   App.jsx                      # state-machine router (no react-router)
   components/
+    UnitPath.jsx               # the learning path: 5 units in teaching order + the Teach Quinn card
     AgenticSession.jsx         # main game loop: prefetch, timing, proactive push, scaffold
+    TeachSession.jsx           # Teach Quinn: Quinn's code, test builder, explanations, coach
     TutorChat.jsx              # streaming tutor sidebar (ReAct client, type- and phase-aware)
     TutorToast.jsx             # proactive hint toast
+    FinalHintCard.jsx          # level-4 final hint: the current step's answer, on request
     AnalysisCard.jsx           # post-question analysis (non-blocking, LC-style)
     UnlockPopup.jsx            # level-up choice (advance / keep practicing)
     LinkedListHintAnimation.jsx# CSS animation hint; AnimNode/Arrow reused by FillBlankBoard
@@ -452,6 +470,7 @@ frontend/src/
     api.js                     # all API calls including streamTutorChat()
     fillBlankSteps.js          # per-operation per-step list states
     stepHints.js               # ordering hint selection (pure)
+    finalHint.js               # final-hint content from the question data (pure)
     adaptiveEngine.js
   contexts/
     AuthContext.jsx  EmotionContext.jsx
@@ -477,7 +496,7 @@ Adding a thirteenth touches ~10 files across backend and frontend (templates, bl
 
 **Identity**: every route that needs the caller's identity takes it from `Depends(get_current_user)`. Never read `user_id` from the body, query, or path — a client can send anyone's id there. Admin routes use `Depends(require_admin)`.
 
-**Other**: all routes follow `/api/<prefix>/`; the frontend calls the backend directly (no Vite proxy); `consecutive_passes` counts consecutive *perfect* passes (`error_count == 0`); when creating a `Mastery` row, pass `type_unlocked=1` and `active_type_level=1` explicitly (SQLAlchemy `default=` does not apply at Python object creation).
+**Other**: all routes follow `/api/<prefix>/`; the frontend calls the backend directly (no Vite proxy); `consecutive_passes` counts consecutive *perfect* passes (`error_count == 0`); when creating a `Mastery` row, pass `type_unlocked` and `active_type_level` explicitly (SQLAlchemy `default=` does not apply at Python object creation); both are `curriculum.entry_level(op, mastery_map)`: 1 for a primary, 3 for a variant whose primary is mastered.
 
 ---
 
@@ -489,8 +508,11 @@ Project skills live in `.claude/skills/` and import the real code, so drift fail
 |---|---|
 | Need the app running (before QA or manual testing) | `/dev` |
 | Edited generation prompts, validators, TEMPLATES, or specs | `/gen-check` |
+| Edited `_BLANKS` / `_BUGS` / TEMPLATES content | `python item_report.py --all --ops <op>` (free) + `pytest tests/test_item_quality.py` |
+| Edited the misconception catalog | `python misconception_report.py` (free) + `pytest tests/test_misconceptions.py` |
 | Adding a new linked-list operation | `/add-operation` |
 | Edited `tutor_agent.py` | `/tutor-sim` |
+| Edited `npc_agent.py` (Teach Quinn) | `pytest tests/test_npc.py` (free) + `npc_sim.py` in `/tutor-sim` |
 | Tuned the adaptive system or collected new play data | `/eval-adaptivity` |
 
 When a change touches a surface a skill depends on, update the skill in the same change.

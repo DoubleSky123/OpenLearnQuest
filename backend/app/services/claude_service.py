@@ -4,16 +4,16 @@ AI question generation — dispatches to question_registry based on mastery spec
 import logging
 import random
 
-from anthropic import Anthropic
+from .anthropic_client import get_client
+from . import anthropic_client
 
-from ..config import settings
 from .question_spec import select_spec
-from .question_registry import get_handler
+from .question_registry import ai_can_target, get_handler
 from .static_questions import consider_for, step_hints_for
 
 logger = logging.getLogger(__name__)
 
-_client = Anthropic(api_key=settings.anthropic_api_key)
+_client = get_client("generation")
 
 MAX_RETRIES = 3
 
@@ -35,11 +35,11 @@ OP_META: dict[str, dict] = {
 
 def _call_model(prompt: str) -> str:
     msg = _client.messages.create(
-        model="claude-haiku-4-5",
-        max_tokens=1200,
+        **anthropic_client.options("generation"),
+        max_tokens=1200 + anthropic_client.THINKING_HEADROOM,
         messages=[{"role": "user", "content": prompt}],
     )
-    return msg.content[0].text
+    return anthropic_client.text_of(msg)   # raises RefusedError on a refusal (generate_question retries it)
 
 
 def run_generation_test(operation: str, n: int = 10, emotion: str = "engaged") -> dict:
@@ -58,7 +58,7 @@ def run_generation_test(operation: str, n: int = 10, emotion: str = "engaged") -
             results.append({"attempt": i + 1, "status": "fail", "error": str(e)})
     passes = sum(1 for r in results if r["status"] == "pass")
     return {
-        "operation": operation, "emotion": emotion, "model": "claude-haiku-4-5",
+        "operation": operation, "emotion": emotion, "model": anthropic_client.MODEL,
         "total": n, "passes": passes, "pass_rate": f"{passes / n * 100:.0f}%",
         "results": results,
     }
@@ -70,21 +70,33 @@ def generate_question(
     type_unlocked: int = 1,
     intra_difficulty: int | None = None,
     variant_seed: int = 0,
+    target_misconception: str | None = None,
+    static_only: bool = False,
 ) -> dict:
     """
     Generate a question whose type is chosen based on the student's unlocked level.
     intra_difficulty (state axis) sets the within-type difficulty. Falls back to
     static on repeated failures. variant_seed rotates static content variants.
+
+    target_misconception: the item must show it — authored content is chosen for
+    it, AI output is checked for it by execution (R4). The payload's
+    `target_misconception` says whether that was achieved (None = not).
+    static_only: authored content only, no model call (remediation serves these).
     """
     meta = OP_META.get(operation)
     if not meta:
         raise ValueError(f"Unknown operation: {operation}")
 
-    spec    = select_spec(operation, emotion, type_unlocked, intra_difficulty, variant_seed)
+    spec    = select_spec(operation, emotion, type_unlocked, intra_difficulty, variant_seed,
+                          target_misconception)
     handler = get_handler(spec.type)
+    if target_misconception:
+        meta = {**meta, "target_misconception": target_misconception}
 
-    # fill_blank is a structured beginner exercise — static is more reliable than AI here
-    if spec.type == "fill_blank":
+    # fill_blank is a structured beginner exercise — static is more reliable than AI here.
+    # A target the model can't be aimed at (swap / delete) is authored content or nothing.
+    if spec.type == "fill_blank" or static_only or (
+            target_misconception and not ai_can_target(operation, target_misconception)):
         q = handler.build_static(operation, spec)
         return _finalize(q, operation, spec)
 
@@ -93,9 +105,20 @@ def generate_question(
         prompt = handler.build_prompt(operation, meta, spec)
         if last_error:
             prompt += f"\n\nPrevious attempt failed: {last_error}\nReturn valid JSON only."
-        raw = _call_model(prompt)
+        try:
+            raw = _call_model(prompt)
+        except anthropic_client.RefusedError:
+            last_error = "the request was declined; produce the JSON the prompt asks for"
+            logger.warning("generate_question attempt %d/%d: model declined", attempt, MAX_RETRIES)
+            continue
+        except Exception as e:   # API error / timeout: the same call fails again, so take the static item now
+            logger.warning("generate_question: model call failed (%s: %s), using static fallback",
+                           type(e).__name__, e)
+            break
         try:
             q = handler.validate(raw, operation, meta)
+            if target_misconception:
+                q["target_misconception"] = target_misconception   # R4 passed in validate
             return _finalize(q, operation, spec)
         except Exception as e:
             last_error = str(e)
@@ -110,6 +133,7 @@ def _finalize(q: dict, operation: str, spec) -> dict:
     """Fields every question carries regardless of generation path."""
     q["difficulty"]    = spec.difficulty
     q["question_type"] = spec.type
+    q.setdefault("target_misconception", None)
     q["consider"]      = random.choice(consider_for(operation))  # analysis-card extension question
     q["step_hints"]    = step_hints_for(operation)               # per-line hints (parallel to pseudocode)
     return q

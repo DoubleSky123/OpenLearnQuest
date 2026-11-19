@@ -1,11 +1,14 @@
 import React, { createContext, useContext, useState, useRef, useMemo, useCallback } from 'react';
 import { getAdaptiveConfig, EMOTIONS } from '../services/adaptiveEngine';
+import { countsForFinalHint } from '../hooks/useScaffold';
 
 const EmotionContext = createContext(null);
 
 export function EmotionProvider({ children }) {
   const [emotion, setEmotionState] = useState(EMOTIONS.ENGAGED);
   const [emotionSource, setEmotionSource] = useState('self-report');
+  // latest emotion NOT inferred from the tutor chat — what the final hint uses
+  const [boardEmotion, setBoardEmotion] = useState(EMOTIONS.ENGAGED);
 
   // Behavioral signals accumulated during the current session
   const signals = useRef({
@@ -27,6 +30,7 @@ export function EmotionProvider({ children }) {
   const setEmotion = useCallback((newEmotion, source = 'self-report') => {
     setEmotionState(newEmotion);
     setEmotionSource(source);
+    if (countsForFinalHint(source)) setBoardEmotion(newEmotion);
   }, []);
 
   // ── Session init — call at start of each game session ────────────────────
@@ -80,7 +84,7 @@ export function EmotionProvider({ children }) {
 
   return (
     <EmotionContext.Provider value={{
-      emotion, setEmotion, emotionSource, adaptiveConfig,
+      emotion, setEmotion, emotionSource, boardEmotion, adaptiveConfig,
       initSession, recordQuestion, recordReset, markUsedTutor, getSignalsSnapshot,
     }}>
       {children}

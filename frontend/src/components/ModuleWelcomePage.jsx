@@ -120,7 +120,7 @@ export default function ModuleWelcomePage({ onBeginner, onExperienced, onBack })
             Singly Linked List
           </h1>
           <p style={fadeUp(0.18)} className="text-white/55 text-base leading-relaxed">
-            12 operations · 3 difficulty tiers · fully AI-adaptive.<br />
+            5 ideas, practised on 12 operations · fully AI-adaptive.<br />
             Each session is unique to where you are right now.
           </p>
         </div>

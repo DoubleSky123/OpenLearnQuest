@@ -1,49 +1,191 @@
+import json
+from typing import Annotated
+import logging
+import time
+
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
-from anthropic import Anthropic, APIError
+from anthropic import APIStatusError
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
-from ..services import tutor_agent, tutor_memory
+
+from ..services.anthropic_client import get_client
+from ..services import anthropic_client
+from ..services import misconception_model, tutor_agent, tutor_memory, tutor_telemetry
 from ..services.error_analyzer import analyze_error as _diagnose
 from ..dependencies import get_current_user
 from ..database import get_db
 from ..models.user import User
 from ..models.mistake import Mistake
 from ..models.mastery import Mastery
+from ..models.game_session import GameSession
+from ..models.question_attempt import QuestionAttempt
 from ..models.tutor_conversation import TutorConversation
-from ..config import settings
-import json
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/ai/tutor", tags=["tutor"])
 
-_client = Anthropic(api_key=settings.anthropic_api_key)
+_client = get_client("interactive")
+
+# What a student sees when the tutor fails. The real error goes to the log, never
+# to the chat (TutorChat shows it as "Tutor unavailable: <this>").
+GENERIC_ERROR = "please try again in a moment."
+# Appended when a stream dies after the student already saw part of the reply —
+# that text can't be taken back, so close it honestly and store it as partial.
+PARTIAL_TAIL = "\n\n(Sorry, I lost my connection for a second. Could you send that again?)"
+RATE_NOTICE = (
+    "You're sending messages very quickly. Give it a few seconds, "
+    "try something on the board, then ask again."
+)
+# One tutor turn across the ReAct loop and its one retry. anthropic_client bounds
+# each call (20 s, 1 retry); this bounds the sum, and each call gets at most the
+# time that is left.
+TURN_DEADLINE_S = 45.0
+PER_CALL_TIMEOUT_S = 20.0
+
+
+class _TurnDeadline(Exception):
+    pass
+
+
+# Error types (APIStatusError.type) that a second try can get past.
+_TRANSIENT_TYPES = {"overloaded_error", "api_error", "timeout_error"}
+
+
+def _worth_retrying(e: Exception) -> bool:
+    """A 4xx won't succeed on a second try (bad request, auth, no credit) — only
+    overload, 5xx, 408/409, timeouts and dropped connections are transient.
+    An error event in the middle of a stream arrives on the 200 response
+    (status_code == 200), so it is judged by its error type instead.
+    Not a 429: the SDK already waited out its retry-after once, and an immediate
+    second turn from every student in a throttled class only prolongs the limit."""
+    if isinstance(e, APIStatusError):
+        if e.status_code == 429 or e.type == "rate_limit_error":
+            return False
+        if e.type in _TRANSIENT_TYPES:
+            return True
+        return e.status_code >= 500 or e.status_code in (408, 409)
+    # a refusal is the same request declined again — not worth a second try
+    return not isinstance(e, (_TurnDeadline, anthropic_client.RefusedError))
+
+
+# Caps on what the client sends: these fields are stored (tutor_turns) and go into
+# the prompt, so a crafted request must not carry megabytes. The legacy history is
+# trimmed, never rejected: TutorChat resends the whole restored conversation every
+# turn, and a long one must keep working.
+HISTORY_KEEP = 40          # legacy client history: the most recent messages kept
+HISTORY_CHARS = 8000       # ... each clipped to this
+FREE_DICT_CHARS = 4000     # error_diagnosis / final_hint_step, serialised
 
 
 class TutorMessage(BaseModel):
-    role: str   # "user" | "assistant"
+    role: str = Field(max_length=20)   # "user" | "assistant"
     content: str
+
+    @field_validator("content")
+    @classmethod
+    def _clip(cls, v: str) -> str:
+        return v[:HISTORY_CHARS]
+
+
+def _small_dict(v):
+    if v is not None and len(json.dumps(v, default=str)) > FREE_DICT_CHARS:
+        raise ValueError("too large")
+    return v
 
 
 class TutorRequest(BaseModel):
-    session_id: str | None = None   # links the conversation to the game session (memory)
-    question_title: str
-    operation: str
-    your_answer: list[str] = []
-    board_note: str | None = None   # "where the student is right now" (fill_blank/find_bug boards)
-    correct_answer: list[str] = []
+    session_id: str | None = Field(default=None, max_length=64)   # links the conversation to the game session (memory)
+    question_title: str = Field(max_length=200)
+    operation: str = Field(max_length=40)
+    # the question being worked on (q.id) — joins tutor_turns to question_attempts
+    question_id: str | None = Field(default=None, max_length=200)
+    your_answer: list[Annotated[str, Field(max_length=400)]] = Field(default=[], max_length=20)
+    board_note: str | None = Field(default=None, max_length=2000)   # "where the student is right now" (fill_blank/find_bug boards)
+    # structured board focus (boardFocus.kind), e.g. find_bug: hunting the line vs choosing the fix
+    board_phase: str | None = Field(default=None, max_length=40)
+    correct_answer: list[Annotated[str, Field(max_length=400)]] = Field(default=[], max_length=20)
     error_count: int = 0
     # legacy client-held history — ignored when a persisted conversation exists
     # (the DB is authoritative; see tutor_memory.model_view)
     messages: list[TutorMessage] = []
-    user_message: str
-    model: str | None = None
+    user_message: str = Field(max_length=4000)
     error_diagnosis: dict | None = None
-    question_type: str | None = None
+    question_type: str | None = Field(default=None, max_length=40)
     # "solving" = exercise still open (strict: no answer reveal).
     # "reviewing" = analysis card is up, so the answer is already on the student's
     # screen and the tutor may explain it outright. Unknown values fall back to
     # "solving" — a stale client can never accidentally unlock answer reveal.
-    phase: str | None = None
+    phase: str | None = Field(default=None, max_length=20)
+    # the board's final hint (scaffold level 4) is on: the tutor may state the
+    # answer for the current step. Honoured only with enough real mistakes
+    # (tutor_agent.final_hint_allowed), never in "reviewing".
+    final_hint: bool = False
+    # {stepNo, answer} as shown on the FinalHintCard — recorded now, used by the guard later
+    final_hint_step: dict | None = None
+    # (no `model` field: the model is server config. Old clients that still send
+    # one are fine — pydantic ignores unknown fields.)
+
+    @field_validator("messages", mode="before")
+    @classmethod
+    def _recent_history(cls, v):
+        return v[-HISTORY_KEEP:] if isinstance(v, list) else v
+
+    @field_validator("error_diagnosis", "final_hint_step")
+    @classmethod
+    def _bounded(cls, v):
+        return _small_dict(v)
+
+
+def _board_mistakes(db: Session, user_id: str, question_id: str | None, title: str) -> int:
+    """Board mistakes on this question as the server saw them: every wrong board
+    try posts a Mistake row (AgenticSession). Question ids are per-serve uuids or
+    pool ids a student is never served twice, so this is this attempt's count.
+    The title must match too, so an old question's id can't unlock a new one's hint."""
+    if not question_id:
+        return 0
+    return (db.query(Mistake)
+            .filter(Mistake.user_id == user_id, Mistake.question_id == str(question_id),
+                    Mistake.title == title, Mistake.source == "agentic")
+            .count())
+
+
+def _honoured_phase(db: Session, user_id: str, body: "TutorRequest") -> str:
+    """"reviewing" lets the tutor explain the answer outright, so it is honoured
+    only once this question's attempt is recorded (the analysis card appears after
+    /session/record) BY THE GAME MASTER for this operation: those rows always carry
+    the server-derived question_type. The legacy /progress attempts route writes
+    rows with any question id and no type, so it can't unlock it. Anything else
+    is "solving"."""
+    if body.phase != "reviewing" or not body.session_id or not body.question_id:
+        return "solving"
+    done = (db.query(QuestionAttempt.id)
+            .join(GameSession, QuestionAttempt.session_id == GameSession.id)
+            .filter(GameSession.user_id == user_id, QuestionAttempt.session_id == body.session_id,
+                    QuestionAttempt.question_id == str(body.question_id),
+                    QuestionAttempt.question_type.isnot(None),
+                    QuestionAttempt.operation == body.operation)
+            .first())
+    return "reviewing" if done else "solving"
+
+
+def _answered(db: Session, user_id: str, question_id: str | None) -> bool:
+    return question_id is not None and (
+        db.query(QuestionAttempt.id)
+        .join(GameSession, QuestionAttempt.session_id == GameSession.id)
+        .filter(GameSession.user_id == user_id, QuestionAttempt.question_id == str(question_id))
+        .first() is not None)
+
+
+def _final_hint(db: Session, user_id: str, body: "TutorRequest") -> bool:
+    """The client claims the final hint; the server checks the mistakes behind it
+    (never trust client-computed counts — a claim above what was posted is capped).
+    A question already answered can't lend its mistakes to a new one."""
+    if not body.final_hint or _answered(db, user_id, body.question_id):
+        return False
+    errors = min(body.error_count, _board_mistakes(db, user_id, body.question_id, body.question_title))
+    return tutor_agent.final_hint_allowed(body.phase, body.final_hint, errors)
 
 
 class TutorResponse(BaseModel):
@@ -73,6 +215,30 @@ def _fetch_history(db: Session, user_id: str, question_title: str, operation: st
     return "\n\n".join(p for p in parts if p)
 
 
+def _misconception_context(db: Session, user_id: str, body: "TutorRequest") -> tuple[str, dict | None]:
+    """[MISCONCEPTION EVIDENCE] for this turn, rebuilt every turn (a pick made
+    mid-chat reaches the tutor on the next message). Only students in the tutor
+    channel get it in the prompt; every recorded turn stores what was — or for a
+    control student, WOULD have been — given (tutor_turns.misconception_context)."""
+    if not misconception_model.recording():
+        return "", None
+    try:
+        items = misconception_model.tutor_evidence(db, user_id, body.question_id, body.operation)
+    except Exception:   # noqa: BLE001 — evidence is an aid, never worth failing the turn
+        db.rollback()
+        logger.exception("misconception evidence failed (question %s)", body.question_id)
+        items = []
+    # the arm can depend on the unit (crossover study): the operation the SERVER
+    # served under this question id, not the one the client names
+    item = misconception_model.served(db, user_id, body.question_id) if body.question_id else None
+    operation = item.operation if item is not None else body.operation
+    sent = misconception_model.targeting(user_id, "tutor", db=db, operation=operation)
+    record = {"arm": misconception_model.arm(user_id, db=db, operation=operation) or misconception_model.mode(),
+              "sent": sent and bool(items),
+              "items": [{k: it.get(k) for k in ("id", "where", "earlier_questions")} for it in items]}
+    return (misconception_model.tutor_note(items) if sent else ""), record
+
+
 def _auto_diagnosis(body: "TutorRequest") -> dict | None:
     """Server-side structured error diagnosis when the client didn't supply one.
     (The client always sent null — this makes [ERROR DIAGNOSIS] actually fire.)"""
@@ -82,6 +248,41 @@ def _auto_diagnosis(body: "TutorRequest") -> dict | None:
         return None
     diag = _diagnose(body.operation, body.your_answer, body.correct_answer)
     return diag if diag.get("error_type") not in (None, "correct") else None
+
+
+def _turn_fields(body: "TutorRequest", final_hint: bool) -> dict:
+    """The tutor_turns columns known before the model is called."""
+    return dict(
+        session_id=body.session_id,
+        question_id=body.question_id,
+        phase=body.phase if body.phase in ("solving", "reviewing") else "solving",
+        final_hint=final_hint,
+        final_hint_step=body.final_hint_step,
+        proactive=tutor_telemetry.is_proactive(body.user_message),
+        question_type=body.question_type,
+        operation=body.operation,
+        your_answer=body.your_answer,
+        correct_answer=body.correct_answer,
+        board_note=body.board_note,
+        board_phase=body.board_phase,
+        error_count_claimed=body.error_count,
+        tutor_version=tutor_agent.TUTOR_VERSION,
+        arm=tutor_agent.ARM,
+        model=tutor_agent.TUTOR_MODEL,
+    )
+
+
+def _rate_limited(db: Session, user_id: str, body: "TutorRequest") -> bool:
+    return tutor_telemetry.over_rate_limit(
+        db, user_id, proactive=tutor_telemetry.is_proactive(body.user_message))
+
+
+def _sse(obj) -> str:
+    return f"data: {json.dumps(obj)}\n\n"
+
+
+def _elapsed_ms(t0: float) -> int:
+    return int((time.monotonic() - t0) * 1000)
 
 
 @router.get("/history")
@@ -112,17 +313,31 @@ def tutor_chat(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    student_history = _fetch_history(db, current_user.id, body.question_title, body.operation)
+    """Non-streaming tutor (legacy — the app uses /stream)."""
     conv = tutor_memory.get_or_create_conversation(
         db, current_user.id, body.session_id, body.question_title, body.operation,
     )
+    body.phase = _honoured_phase(db, current_user.id, body)
+    final_hint = _final_hint(db, current_user.id, body)
+    if _rate_limited(db, current_user.id, body):
+        tutor_telemetry.start_turn(db, current_user.id, conv, _turn_fields(body, final_hint), status="rate_limited")
+        raise HTTPException(status_code=429, detail=RATE_NOTICE)
+
+    student_history = _fetch_history(db, current_user.id, body.question_title, body.operation)
+    mc_note, mc_record = _misconception_context(db, current_user.id, body)
     history = tutor_memory.model_view(db, conv)
     if not history and body.session_id is None and body.messages:
         # sessionless legacy caller — honour client-held history. With a session_id
         # the DB is strictly authoritative: empty history = first turn, which
         # (correctly) triggers the full [TUTOR CONTEXT] + [STUDENT HISTORY] block.
         history = [m.model_dump() for m in body.messages]
+    diagnosis = _auto_diagnosis(body)
+    turn = tutor_telemetry.start_turn(
+        db, current_user.id, conv,
+        {**_turn_fields(body, final_hint), "diagnosis": diagnosis, "misconception_context": mc_record},
+    )
     tutor_memory.append_message(db, conv, "user", body.user_message)
+    t0 = time.monotonic()
     try:
         reply = tutor_agent.chat(
             question_title=body.question_title,
@@ -132,21 +347,62 @@ def tutor_chat(
             error_count=body.error_count,
             messages=history,
             user_message=body.user_message,
-            model=body.model,
-            error_diagnosis=_auto_diagnosis(body),
+            error_diagnosis=diagnosis,
             student_history=student_history,
             question_type=body.question_type,
             board_note=body.board_note,
             phase=body.phase,
+            final_hint=final_hint,
+            misconception_note=mc_note,
         )
-    except APIError as e:
-        raise HTTPException(status_code=503, detail=f"Claude API error: {str(e)}")
-    except Exception as e:
-        raise HTTPException(status_code=503, detail=f"Tutor unavailable: {str(e)}")
+    except Exception:
+        logger.exception("tutor chat failed (conversation %s)", conv.id)
+        tutor_telemetry.finish_turn(db, turn, status="error", total_ms=_elapsed_ms(t0))
+        raise HTTPException(status_code=503, detail=GENERIC_ERROR)
 
-    tutor_memory.append_message(db, conv, "assistant", reply)
+    msg = tutor_memory.append_message(db, conv, "assistant", reply)
+    tutor_telemetry.finish_turn(db, turn, status="ok", message_id=msg.id, total_ms=_elapsed_ms(t0))
     tutor_memory.maybe_compact(db, conv)
     return TutorResponse(reply=reply, turn=len(history) // 2 + 1)
+
+
+def _stream_react(api_messages: list[dict], system: str, deadline: float, st: dict, t0: float):
+    """One attempt at the turn: the ReAct loop (max 3 model calls; one tool call is
+    the common case), yielding SSE token events. Text, usage and tool calls land in
+    `st` so the caller can retry, close a partial reply, and write telemetry."""
+    for _ in range(3):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise _TurnDeadline()
+        with _client.messages.stream(
+            **tutor_agent.request_kwargs(system, api_messages),
+            timeout=min(PER_CALL_TIMEOUT_S, remaining),
+        ) as stream:
+            for text in stream.text_stream:
+                if st["ttft_ms"] is None:
+                    st["ttft_ms"] = _elapsed_ms(t0)
+                st["text"] += text
+                st["sent"] = True
+                yield _sse({"token": text})
+            final = stream.get_final_message()
+
+        st["input_tokens"] += final.usage.input_tokens
+        st["output_tokens"] += final.usage.output_tokens
+        if final.stop_reason == "refusal":
+            raise anthropic_client.RefusedError("tutor turn declined")
+        if final.stop_reason != "tool_use":
+            return
+        # final.content keeps any thinking blocks: they go back unmodified with the tool results
+
+        api_messages.append({"role": "assistant", "content": final.content})
+        tool_results = []
+        for block in final.content:
+            if block.type == "tool_use":
+                st["tool_calls"].append({"name": block.name, "concept": (block.input or {}).get("concept")})
+                result = tutor_agent._execute_tool(block.name, block.input)
+                st["tool_outputs"].append(result)
+                tool_results.append({"type": "tool_result", "tool_use_id": block.id, "content": result})
+        api_messages.append({"role": "user", "content": tool_results})
 
 
 @router.post("/stream")
@@ -159,84 +415,111 @@ def tutor_chat_stream(
     Streaming version with ReAct loop + cross-session history injection.
 
     Flow:
-    1. Query past mistakes + mastery from DB (before streaming starts).
+    1. Rate limit (proactive pushes exempt), then query past mistakes + mastery.
     2. Inject history into first-turn context block.
     3. Stream response. If Claude calls lookup_resource, execute it and stream the follow-up.
+    4. A failure before any text reached the student retries the whole turn once;
+       after text was shown, the reply is closed with PARTIAL_TAIL instead.
     """
-    student_history = _fetch_history(db, current_user.id, body.question_title, body.operation)
     conv = tutor_memory.get_or_create_conversation(
         db, current_user.id, body.session_id, body.question_title, body.operation,
     )
+    body.phase = _honoured_phase(db, current_user.id, body)
+    final_hint = _final_hint(db, current_user.id, body)
+
+    if _rate_limited(db, current_user.id, body):
+        # not stored as a message: the student's text never reached the tutor
+        tutor_telemetry.start_turn(db, current_user.id, conv, _turn_fields(body, final_hint), status="rate_limited")
+
+        def notice():
+            yield _sse({"notice": RATE_NOTICE})
+            yield "data: [DONE]\n\n"
+        return StreamingResponse(notice(), media_type="text/event-stream")
+
+    student_history = _fetch_history(db, current_user.id, body.question_title, body.operation)
+    mc_note, mc_record = _misconception_context(db, current_user.id, body)
     history = tutor_memory.model_view(db, conv)
     if not history and body.session_id is None and body.messages:
         # sessionless legacy caller — honour client-held history. With a session_id
         # the DB is strictly authoritative: empty history = first turn, which
         # (correctly) triggers the full [TUTOR CONTEXT] + [STUDENT HISTORY] block.
         history = [m.model_dump() for m in body.messages]
+    diagnosis = _auto_diagnosis(body)
+    turn = tutor_telemetry.start_turn(
+        db, current_user.id, conv,
+        {**_turn_fields(body, final_hint), "diagnosis": diagnosis, "misconception_context": mc_record},
+    )
     tutor_memory.append_message(db, conv, "user", body.user_message)
 
     def generate():
-        api_messages = tutor_agent.build_api_messages(
+        base_messages = tutor_agent.build_api_messages(
             body.question_title, body.operation,
             body.your_answer, body.correct_answer,
             body.error_count, history, body.user_message,
-            _auto_diagnosis(body), student_history, body.question_type,
-            body.board_note, body.phase,
+            diagnosis, student_history, body.question_type,
+            body.board_note, body.phase, final_hint, mc_note,
         )
-        _model = body.model or "claude-haiku-4-5"
-        full_text = ""
+        system = tutor_agent.system_prompt_for(body.phase, final_hint)
+        t0 = time.monotonic()
+        deadline = t0 + TURN_DEADLINE_S
+        st = {"text": "", "sent": False, "ttft_ms": None, "input_tokens": 0, "output_tokens": 0,
+              "tool_calls": [], "tool_outputs": []}
+        # "cancelled" survives only if the client disconnects mid-stream (GeneratorExit)
+        outcome = {"status": "cancelled", "message_id": None}
 
         try:
-            for _ in range(3):  # max 3 iterations (1 tool call is the common case)
-                with _client.messages.stream(
-                    model=_model,
-                    max_tokens=600,    # keep in sync with tutor_agent.chat()
-                    temperature=0.3,   # keep in sync with tutor_agent.chat()
-                    system=tutor_agent.system_prompt_for(body.phase),
-                    messages=api_messages,
-                    tools=tutor_agent._TOOLS,
-                ) as stream:
-                    for text in stream.text_stream:
-                        full_text += text
-                        yield f"data: {json.dumps({'token': text})}\n\n"
-                    final = stream.get_final_message()
-
-                if final.stop_reason == "end_turn":
+            for attempt in range(2):
+                try:
+                    yield from _stream_react(list(base_messages), system, deadline, st, t0)
+                    outcome["status"] = "ok"
+                    break
+                except Exception as e:  # API errors, timeouts, mid-stream overload, deadline
+                    logger.warning("tutor stream attempt %d failed (conversation %s): %r", attempt + 1, conv.id, e)
+                    if st["sent"]:
+                        st["text"] += PARTIAL_TAIL
+                        yield _sse({"token": PARTIAL_TAIL})
+                        outcome["status"] = "partial"
+                        break
+                    if attempt == 0 and _worth_retrying(e) and time.monotonic() < deadline:
+                        st["tool_calls"], st["tool_outputs"] = [], []
+                        continue
+                    yield _sse({"error": GENERIC_ERROR})
+                    outcome["status"] = "error"
                     break
 
-                if final.stop_reason == "tool_use":
-                    api_messages.append({"role": "assistant", "content": final.content})
-                    tool_results = []
-                    for block in final.content:
-                        if block.type == "tool_use":
-                            result = tutor_agent._execute_tool(block.name, block.input)
-                            tool_results.append({
-                                "type": "tool_result",
-                                "tool_use_id": block.id,
-                                "content": result,
-                            })
-                    api_messages.append({"role": "user", "content": tool_results})
-                    continue
+            if outcome["status"] == "ok":
+                # a fetched video must reach the student even if the reply forgot its link
+                link = tutor_agent.missing_video_link(st["text"], st["tool_outputs"])
+                if link:
+                    st["text"] += link
+                    yield _sse({"token": link})
 
-                break
+            # Persist the reply BEFORE [DONE] — the client's onDone may immediately
+            # call infer-chat, which reads this conversation from the DB.
+            if st["text"].strip():
+                try:
+                    outcome["message_id"] = tutor_memory.append_message(db, conv, "assistant", st["text"]).id
+                except Exception:
+                    db.rollback()
 
-        except Exception as e:
-            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+            yield "data: [DONE]\n\n"
 
-        # Persist the reply BEFORE [DONE] — the client's onDone may immediately
-        # call infer-chat, which reads this conversation from the DB.
-        if full_text.strip():
+            # After [DONE]: compaction is latency-invisible to the student.
             try:
-                tutor_memory.append_message(db, conv, "assistant", full_text)
+                tutor_memory.maybe_compact(db, conv)
             except Exception:
                 db.rollback()
-
-        yield "data: [DONE]\n\n"
-
-        # After [DONE]: compaction is latency-invisible to the student.
-        try:
-            tutor_memory.maybe_compact(db, conv)
-        except Exception:
-            db.rollback()
+        finally:
+            tutor_telemetry.finish_turn(
+                db, turn,
+                status=outcome["status"],
+                message_id=outcome["message_id"],
+                input_tokens=st["input_tokens"],
+                output_tokens=st["output_tokens"],
+                ttft_ms=st["ttft_ms"],
+                ttfv_ms=st["ttft_ms"],   # nothing is buffered yet, so first seen == first generated
+                total_ms=_elapsed_ms(t0),
+                tool_calls=st["tool_calls"],
+            )
 
     return StreamingResponse(generate(), media_type="text/event-stream")

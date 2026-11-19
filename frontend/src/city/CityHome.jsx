@@ -48,7 +48,7 @@ function Backpack({ city, error, placing, saving, onRetry, onPlace, onCancel }) 
                   {ready && <span className="rounded-full bg-amber-400 px-1.5 text-[10px] font-bold uppercase text-amber-950">New</span>}
                 </div>
                 <div className="text-xs text-slate-500">
-                  {!p.earned && `Master all ${p.total} linked-list operations in the school`}
+                  {!p.earned && `Master all ${p.total} linked-list units in the school`}
                   {ready && 'Earned! Place it on an empty lot'}
                   {where && `Built on lot ${where.lot + 1}`}
                 </div>
@@ -59,7 +59,7 @@ function Backpack({ city, error, placing, saving, onRetry, onPlace, onCancel }) 
                 <div className="h-2 overflow-hidden rounded-full bg-slate-100">
                   <div className="h-full rounded-full bg-indigo-500 transition-all" style={{ width: `${pct}%` }} />
                 </div>
-                <div className="mt-1 text-right text-[11px] font-medium text-slate-500">{p.mastered} / {p.total} mastered</div>
+                <div className="mt-1 text-right text-[11px] font-medium text-slate-500">{p.mastered} / {p.total} units mastered</div>
               </div>
             )}
             {p.earned && (

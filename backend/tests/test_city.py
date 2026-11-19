@@ -5,29 +5,30 @@ import uuid
 import pytest
 
 from app.models import CityBuilding
-from app.services import city
+from app.services import city, curriculum
 from app.services.game_master import ALL_OPS, update_mastery
+from tests.mastery_helpers import master_units
 
 UID = lambda: str(uuid.uuid4())
 
 
-def master(db, uid, ops):
-    for op in ops:
-        update_mastery(db, uid, "singly", op, passed=True, error_count=0)
+def master(db, uid, ops=None):
+    """Master the curriculum units (the Tower is earned per unit, not per op)."""
+    master_units(db, uid)
 
 
 def test_new_student_has_an_empty_city_and_no_building(db):
     state = city.city_state(db, UID())
     assert state["lots"] == city.LOT_COUNT
     assert state["placed"] == [] and state["inventory"] == []
-    assert state["progress"]["linked_list"] == {"title": "Linked List Tower", "mastered": 0, "total": 12, "earned": False}
+    assert state["progress"]["linked_list"] == {"title": "Linked List Tower", "mastered": 0, "total": len(curriculum.UNITS), "earned": False}
 
 
-def test_eleven_of_twelve_is_not_enough(db):
+def test_all_but_the_last_unit_is_not_enough(db):
     uid = UID()
-    master(db, uid, ALL_OPS[:-1])
+    master_units(db, uid, curriculum.UNITS[:-1])
     state = city.city_state(db, uid)
-    assert state["progress"]["linked_list"]["mastered"] == 11
+    assert state["progress"]["linked_list"]["mastered"] == len(curriculum.UNITS) - 1
     assert state["inventory"] == []
     with pytest.raises(city.CityError) as e:
         city.place(db, uid, "linked_list", 0)
@@ -39,6 +40,15 @@ def test_imperfect_passes_do_not_count_as_mastered(db):
     for op in ALL_OPS:
         update_mastery(db, uid, "singly", op, passed=True, error_count=1)
     assert city.city_state(db, uid)["progress"]["linked_list"]["earned"] is False
+
+
+def test_one_perfect_fill_blank_per_op_is_not_mastery(db):
+    """The old rule: a single zero-error pass of ANY type was Mastered. A guessed
+    3-way blank is not evidence the student can build the procedure."""
+    uid = UID()
+    for op in ALL_OPS:
+        update_mastery(db, uid, "singly", op, passed=True, error_count=0, question_type="fill_blank")
+    assert city.city_state(db, uid)["progress"]["linked_list"]["mastered"] == 0
 
 
 def test_mastering_every_operation_puts_the_tower_in_the_inventory(db):

@@ -1,0 +1,26 @@
+{
+  "version": "draft-2026-11-18",
+  "draft": true,
+  "title": "Taking part in a study about this game",
+  "paragraphs": [
+    "DRAFT: replace this text with the consent form your ethics board (IRB) approved, then change \"version\" above. Changing the version asks every student again.",
+    "We are studying whether the game's AI tutor helps students learn linked lists. If you agree, the answers you give in the game and on three short tests (one now, one at the end of the course, one a few weeks later) will be used for research, without your name or email.",
+    "Taking part is voluntary. If you say no, you play the game exactly as normal, you skip the tests, and none of your data is used for research. Your grade does not depend on your answer.",
+    "The tests have no tutor and no hints, and they do not show your score. Just answer as well as you can; it is fine not to know something yet.",
+    "You can change your mind at any time by contacting the course staff."
+  ],
+  "agree": "I agree to take part",
+  "decline": "No, thanks",
+  "background": [
+    {
+      "id": "programming_experience",
+      "label": "How long have you been programming? (optional)",
+      "options": ["Not at all", "Less than 6 months", "6 months to 2 years", "More than 2 years"]
+    },
+    {
+      "id": "linked_lists_before",
+      "label": "Have you studied linked lists before this course? (optional)",
+      "options": ["No", "A little", "Yes"]
+    }
+  ]
+}

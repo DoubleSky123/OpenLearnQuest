@@ -112,6 +112,35 @@ export default function AnalysisCard({
           </Section>
         )}
 
+        {/* What your choice did — each wrong pick that shows a known misconception,
+            run on this board (backend misconception_model.feedback_for). Only sent
+            for students who get misconception remediation. */}
+        {analysis?.misconception_feedback?.length > 0 && (
+          <Section icon="🔍" title="What your choice did">
+            <div className="flex flex-col gap-2">
+              {analysis.misconception_feedback.map((f, i) => (
+                <div key={i} className="bg-amber-50 border border-amber-100 rounded-xl px-3.5 py-2.5">
+                  {f.option && (
+                    <p className="text-xs text-gray-500 mb-1">
+                      You picked <code className="font-mono text-gray-800">{f.option}</code>
+                      {f.line != null && <> on line {f.line + 1}</>}
+                    </p>
+                  )}
+                  {f.consequence && (
+                    <p className="text-sm text-amber-900">On this list: {f.consequence}.</p>
+                  )}
+                  <p className="text-sm text-gray-700 mt-1">
+                    <span className="font-semibold">The idea behind it:</span> {f.belief}
+                  </p>
+                  <p className="text-sm text-emerald-800 mt-1">
+                    <span className="font-semibold">What actually works:</span> {f.correction}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </Section>
+        )}
+
         {/* Speed (peer percentile — hidden until enough classmates have data) */}
         {peer && (
           <Section icon="⚡" title="Speed">

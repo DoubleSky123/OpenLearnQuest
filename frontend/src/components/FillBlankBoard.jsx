@@ -14,7 +14,8 @@ import { AnimNode, Arrow } from './LinkedListHintAnimation';
  * Props:
  *   question       – question object with pseudocode, blanks, initialNodes, goalPattern
  *   onComplete(errorCount) – called when all blanks are correctly filled
- *   onError()      – called each time a wrong option is chosen
+ *   onError(pick)  – called each time a wrong option is chosen; pick = { line, picked, answer }
+ *                    (item analysis: which distractor students actually choose)
  */
 export default function FillBlankBoard({ question, onComplete, onError, onStateChange }) {
   const [filled,   setFilled]   = useState(() => question.blanks.map(() => null));
@@ -93,7 +94,7 @@ export default function FillBlankBoard({ question, onComplete, onError, onStateC
       setErrorIdx(lineIdx);
       setLastWrong({ lineIdx, word });
       setErrors(errors + 1);
-      onError();
+      onError({ line: lineIdx, picked: word, answer: blank.answer });
     }
   };
 

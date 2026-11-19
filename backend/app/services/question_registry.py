@@ -80,9 +80,43 @@ def _sll_reject_reason(text: str, operation: str) -> str | None:
 
 from .question_spec import QuestionSpec
 from .ll_executor import execute_operation, find_head_id
-from .static_questions import _rand_position, instantiate
+from .static_questions import _rand_position, instantiate, _cycle_extra, valid_orders_for
+from . import item_quality
+from . import misconceptions
 
 logger = logging.getLogger(__name__)
+
+
+def _target_replace(operation: str, spec: QuestionSpec):
+    """The targeted misconception's canonical one-line form on this operation, or
+    None. Only a `replace` form can be generated as a buggy line / distractor; a
+    swap is tested by any ordering item, a delete only by authored content."""
+    mid = getattr(spec, "target_misconception", None)
+    if not mid or mid not in misconceptions.CATALOG or operation not in misconceptions.CATALOG[mid].mutants:
+        return None
+    mut = misconceptions.canonical(operation, mid)
+    return mut if mut.kind == "replace" else None
+
+
+def ai_can_target(operation: str, mid: str | None) -> bool:
+    """Can model output (find_bug / ordering) be aimed at `mid` and pass R4? Only a
+    one-line (replace) form becomes a buggy line or a distractor. A swap is shown
+    by any authored ordering item, a delete only by authored content — asking the
+    model for those spends every retry on output R4 must reject."""
+    return (bool(mid) and mid in misconceptions.CATALOG
+            and operation in misconceptions.CATALOG[mid].mutants
+            and misconceptions.canonical(operation, mid).kind == "replace")
+
+
+def _r4(operation: str, target: str | None, shown: frozenset[str], what: str) -> None:
+    """R4: a targeted item must SHOW the targeted misconception — decided by
+    running it, not by the model saying so."""
+    if target and target not in shown:
+        m = misconceptions.get(target)
+        raise ValueError(
+            f"{what} must show the targeted misconception ({m.tutor_note}), but when run it "
+            f"behaves like {', '.join(sorted(shown)) or 'no known misconception'} — write it the "
+            f"way a student who believes \"{m.belief}\" would")
 
 
 @dataclass
@@ -153,52 +187,15 @@ def _enrich(q: dict, operation: str, meta: dict, qtype: str) -> dict:
     q["question_type"] = qtype
     q["operation"]     = operation
     q["isMerge"]       = meta.get("isMerge", False)
-    if operation == "detectCycle" and q.get("initialNodes"):
-        # display metadata: tail loops back to index 1 (LeetCode pos style);
-        # initialNodes stay LINEAR so board/executor logic never walks a cycle
-        q["cycleTo"] = 1
+    if operation == "detectCycle" and q.get("initialNodes") and "cycleTo" not in q:
+        # display metadata: tail loops back to index 1 on half the boards (see
+        # static_questions._cycle_extra); initialNodes stay LINEAR
+        q.update(_cycle_extra(operation, len(q["initialNodes"])))
     q = _compute_goal(q, operation, meta)
     # Payload literals LAST: everything upstream (prompts, validators, alias
     # analysis, content_hash) works on the symbolic {value} form, so the
     # rename-detection and dedup logic never sees a random number.
     return instantiate(q)
-
-
-# ── ordering: parallel-create valid orders ─────────────────────────────────────
-
-_PARALLEL_CREATE_OPS = {"insertAtTail", "insertAtPosition"}
-
-
-def _build_valid_orders(pseudocode: list[str], correct: list[int], operation: str) -> list[list[int]]:
-    if operation not in _PARALLEL_CREATE_OPS:
-        return [list(correct)]
-    create_idx: int | None = None
-    for idx, step in enumerate(pseudocode):
-        s = step.lower().replace(" ", "")
-        if "create" in s or "newnode(" in s or "=node(" in s or "malloc" in s:
-            create_idx = idx
-            break
-    if create_idx is None:
-        return [list(correct)]
-    traversal, wiring = [], []
-    for idx in correct:
-        if idx == create_idx:
-            continue
-        s = pseudocode[idx].lower().replace(" ", "")
-        (wiring if "newnode" in s else traversal).append(idx)
-    orders: list[tuple] = [
-        tuple([create_idx] + traversal + wiring),
-    ]
-    if traversal:
-        orders.append(tuple([traversal[0], create_idx] + traversal[1:] + wiring))
-    orders.append(tuple(traversal + [create_idx] + wiring))
-    seen: set[tuple] = set()
-    unique: list[list[int]] = []
-    for o in orders:
-        if o not in seen:
-            seen.add(o)
-            unique.append(list(o))
-    return unique
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -213,10 +210,19 @@ def _ordering_prompt(operation: str, meta: dict, spec: QuestionSpec) -> str:
 
     correct_steps = TEMPLATES.get(operation, {}).get("pseudocode", [])
     steps_json    = json.dumps(correct_steps, ensure_ascii=False)
+    target = _target_replace(operation, spec)
+    targeted = ""
+    if target:
+        m = misconceptions.get(spec.target_misconception)
+        targeted = (
+            f'\nOne distractor must show this specific misconception, a belief real students hold:\n'
+            f'  "{m.belief}"\n'
+            f'Such a student writes step {target.lines[0]} ("{correct_steps[target.lines[0]]}") as: "{target.code}"\n'
+            f'Include that line, or another line that behaves exactly like it when run.\n')
 
     return f"""The correct pseudocode for "{title}" ({operation}) is:
 {steps_json}
-
+{targeted}
 Generate {n_dist} distractor steps that look plausible for {operation} but are WRONG.
 Return ONLY this JSON:
 {{
@@ -248,24 +254,45 @@ def _ordering_validate(raw: str, operation: str, meta: dict) -> dict:
     # Normalise distractors
     distractors = [_ascii_ops(d) for d in ai["distractors"]]
 
-    # Distractors must not copy correct steps
+    # Distractors must not copy correct steps. Drop copies instead of rejecting the
+    # whole answer (same policy as find_bug's wrong_options): Haiku 5.5 echoed one
+    # correct step in half its first attempts, while its other distractors were fine.
     step_set = {s.strip() for s in correct_steps}
     seen: set[str] = set()
     clean: list[str] = []
     for d in distractors:
         key = d.strip()
-        if key in step_set:
-            raise ValueError(f"distractor '{d}' is identical to a correct pseudocode step")
-        if key not in seen:
-            clean.append(d)
-            seen.add(key)
+        if key in step_set or key in seen:
+            continue
+        clean.append(d)
+        seen.add(key)
     if not clean:
-        raise ValueError("No valid distractors after dedup")
+        raise ValueError("every distractor copied a correct pseudocode step — "
+                         "write wrong steps, not steps from the correct pseudocode")
 
     # SLL constraint check
     reason = _sll_reject_reason(" ".join(correct_steps + clean), operation)
     if reason:
         raise ValueError(f"SLL violation in ordering question: {reason}")
+
+    # Item harness: a distractor that names something the program doesn't have
+    # is a free elimination; one that can take a real step's place and still
+    # run correctly would mark a right answer wrong. Drop both; keep the rest.
+    rejected = []
+    kept = []
+    for d in clean:
+        rep = item_quality.lint_ordering_distractor(operation, correct_steps, d)
+        (kept if rep.ok else rejected).append((d, rep.issues))
+    if not kept:
+        raise ValueError(
+            "no usable distractors: " + "; ".join(f"{d!r} {issues[0]}" for d, issues in rejected)
+            + " — make each distractor a near-miss of a real step that uses only the "
+              "program's own variables and breaks the list wherever it is placed")
+    clean = [d for d, _ in kept]
+    target = meta.get("target_misconception")
+    if target and misconceptions.canonical(operation, target).kind == "replace":
+        shown = frozenset().union(*(misconceptions.tag_distractor(operation, correct_steps, d) for d in clean))
+        _r4(operation, target, shown, "one of the distractors")
 
     # ── Assemble full question ─────────────────────────────────────────────────
     # startsEmpty (insertIntoEmpty): the executor ignores any initial list, so
@@ -308,14 +335,14 @@ def _ordering_validate(raw: str, operation: str, meta: dict) -> dict:
         q["l2Values"]    = l2_vals
 
     q = _enrich(q, operation, meta, "ordering")
-    q["validOrders"] = TEMPLATES.get(operation, {}).get("validOrders") or \
-                       _build_valid_orders(correct_steps, correct_order, operation)
+    q["validOrders"] = valid_orders_for(operation)
     return q
 
 
 def _ordering_static(operation: str, spec: QuestionSpec) -> dict:
     from .static_questions import generate_static_question
-    q = generate_static_question(operation, spec.emotion, 0, None, intra_level=spec.intra_difficulty)
+    q = generate_static_question(operation, spec.emotion, 0, None, intra_level=spec.intra_difficulty,
+                                 target_misconception=spec.target_misconception)
     q["question_type"] = "ordering"
     q["difficulty"]    = spec.difficulty
     return q
@@ -448,10 +475,14 @@ _BUG_SUBTLETY = {
 def _find_bug_prompt(operation: str, meta: dict, spec: QuestionSpec) -> str:
     from .static_questions import TEMPLATES
     correct_steps = TEMPLATES.get(operation, {}).get("pseudocode", [])
-    # Randomly pick a line to corrupt; prefer pointer-assignment lines
-    candidates = [i for i, s in enumerate(correct_steps)
-                  if any(t in s for t in ["=", ".next", ".val"])]
-    bug_line = random.choice(candidates) if candidates else random.randrange(len(correct_steps))
+    target = _target_replace(operation, spec)
+    if target:
+        bug_line = target.lines[0]            # where that belief shows (R4 checks the rest)
+    else:
+        # Randomly pick a line to corrupt; prefer pointer-assignment lines
+        candidates = [i for i, s in enumerate(correct_steps)
+                      if any(t in s for t in ["=", ".next", ".val"])]
+        bug_line = random.choice(candidates) if candidates else random.randrange(len(correct_steps))
     correct_line = correct_steps[bug_line]
 
     intra    = spec.intra_difficulty or 2
@@ -488,7 +519,19 @@ def _find_bug_prompt(operation: str, meta: dict, spec: QuestionSpec) -> str:
     from .static_questions import _BUGS, _pick_bug_variant
     example = ""
     variants = _BUGS.get(operation)
-    if variants:
+    if target:
+        # Remediation: the bug must show ONE specific belief. Its canonical form
+        # anchors the model; R4 (execution) accepts any form that behaves the same.
+        m = misconceptions.get(spec.target_misconception)
+        example = (
+            f'\nThe bug must show this specific misconception, a belief real students hold:\n'
+            f'  "{m.belief}"\n'
+            f'A student with this belief writes line {bug_line} like this: "{target.code}"\n'
+            f'Write the buggy line the way such a student would. It is checked by running it: '
+            f'it must behave exactly like the line above. Make the wrong fixes plausible '
+            f'repairs that still do not fix it.\n'
+        )
+    elif variants:
         ref = _pick_bug_variant(variants, intra, 0)
         example = (
             f'\nReference example of this subtlety level for this operation:\n'
@@ -597,29 +640,69 @@ def _find_bug_validate(raw: str, operation: str, meta: dict) -> dict:
     if reason:
         raise ValueError(f"SLL violation in find_bug question: {reason}")
 
+    # Item harness: RUN the buggy program and every fix. The textual alias check
+    # above only catches renames it can see; execution catches every rewrite
+    # that still works ("head = temp.next" when temp holds head) and every
+    # "bug" that is really a typo the compiler would reject.
+    rep = item_quality.lint_bug(operation, template_steps, bug_line, buggy_line, correct_line, wrong_opts)
+    bug_run = rep.options[0]
+    if bug_run.correct:
+        raise ValueError(
+            f"buggy_line '{buggy_line}' still produces the correct result when run — "
+            f"it is not a bug; change which pointer/field is read or written")
+    if bug_run.outcome == "compile_error":
+        raise ValueError(
+            f"buggy_line '{buggy_line}' does not compile ({bug_run.consequence}) — use only the "
+            f"variables, fields (value, next) and functions the program already has")
+    wrong_opts = item_quality.usable_wrong_fixes(rep, operation)
+    if not wrong_opts:
+        raise ValueError(
+            "no usable wrong_options: when run, each one either also works or names something "
+            "the program doesn't have — provide fixes that are wrong for a linked-list reason")
+    _r4(operation, meta.get("target_misconception"),
+        misconceptions.tag_line(operation, template_steps, bug_line, buggy_line), f"the bug {buggy_line!r}")
+
     # ── Assemble the full question from template + AI contributions ────────────
     pseudocode = list(template_steps)
     pseudocode[bug_line] = buggy_line
 
+    def with_line(code: str) -> list[str]:
+        lines = list(template_steps)
+        lines[bug_line] = code
+        return lines
+
     # startsEmpty (insertIntoEmpty): the executor ignores any initial list, so
     # rendering one would show a 'Current state' that contradicts the operation.
     nodes = 0 if meta.get("startsEmpty") else max(meta["minNodes"], 3)
-    if meta.get("isMerge"):
-        # merge needs TWO input lists + the merged goal — a generic node chain
-        # rendered a bogus single list with an empty goal state
-        size    = 3
-        l1_vals = sorted(random.sample(range(1, 50), size))
-        l2_vals = sorted(random.sample([v for v in range(1, 50) if v not in l1_vals], size))
-        init_nodes = [{"id": i + 1, "value": v, "next": i + 2 if i + 1 < len(l1_vals) else None}
-                      for i, v in enumerate(l1_vals)]
-        op_value, op_position = {"l1Values": l1_vals, "l2Values": l2_vals}, None
+    # Serve-time gate: the bug must visibly break the board the student is
+    # shown, and so must every wrong fix offered — re-roll the board until so.
+    for _ in range(12):
+        extra: dict = {}
+        if meta.get("isMerge"):
+            # merge needs TWO input lists + the merged goal — a generic node chain
+            # rendered a bogus single list with an empty goal state
+            size    = 3
+            l1_vals = sorted(random.sample(range(1, 50), size))
+            l2_vals = sorted(random.sample([v for v in range(1, 50) if v not in l1_vals], size))
+            init_nodes = [{"id": i + 1, "value": v, "next": i + 2 if i + 1 < len(l1_vals) else None}
+                          for i, v in enumerate(l1_vals)]
+            op_value, op_position = {"l1Values": l1_vals, "l2Values": l2_vals}, None
+        else:
+            init_nodes = [{"id": i, "value": random.randint(1, 30) * i, "next": i + 1 if i < nodes else None}
+                          for i in range(1, nodes + 1)]
+            if init_nodes:
+                init_nodes[-1]["next"] = None
+            op_value    = random.randint(1, 99) if meta["needsValue"] else None
+            op_position = _rand_position(operation, nodes) if meta["needsPosition"] else None
+            extra = _cycle_extra(operation, len(init_nodes))
+        board = item_quality.board_of(operation, init_nodes, op_value, op_position, extra)
+        visible_wrong = [o for o in wrong_opts if item_quality.wrong_on_board(operation, with_line(o), board)]
+        if visible_wrong and item_quality.wrong_on_board(operation, pseudocode, board):
+            wrong_opts = visible_wrong
+            break
     else:
-        init_nodes = [{"id": i, "value": random.randint(1, 30) * i, "next": i + 1 if i < nodes else None}
-                      for i in range(1, nodes + 1)]
-        if init_nodes:
-            init_nodes[-1]["next"] = None
-        op_value    = random.randint(1, 99) if meta["needsValue"] else None
-        op_position = _rand_position(operation, nodes) if meta["needsPosition"] else None
+        raise ValueError(f"buggy_line '{buggy_line}' does not visibly break any board a student "
+                         f"would be shown — make a bug that changes the result on a typical list")
 
     q = {
         "question_type": "find_bug",
@@ -634,6 +717,8 @@ def _find_bug_validate(raw: str, operation: str, meta: dict) -> dict:
         "operationValue":    op_value,
         "operationPosition": op_position,
     }
+    if operation == "detectCycle":
+        q["cycleTo"] = extra.get("cycleTo")   # decided by the board above (None = no cycle)
     if meta.get("isMerge"):
         q["goalPattern"] = sorted(l1_vals + l2_vals)
         q["l1Values"], q["l2Values"] = l1_vals, l2_vals

@@ -36,6 +36,8 @@ def _code_fields():
     for op, sets in _BLANKS.items():
         for si, s in enumerate(sets):
             for i, bd in enumerate(s):
+                if bd is None:
+                    continue
                 yield f"{op}._BLANKS[{si}][{i}].a", bd["a"]
                 for wi, w in enumerate(bd["w"]):
                     yield f"{op}._BLANKS[{si}][{i}].w[{wi}]", w
@@ -111,27 +113,22 @@ def test_createnode_shows_the_actual_payload():
     assert "createNode(value)" not in "\n".join(q["pseudocode"])
 
 
-def test_value_blank_offers_the_index_as_the_wrong_answer():
-    """The pedagogical point of this blank is value-vs-index confusion, so the
-    answer must be the payload literal and a wrong option the index literal."""
-    spec = select_spec("insertAtPosition", "engaged", type_unlocked=1,
-                       intra_difficulty=3, variant_seed=2)
-    q = get_handler("fill_blank").build_static("insertAtPosition", spec)
-    value_blanks = [b for b in q["blanks"] if b["answer"] == str(q["operationValue"])]
-    assert value_blanks, q["blanks"]
-    assert str(q["operationPosition"]) in value_blanks[0]["options"]
+def test_the_payload_is_never_a_blank():
+    """`createNode(___)` with 35 on the task card is read off the screen, not
+    reasoned about (item harness R1). The old value-vs-index blank is gone."""
+    for op, sets in _BLANKS.items():
+        for bset in sets:
+            for bd in bset:
+                if bd is not None:
+                    assert bd["a"] not in ("{value}", "{index}"), (op, bd)
 
 
-def test_value_less_ops_still_literalise_borrowed_distractors():
-    """removeAtTail borrows `newNode = createNode({value});` as a distractor. If
-    it stayed symbolic while every other line held a number, it would be the
-    obvious odd one out — a free elimination."""
-    spec = select_spec("removeAtTail", "engaged", type_unlocked=3, intra_difficulty=3)
-    q = get_handler("ordering").build_static("removeAtTail", spec)
-    borrowed = [d for d in q["distractors"] if "createNode" in d]
-    assert borrowed, q["distractors"]
-    for d in borrowed:
-        assert re.search(r"createNode\(\d+\)", d), d
+def test_field_access_is_never_literalised():
+    """`.value` is the Node field: instantiate() must not turn
+    `l1.value <= l2.value` into `l1.18 <= l2.18`."""
+    spec = select_spec("mergeSortedLists", "engaged", type_unlocked=3, intra_difficulty=2)
+    q = get_handler("ordering").build_static("mergeSortedLists", spec)
+    assert any("l1.value <= l2.value" in s for s in q["pseudocode"]), q["pseudocode"]
 
 
 def test_payload_literal_does_not_defeat_pool_dedup():
