@@ -2,6 +2,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from ..database import get_db
 from ..schemas.progress import XPUpdate, MistakeCreate, MistakeOut, SessionCreate, SessionOut, AttemptCreate
@@ -79,11 +80,16 @@ def record_attempt(
     session = db.query(GameSession).filter(GameSession.id == session_id, GameSession.user_id == current_user.id).first()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
+    # one attempt per (session, question) (uq_question_attempts_session_question):
+    # a repeat is acknowledged, not stored twice, and earns no XP twice
     attempt = QuestionAttempt(session_id=session_id, **body.model_dump())
     db.add(attempt)
     if body.passed and body.xp_gained > 0:
         current_user.xp += body.xp_gained
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
     return {"ok": True, "xp": current_user.xp}
 
 

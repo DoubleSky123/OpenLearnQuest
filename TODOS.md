@@ -3,45 +3,7 @@
 Follow-ups from the pre-merge review of `feat/tutor-harness` (2026-11-03). Each was found by
 the review and deliberately left for later; the PR description lists them too.
 
-## Recording and mastery
-
-### Make attempt recording atomic and race-free
-
-**What:** Back the "one attempt per (session, question)" rule with a unique index, and write the attempt, its mastery update and the intervention outcome in one transaction.
-
-**Why:** The current guard is check-then-insert. A slow `/session/record` and the `/session/next` resend can both insert, applying mastery twice. Also, if the request fails after the attempt commits but before mastery, the resend now sees the attempt and returns, so that clean pass never reaches mastery.
-
-**Context:** `game_master._record_attempt` (early `return existing`), `update_mastery` and `_close_intervention_loop` each commit on their own. Needs an Alembic migration for `uq_question_attempts_session_question`; the local DB had no duplicate rows on 2026-11-03. On `IntegrityError`, roll back and return the existing row.
-
-**Effort:** M
-**Priority:** P1
-**Depends on:** None. Do this before switching `MISCONCEPTION_MODE` to `ab`.
-
 ## Tutor
-
-### Save the "cancelled" status when a student disconnects mid-reply
-
-**What:** Make sure `tutor_turns` rows reach `cancelled` (or `ok`) when the client aborts the stream.
-
-**Why:** Starlette never closes the sync `generate()`; it is finalized later on the event-loop thread after `get_db` closed the session, so the row stays `started` with no tokens or timings. This skews the tutor telemetry for the paper.
-
-**Context:** `routes/tutor.py` stream route `finally`. Fix with an async wrapper that closes the generator in a thread, or write the final status from a fresh `SessionLocal()`. Add a test that simulates `http.disconnect`.
-
-**Effort:** M
-**Priority:** P2
-**Depends on:** None
-
-### Tie the answer-reveal gates to the question being asked about
-
-**What:** Bind the "reviewing" phase and the final-hint mistake count to the served item (operation and title), not only to a client-sent question id.
-
-**Why:** `POST /api/progress/sessions/{id}/attempts` lets a client create an attempt row with any question id, which unlocks "reviewing". An earlier question of the same operation can unlock the final hint. The answer already reaches the client in the payload, so the cost is mostly wrong telemetry.
-
-**Context:** `routes/tutor._honoured_phase`, `_board_mistakes`; look up `served_items` for (user, question_id), or stop the legacy attempts route from writing into agentic sessions.
-
-**Effort:** S
-**Priority:** P2
-**Depends on:** None
 
 ### Count tokens for failed and partial tutor calls
 
@@ -121,42 +83,16 @@ the review and deliberately left for later; the PR description lists them too.
 
 ## Misconception diagnosis
 
-### Make evidence writes race-free
-
-**What:** Dedupe `picked` events and update `misconception_state` atomically.
-
-**Why:** Two quick wrong picks can log duplicate `picked` events for one question; two first-time state inserts can collide and silently drop evidence.
-
-**Context:** `misconception_model.record_pick`, `_apply`, `record_outcome`.
-
-**Effort:** M
-**Priority:** P3
-**Depends on:** None
-
 ### Don't count the stale load-time prefetch as served
 
 **What:** Stop the question-load prefetch from incrementing `times_served` and writing `served_items` when it is replaced.
 
-**Why:** It skews the least-served ordering; `misconception_eval` already filters unseen items.
+**Why:** It skews the pool's least-served ordering. The study is not affected: `misconception_eval` and `study_tool.py export` (first exposures) count only items the student answered or tried, and the study serves authored content (`QUESTION_SOURCE=authored`), not the pool.
 
 **Context:** `AgenticSession.startPrefetch` at question load; `game_master.prefetch_question`.
 
 **Effort:** S
 **Priority:** P3
-**Depends on:** None
-
-## API hygiene
-
-### Stop returning exception text from the game-master routes
-
-**What:** Replace `HTTPException(503, detail=str(e))` with a generic message and log the exception.
-
-**Why:** Internal error text (including database errors) reaches the client. Pre-existing on `main`.
-
-**Context:** `routes/game_master.py`: session start, next, prefetch, level-up.
-
-**Effort:** S
-**Priority:** P2
 **Depends on:** None
 
 ## Frontend design
@@ -174,3 +110,23 @@ the review and deliberately left for later; the PR description lists them too.
 **Depends on:** None
 
 ## Completed
+
+### Make attempt recording atomic and race-free (P1) — done 2026-11-18
+
+`uq_question_attempts_session_question` (migration `c4f7307a8d70`); `game_master._record_attempt` writes the attempt, its intervention outcome and its mastery update in one transaction (`update_mastery(commit=False)`), and on `IntegrityError` rolls back and returns the winner's row. A resend also repairs a lost misconception outcome. Tests: `tests/test_recording_races.py`; checked with 8 real concurrent requests on Postgres (one attempt, mastery once).
+
+### Make evidence writes race-free (was P3, raised to P1 for the study) — done 2026-11-18
+
+`uq_misconception_events_once` (user, question, misconception, kind); `misconception_model._write_evidence` locks the state row first (`SELECT ... FOR UPDATE`, first insert via `ON CONFLICT DO NOTHING`), then checks whether the question already gave that evidence. 8 concurrent first picks of one misconception on Postgres: `n_picked=8` with the lock, `3` without it (lost updates). Tests: `tests/test_recording_races.py`.
+
+### Stop returning exception text from the game-master routes (P2) — done 2026-11-18
+
+`routes/game_master.py`: session start, next, prefetch and level-up log the exception (`_unavailable`) and return `GENERIC_ERROR`. Also fixed: a 422 with a list of field errors showed `[object Object]` (e.g. an invalid email at registration); `services/api.js` now shows the messages.
+
+### Save the "cancelled" status when a student disconnects mid-reply (P2) — done 2026-11-18
+
+`tutor_telemetry.finish_turn` sees the turn is detached (the request's session was closed before Starlette finalized the stream) and writes it through a session of its own (`_finish_detached`). Test: `test_a_reply_the_student_closed_mid_stream_is_saved_as_cancelled`. The study's dose counts completed turns, so this matters for the paper.
+
+### Tie the answer-reveal gates to the question being asked about (P2) — done 2026-11-18
+
+`_honoured_phase` needs an attempt the game master recorded (server-derived `question_type`, the same `operation`); a legacy `/progress/.../attempts` row can't unlock "reviewing". `_final_hint` refuses for a question that already has an attempt, so an answered question can't lend its mistakes to a new one. The legacy route is idempotent per (session, question) now (the new unique index would otherwise 500). TUTOR_VERSION 2026-11-18.2.

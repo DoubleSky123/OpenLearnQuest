@@ -9,6 +9,7 @@ by a message or two, which is fine for a soft limit.
 import logging
 from datetime import datetime, timedelta
 
+from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.orm import Session
 
 from ..models.tutor_conversation import TutorConversation, TutorMessage
@@ -66,6 +67,14 @@ def start_turn(db: Session, user_id: str, conv: TutorConversation, fields: dict,
 def finish_turn(db: Session, turn: TutorTurn | None, **fields) -> None:
     if turn is None:
         return
+    state = sa_inspect(turn)
+    if state.detached:
+        # The student closed the reply mid-stream: Starlette finalizes the stream
+        # generator only after get_db has closed the request's session, so the row
+        # would stay "started" forever (wrong dose counts for the study). Write it
+        # through a session of its own.
+        _finish_detached(state.identity[0] if state.identity else None, fields)
+        return
     try:
         for k, v in fields.items():
             setattr(turn, k, v)
@@ -73,4 +82,23 @@ def finish_turn(db: Session, turn: TutorTurn | None, **fields) -> None:
         db.commit()
     except Exception as e:
         db.rollback()
-        logger.warning("tutor_turns update failed for %s: %s", turn.id, e)
+        logger.warning("tutor_turns update failed for %s: %s", state.identity, e)
+
+
+def _finish_detached(turn_id: str | None, fields: dict) -> None:
+    if turn_id is None:
+        return
+    from .. import database          # module attribute: tests bind it to their engine
+    s = database.SessionLocal()
+    try:
+        row = s.get(TutorTurn, turn_id)
+        if row is not None and row.status == "started":
+            for k, v in fields.items():
+                setattr(row, k, v)
+            row.ended_at = datetime.utcnow()
+            s.commit()
+    except Exception as e:
+        s.rollback()
+        logger.warning("tutor_turns update (detached) failed for %s: %s", turn_id, e)
+    finally:
+        s.close()

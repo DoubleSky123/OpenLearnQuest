@@ -18,9 +18,11 @@ from __future__ import annotations
 import hashlib
 import logging
 import re
+import uuid
 from dataclasses import dataclass, field, replace
 from datetime import datetime
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..config import settings
@@ -56,17 +58,45 @@ def recording() -> bool:
     return mode() != "off"
 
 
-def arm(user_id: str | None) -> str | None:
-    """'ab' group, stable per student (same hashing idea as _variant_offset)."""
+def arm(user_id: str | None, *, db: Session | None = None, operation: str | None = None) -> str | None:
+    """'ab' group. In a study (STUDY_ENABLED) it is the STORED assignment
+    (services/study.py; per unit of `operation` under a crossover; None for a
+    student who declined or is not assigned yet). Outside a study: a stable hash
+    of the student (same idea as _variant_offset)."""
     if mode() != "ab" or not user_id:
         return None
+    from . import study
+    if study.enabled():
+        if db is None:
+            raise ValueError("arm() needs the db in a study: the assignment is stored")
+        return study.arm_for(db, user_id, operation)
     h = int(hashlib.sha256(f"misconception:{user_id}".encode()).hexdigest()[:8], 16)
     return "targeted" if h % 2 == 0 else "control"
 
 
-def targeting(user_id: str | None) -> bool:
-    """Does this student actually get remediation (and its feedback)?"""
-    return mode() == "on" or (mode() == "ab" and arm(user_id) == "targeted")
+CHANNELS = ("tutor", "remediation", "feedback")
+
+
+def channels() -> set[str]:
+    """MISCONCEPTION_CHANNELS: what a treated student gets (see config.py)."""
+    raw = settings.misconception_channels if settings.misconception_channels is not None else ",".join(CHANNELS)
+    return {c.strip().lower() for c in raw.split(",") if c.strip().lower() in CHANNELS}
+
+
+def treated(user_id: str | None, *, db: Session | None = None, operation: str | None = None) -> bool:
+    """'on', or the 'targeted' half of 'ab' (on this operation's unit, in a crossover study)."""
+    return mode() == "on" or (mode() == "ab" and arm(user_id, db=db, operation=operation) == "targeted")
+
+
+def targeting(user_id: str | None, channel: str, *, db: Session | None = None,
+              operation: str | None = None) -> bool:
+    """Does this student get this channel: tutor | remediation | feedback?
+    Separate channels let a study vary one thing (e.g. only what the tutor
+    knows) while both arms get the same questions and the same analysis card.
+    db + operation: needed in a study (stored assignment; per unit in a crossover)."""
+    if channel not in CHANNELS:
+        raise ValueError(f"unknown channel {channel!r}")
+    return channel in channels() and treated(user_id, db=db, operation=operation)
 
 
 # ── tags of a served item ──────────────────────────────────────────────────────
@@ -163,7 +193,7 @@ def record_served(db: Session, user_id: str | None, q: dict | None, *, session_i
         row.variant = q.get("variant")
         row.purpose = purpose
         row.target_misconception = target
-        row.arm = arm(user_id)
+        row.arm = arm(user_id, db=db, operation=q["operation"])
         row.operation_value = q.get("operationValue")
         row.tags = item_tags(q)
         row.board = board_of_payload(q)
@@ -241,18 +271,73 @@ def update(d: Diagnosis, kind: str, *, question_id: str | None = None, operation
 
 # ── persistence ────────────────────────────────────────────────────────────────
 
+# Evidence writes are race-free: two quick wrong picks (or a resend racing the
+# original) must neither count one question twice nor lose an update.
+#   1. the state row is LOCKED before it is read (SELECT ... FOR UPDATE; a
+#      first-time row is created with INSERT ... ON CONFLICT DO NOTHING, so two
+#      first inserts don't collide), held until commit;
+#   2. only then is "did this question already give this evidence?" checked —
+#      the second request waits on the lock and sees the first one's event;
+#   3. uq_misconception_events_once is the backstop: a duplicate that still gets
+#      through rolls the request back (IntegrityError) instead of being counted.
+# Misconceptions are always locked in sorted order (no deadlock between two
+# requests). SQLite (tests) has no row locks and writes one at a time anyway.
+
+def _state_query(db: Session, user_id: str, mid: str):
+    return (db.query(MisconceptionState)
+            .filter(MisconceptionState.user_id == user_id, MisconceptionState.misconception_id == mid)
+            .with_for_update().populate_existing())
+
+
+def _insert_state(db: Session, user_id: str, mid: str) -> None:
+    values = dict(id=str(uuid.uuid4()), user_id=user_id, misconception_id=mid, p_hold=PRIOR, n_picked=0,
+                  n_avoided=0, picked_items=[], picked_ops=[], resolved_ops=[], status="unknown",
+                  updated_at=datetime.utcnow())
+    dialect = db.get_bind().dialect.name
+    if dialect == "postgresql":
+        from sqlalchemy.dialects.postgresql import insert
+    elif dialect == "sqlite":
+        from sqlalchemy.dialects.sqlite import insert
+    else:                                    # no upsert: a collision rolls the request back (IntegrityError)
+        db.add(MisconceptionState(**values))
+        db.flush()
+        return
+    db.execute(insert(MisconceptionState).values(**values)
+               .on_conflict_do_nothing(index_elements=["user_id", "misconception_id"]))
+
+
 def _row(db: Session, user_id: str, mid: str) -> MisconceptionState:
-    row = (db.query(MisconceptionState)
-           .filter(MisconceptionState.user_id == user_id, MisconceptionState.misconception_id == mid).first())
+    """m's state row for this student, created if needed, locked until commit."""
+    row = _state_query(db, user_id, mid).first()
     if row is None:
-        row = MisconceptionState(user_id=user_id, misconception_id=mid, p_hold=PRIOR, n_picked=0, n_avoided=0,
-                                 picked_items=[], picked_ops=[], resolved_ops=[], status="unknown")
-        db.add(row)
+        _insert_state(db, user_id, mid)
+        row = _state_query(db, user_id, mid).one()
     return row
 
 
-def _apply(db: Session, user_id: str, mid: str, kind: str, **kw) -> float:
+def _has_event(db: Session, user_id: str, question_id: str, mid: str, kind: str) -> bool:
+    return db.query(MisconceptionEvent.id).filter(
+        MisconceptionEvent.user_id == user_id, MisconceptionEvent.question_id == str(question_id),
+        MisconceptionEvent.misconception_id == mid, MisconceptionEvent.kind == kind).first() is not None
+
+
+def _write_evidence(db: Session, user_id: str, mid: str, kind: str, question_id: str, *,
+                    update_kw: dict, event_kw: dict) -> float | None:
+    """Lock m's state, then record one piece of evidence unless this question
+    already gave it. Returns p after the update, or None if already counted.
+    The caller commits."""
     row = _row(db, user_id, mid)
+    if _has_event(db, user_id, question_id, mid, kind):
+        return None
+    p = _apply(db, user_id, mid, kind, row=row, question_id=question_id, **update_kw)
+    db.add(MisconceptionEvent(user_id=user_id, misconception_id=mid, kind=kind, question_id=question_id,
+                              p_after=p, **event_kw))
+    return p
+
+
+def _apply(db: Session, user_id: str, mid: str, kind: str, *, row: MisconceptionState | None = None,
+           **kw) -> float:
+    row = row if row is not None else _row(db, user_id, mid)
     before = Diagnosis(row.p_hold, row.n_picked or 0, row.n_avoided or 0, list(row.picked_items or []),
                        list(row.picked_ops or []), list(row.resolved_ops or []), row.status or "unknown")
     after = update(before, kind, n_ops=len(mc.ops_for(mid)) if mid in mc.CATALOG else 2, **kw)
@@ -306,26 +391,29 @@ def record_pick(db: Session, user_id: str, question_id: str, *, line: int | None
             offered = set(TEMPLATES[op]["pseudocode"]) | set((item.tags or {}).get("distractors") or {})
             if len(prog) != len(TEMPLATES[op]["pseudocode"]) or not set(prog) <= offered:
                 return []
-            mids = sorted(mc.classify_program(op, prog))
+            mids = sorted(mc.classify_assembly(op, prog))
             stored, line = "\n".join(prog), None
         else:
             if line is None or option is None:
                 return []
             stored = _sym(option, val)
             mids = ((item.tags.get("lines") or {}).get(str(line), {}).get("options") or {}).get(stored, [])
-        counted = {e.misconception_id for e in _events(db, user_id, question_id, "picked")}
         out = []
-        for m in mids:
-            if m in counted or m not in mc.CATALOG:
+        for m in sorted(set(mids)):                        # sorted: the lock order
+            if m not in mc.CATALOG:
                 continue
-            p = _apply(db, user_id, m, "picked", question_id=str(question_id), operation=op)
-            db.add(MisconceptionEvent(user_id=user_id, misconception_id=m, kind="picked",
-                                      question_id=str(question_id), operation=op,
-                                      question_type=item.question_type, line=line, option=stored,
-                                      targeted=item.target_misconception == m, p_after=p))
-            out.append(m)
+            p = _write_evidence(db, user_id, m, "picked", str(question_id),
+                                update_kw=dict(operation=op),
+                                event_kw=dict(operation=op, question_type=item.question_type, line=line,
+                                              option=stored, targeted=item.target_misconception == m))
+            if p is not None:
+                out.append(m)
         db.commit()
         return out
+    except IntegrityError:   # a concurrent request wrote this evidence first: it counts once
+        db.rollback()
+        logger.warning("record_pick: duplicate evidence for %s ignored", question_id)
+        return []
     except Exception:   # noqa: BLE001 — diagnosis must never fail the mistake-book write
         db.rollback()
         logger.exception("record_pick failed for %s", question_id)
@@ -342,18 +430,23 @@ def record_outcome(db: Session, user_id: str, question_id: str, *, passed: bool,
         item = served(db, user_id, question_id)
         if item is None:
             return
-        picked = {e.misconception_id for e in _events(db, user_id, question_id, "picked")}
-        done = {e.misconception_id for e in _events(db, user_id, question_id, "avoided")}
-        for m in sorted(available(item.tags or {}) - picked - done):
+        qid = str(question_id)
+        for m in sorted(available(item.tags or {})):          # sorted: the lock order
             if m not in mc.CATALOG:
                 continue
+            _row(db, user_id, m)                               # lock first, then look (see above)
+            if _has_event(db, user_id, qid, m, "picked"):
+                continue
             targeted = item.target_misconception == m
-            p = _apply(db, user_id, m, "avoided", question_id=str(question_id), operation=item.operation,
-                       targeted=targeted, clean=(error_count or 0) == 0)
-            db.add(MisconceptionEvent(user_id=user_id, misconception_id=m, kind="avoided",
-                                      question_id=str(question_id), operation=item.operation,
-                                      question_type=item.question_type, targeted=targeted, p_after=p))
+            _write_evidence(db, user_id, m, "avoided", qid,
+                            update_kw=dict(operation=item.operation, targeted=targeted,
+                                           clean=(error_count or 0) == 0),
+                            event_kw=dict(operation=item.operation, question_type=item.question_type,
+                                          targeted=targeted))
         db.commit()
+    except IntegrityError:   # a concurrent request (the /next resend) wrote it first
+        db.rollback()
+        logger.warning("record_outcome: duplicate evidence for %s ignored", question_id)
     except Exception:   # noqa: BLE001
         db.rollback()
         logger.exception("record_outcome failed for %s", question_id)
@@ -367,12 +460,12 @@ def record_taught(db: Session, user_id: str, case_id: str, operation: str, mid: 
         return
     qid = f"npc:{case_id}"
     try:
-        if any(e.misconception_id == mid for e in _events(db, user_id, qid, "taught")):
-            return
-        p = _apply(db, user_id, mid, "taught", question_id=qid, operation=operation)
-        db.add(MisconceptionEvent(user_id=user_id, misconception_id=mid, kind="taught", question_id=qid,
-                                  operation=operation, question_type=f"teach_{how}", p_after=p))
+        _write_evidence(db, user_id, mid, "taught", qid, update_kw=dict(operation=operation),
+                        event_kw=dict(operation=operation, question_type=f"teach_{how}"))
         db.commit()
+    except IntegrityError:   # a concurrent request wrote it first
+        db.rollback()
+        logger.warning("record_taught: duplicate evidence for %s ignored", qid)
     except Exception:   # noqa: BLE001 — diagnosis must never fail the teaching flow
         db.rollback()
         logger.exception("record_taught failed for %s", qid)
@@ -425,18 +518,76 @@ def feedback_for(db: Session, user_id: str, question_id: str) -> list[dict]:
     return out
 
 
-def tutor_block(db: Session, user_id: str, operation: str) -> str:
-    """[LIKELY MISCONCEPTIONS] for the tutor's first-turn context: active ones that
-    apply to this operation, with the evidence count. Deterministic."""
-    rows = [r for r in active(db, user_id)
-            if r.misconception_id in mc.CATALOG and operation in mc.CATALOG[r.misconception_id].mutants]
-    if not rows:
+EARLIER_MAX = 3   # earlier misconceptions shown to the tutor, most questions first
+
+
+def tutor_evidence(db: Session, user_id: str, question_id: str | None, operation: str) -> list[dict]:
+    """What the tutor can be told about this student's misconceptions, rebuilt on
+    every turn (deterministic, no model):
+    - this_question: each misconception the student's wrong picks HERE showed,
+      with what the pick did on their board, and how many earlier questions
+      showed it too — something no model can infer from this question alone;
+    - earlier: misconceptions picked on other questions, not resolved since,
+      that apply to this operation.
+    Only belief prose reaches the prompt (tutor_note), never the correction:
+    the correction is this exercise's answer in plain English."""
+    states = {r.misconception_id: r for r in db.query(MisconceptionState)
+              .filter(MisconceptionState.user_id == user_id).all()}
+    before: dict[str, dict] = {}
+    for e in (db.query(MisconceptionEvent)
+              .filter(MisconceptionEvent.user_id == user_id, MisconceptionEvent.kind == "picked")
+              .order_by(MisconceptionEvent.at).all()):
+        if e.misconception_id not in mc.CATALOG or (question_id and e.question_id == str(question_id)):
+            continue
+        b = before.setdefault(e.misconception_id, {"questions": [], "operations": []})
+        if e.question_id not in b["questions"]:
+            b["questions"].append(e.question_id)
+        if e.operation and e.operation not in b["operations"]:
+            b["operations"].append(e.operation)
+
+    def earlier(mid: str) -> dict:
+        st = states.get(mid)
+        if mid not in before or (st is not None and st.status == "resolved"):
+            return {"earlier_questions": 0, "earlier_operations": []}
+        return {"earlier_questions": len(before[mid]["questions"]), "earlier_operations": before[mid]["operations"]}
+
+    items: list[dict] = []
+    shown: set[str] = set()
+    for f in (feedback_for(db, user_id, question_id) if question_id else []):
+        if f["misconception"] in shown:
+            continue
+        shown.add(f["misconception"])
+        items.append({"id": f["misconception"], "where": "this_question", "line": f["line"],
+                      "option": f["option"], "consequence": f["consequence"], **earlier(f["misconception"])})
+    rest = [mid for mid in before if mid not in shown and operation in mc.CATALOG[mid].mutants
+            and earlier(mid)["earlier_questions"]]
+    rest.sort(key=lambda mid: (-len(before[mid]["questions"]), list(mc.CATALOG).index(mid)))
+    items += [{"id": mid, "where": "earlier", **earlier(mid)} for mid in rest[:EARLIER_MAX]]
+    return items
+
+
+def tutor_note(items: list[dict]) -> str:
+    """[MISCONCEPTION EVIDENCE] — the block a treated student's tutor gets on every turn."""
+    if not items:
         return ""
-    lines = [f"- {mc.CATALOG[r.misconception_id].tutor_note} "
-             f"(picked on {len(r.picked_items or [])} different question(s))" for r in rows[:3]]
-    return ("[LIKELY MISCONCEPTIONS — inferred from the student's own wrong picks, deterministic]\n"
-            + "\n".join(lines)
-            + "\n[Use this to aim your questions; do not label the student or name the misconception.]")
+    lines = []
+    for it in items:
+        m = mc.CATALOG[it["id"]]
+        ops = ", ".join(it.get("earlier_operations") or [])
+        again = (f" They showed the same belief on {it['earlier_questions']} earlier question(s) ({ops})."
+                 if it.get("earlier_questions") else "")
+        if it["where"] == "this_question":
+            what = ("their step order" if it.get("option") is None else
+                    f"their choice `{it['option']}`" + (f" on line {it['line'] + 1}" if it.get("line") is not None else ""))
+            ran = f" When run on their board: {it['consequence']}." if it.get("consequence") else ""
+            lines.append(f"- On THIS question, {what} fits this belief: \"{m.belief}\"{ran}{again}")
+        else:
+            lines.append(f"- On {it['earlier_questions']} earlier question(s) ({ops}) their choices fit this "
+                         f"belief: \"{m.belief}\" It applies to this exercise too.")
+    return ("[MISCONCEPTION EVIDENCE — from the student's own wrong choices, checked by running them; "
+            "background, never quote]\n" + "\n".join(lines)
+            + "\n[Aim your questions at the belief behind the mistake. Do not name or label it, and the "
+              "answer rule still holds.]")
 
 
 def can_target(db: Session, user_id: str, operation: str, qtype: str, mid: str) -> bool:
@@ -445,5 +596,7 @@ def can_target(db: Session, user_id: str, operation: str, qtype: str, mid: str) 
     ordering) a tagged pool row they haven't done — exactly what serve() would find."""
     if mc.authored_target_exists(operation, qtype, mid):
         return True
+    if settings.authored_only:                       # QUESTION_SOURCE=authored: no pool rows
+        return False
     from . import question_pool
     return question_pool.can_serve_targeted(db, user_id, operation, qtype, mid)

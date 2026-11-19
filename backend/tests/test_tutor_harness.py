@@ -343,14 +343,72 @@ def test_reviewing_is_honoured_only_once_the_attempt_is_recorded(harness):
     fake = harness.use({"tokens": ["ok"]}, {"tokens": ["ok"]})
     body = _body(harness, phase="reviewing", user_message="why is step 2 first?")
     harness.client.post("/api/ai/tutor/stream", json=body)
+    # as the game master records it: server-derived question_type, the operation
     harness.db.add(QuestionAttempt(session_id=harness.session.id, question_id="q-123", difficulty=1,
-                                   passed=True, error_count=1))
+                                   passed=True, error_count=1, question_type="ordering",
+                                   operation="insertAtHead"))
     harness.db.commit()
     harness.client.post("/api/ai/tutor/stream", json={**body, "user_message": "and now?"})
     turns = harness.db.query(TutorTurn).order_by(TutorTurn.started_at).all()
     assert [t.phase for t in turns] == ["solving", "reviewing"]
     assert fake.calls[0]["system"] == tutor_agent.system_prompt_for("solving", False)
     assert fake.calls[1]["system"] == tutor_agent.system_prompt_for("reviewing", False)
+
+
+def test_a_legacy_attempt_row_can_not_unlock_reviewing(harness):
+    """POST /api/progress/sessions/{id}/attempts takes any question id from the
+    client; such a row (no question_type, no operation) must not open the answer."""
+    harness.use({"tokens": ["ok"]})
+    r = harness.client.post(f"/api/progress/sessions/{harness.session.id}/attempts", json={
+        "question_id": "q-123", "difficulty": 1, "time_spent_ms": 1, "error_count": 0, "xp_gained": 0,
+        "passed": True})
+    assert r.status_code == 200
+    harness.client.post("/api/ai/tutor/stream", json=_body(harness, phase="reviewing"))
+    assert harness.db.query(TutorTurn).one().phase == "solving"
+
+
+def test_an_answered_question_can_not_lend_its_mistakes_to_the_final_hint(harness):
+    from app.models import Mistake, QuestionAttempt
+    for _ in range(3):
+        harness.db.add(Mistake(user_id=harness.user.id, question_id="q-123", source="agentic",
+                               title="Insert at Head", your_answer=[], correct_answer=[], explanation=""))
+    harness.db.commit()
+    harness.use({"tokens": ["ok"]}, {"tokens": ["ok"]})
+    body = _body(harness, final_hint=True, error_count=3)
+    harness.client.post("/api/ai/tutor/stream", json=body)          # still solving: allowed
+    harness.db.add(QuestionAttempt(session_id=harness.session.id, question_id="q-123", difficulty=1,
+                                   passed=True, error_count=3, question_type="ordering",
+                                   operation="insertAtHead"))
+    harness.db.commit()
+    harness.client.post("/api/ai/tutor/stream", json={**body, "user_message": "next one?"})
+    turns = harness.db.query(TutorTurn).order_by(TutorTurn.started_at).all()
+    assert [t.final_hint for t in turns] == [True, False]
+
+
+def test_a_repeated_legacy_attempt_is_acknowledged_not_a_500(harness):
+    body = {"question_id": "same", "difficulty": 1, "time_spent_ms": 1, "error_count": 0, "xp_gained": 0,
+            "passed": True}
+    for _ in range(2):
+        assert harness.client.post(f"/api/progress/sessions/{harness.session.id}/attempts",
+                                   json=body).status_code == 200
+
+
+def test_a_reply_the_student_closed_mid_stream_is_saved_as_cancelled(harness, monkeypatch):
+    """Starlette finalizes the stream after get_db closed the request's session;
+    the turn is then written through a session of its own."""
+    from sqlalchemy.orm import sessionmaker
+    from app import database
+    from app.routes import tutor as route
+    monkeypatch.setattr(database, "SessionLocal", sessionmaker(bind=harness.db.get_bind()))
+    monkeypatch.setattr(route, "StreamingResponse", lambda gen, media_type: gen)   # the raw generator
+    harness.use({"tokens": ["one ", "two ", "three"]})
+    req = route.TutorRequest(**_body(harness))
+    gen = route.tutor_chat_stream(req, harness.user, harness.db)
+    next(gen)                        # the student has seen the first token ...
+    harness.db.close()               # ... get_db's cleanup runs ...
+    gen.close()                      # ... and the abandoned generator is finalized
+    turn = harness.db.query(TutorTurn).one()
+    assert turn.status == "cancelled" and turn.ended_at is not None
 
 
 def test_another_questions_mistakes_do_not_unlock_the_final_hint(harness):

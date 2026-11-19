@@ -59,6 +59,11 @@ class TutorTurn(Base):
     tutor_version: Mapped[str | None] = mapped_column(String, nullable=True)
     arm: Mapped[str | None] = mapped_column(String, nullable=True)
     model: Mapped[str | None] = mapped_column(String, nullable=True)
+    # What the tutor was told about the student's misconceptions on this turn
+    # (misconception_model.tutor_evidence): {"arm", "sent", "items": [{id, where, ...}]}.
+    # Written for control students too, with sent=false: what it WOULD have been
+    # told — the manipulation check and the dose. Null when MISCONCEPTION_MODE=off.
+    misconception_context: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     input_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     output_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)

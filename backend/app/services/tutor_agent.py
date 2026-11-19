@@ -23,7 +23,7 @@ _client = get_client("interactive")
 # Model is server config, never client input. TUTOR_VERSION / ARM are stamped on
 # every tutor_turns row, so bump the version whenever tutor behaviour changes.
 TUTOR_MODEL = anthropic_client.MODEL   # Claude Haiku 5.5 since 2026-10-27
-TUTOR_VERSION = "2026-11-03.3"   # route: reviewing needs a recorded attempt, final hint counts this question only, no route retry on 429
+TUTOR_VERSION = "2026-11-18.2"   # reviewing / final hint bound to a game-master attempt of this question (was: any attempt row); .1: [MISCONCEPTION EVIDENCE] every turn
 ARM = "A0"
 
 # Design note: keep these prompts SHORT and principled — "a simple Socratic
@@ -351,6 +351,7 @@ def build_context_block(
     board_note: str | None = None,
     phase: str | None = None,
     final_hint: bool = False,
+    misconception_note: str = "",
 ) -> str:
     """Injects question context + error analysis + cross-session history into the first user message."""
     error_analysis = analyze_error(your_answer, correct_answer)
@@ -390,6 +391,8 @@ confidence:    {conf}
 {student_history}
 [Use this to recognise recurring patterns. If the student repeats a past mistake, acknowledge it warmly.]"""
 
+    evidence_block = f"\n{misconception_note}" if misconception_note else ""
+
     final_hint = final_hint and not reviewing
     if reviewing:
         phase_block = (
@@ -414,7 +417,7 @@ Exercise: This is {_ACTIVITY[qt]}.
 Mistakes so far this session: {error_count}{board_block}
 {history_block}
 Error analysis:
-{error_analysis}{diagnosis_block}
+{error_analysis}{diagnosis_block}{evidence_block}
 [VOCABULARY] {_VOCAB[qt]}
 [JUDGING] Judge claims at this exercise's level: a node nothing points to counts as \
 "lost" — don't correct that to "still in memory". If they got it right, say so.
@@ -437,15 +440,19 @@ def build_api_messages(
     board_note: str | None = None,
     phase: str | None = None,
     final_hint: bool = False,
+    misconception_note: str = "",
 ) -> list[dict]:
-    """Build the messages list for the Claude API call."""
+    """Build the messages list for the Claude API call. `misconception_note`
+    ([MISCONCEPTION EVIDENCE], tutor channel only) goes in the first-turn context
+    AND every refresh: the first-turn block is forgotten by turn 3, and a pick
+    made mid-chat only reaches the tutor through the refresh."""
     api_messages: list[dict] = []
 
     if not messages:
         context_block = build_context_block(
             question_title, operation, your_answer, correct_answer,
             error_count, error_diagnosis, student_history, question_type, board_note,
-            phase, final_hint,
+            phase, final_hint, misconception_note,
         )
         api_messages.append({
             "role": "user",
@@ -477,13 +484,15 @@ def build_api_messages(
                 "plus the video, not a third paragraph. If they are making progress, skip the video."
             )
         board_line = f"\nWhere the student is RIGHT NOW: {board_note}" if board_note else ""
+        # before the video nudge and the phase note: those two stay last (measured, below)
+        evidence_line = f"\n{misconception_note}" if misconception_note else ""
         phase_line = "" if phase == "reviewing" else f"\n{_FINAL_HINT_NOTE if final_hint else _SOLVING_NOTE}"
         # Order matters, measured: with the phase note BEFORE the video nudge the stuck
         # student got the video 3/6 times, with it after 6/6 (tutor_sim third_turn_video).
         context_refresh = (
             f"[Context refresh — errors: {error_count}, "
             f"current attempt: {' → '.join(your_answer) if your_answer else 'nothing'}{board_line}\n"
-            f"Updated error analysis:\n{fresh_analysis}{tool_note}{phase_line}]\n"
+            f"Updated error analysis:\n{fresh_analysis}{evidence_line}{tool_note}{phase_line}]\n"
         )
         api_messages.append({"role": "user", "content": context_refresh + user_message})
 
@@ -522,6 +531,7 @@ def chat(
     board_note: str | None = None,
     phase: str | None = None,
     final_hint: bool = False,
+    misconception_note: str = "",
 ) -> str:
     """
     Send one turn to the tutor agent and return its reply.
@@ -532,7 +542,7 @@ def chat(
     api_messages = build_api_messages(
         question_title, operation, your_answer, correct_answer,
         error_count, messages, user_message, error_diagnosis, student_history,
-        question_type, board_note, phase, final_hint,
+        question_type, board_note, phase, final_hint, misconception_note,
     )
 
     _model = model or TUTOR_MODEL

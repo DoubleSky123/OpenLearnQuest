@@ -15,11 +15,22 @@ Templates are symbolic ({value}); so are mutants and everything compared here.
 `belief` and `correction` are student-facing prose and must contain no code:
 corrections are also the explanation choices offered when a student teaches
 the classmate, so a code fragment there would hand over the fix.
+
+Execution decides what a program DOES, not what the student BELIEVES. Two
+beliefs can behave alike on every board (on insertIntoEmpty, only empty lists
+exist, so many wrong ideas end in "the list is still empty"), and one belief
+written two ways can behave differently (docs/diagnosis-check-2026-11-18). So
+a teacher's label for an edit (data/misconception_labels.json, filled from the
+review sheet by `misconception_labels_sheet.py import`) OVERRIDES execution,
+and MISCONCEPTION_TAGS=reviewed drops every tag a teacher has not confirmed.
 """
 from __future__ import annotations
 
+import json
+import re
 from dataclasses import dataclass, field
 from functools import lru_cache
+from pathlib import Path
 
 from . import pseudo_exec as px
 from .item_quality import boards
@@ -311,27 +322,106 @@ def classify_program(operation: str, lines: list[str]) -> frozenset[str]:
     return frozenset(mid for mid, mfp in _mutant_prints(operation) if mfp == fp)
 
 
+# ── teacher-confirmed labels (override execution) ──────────────────────────────
+
+LABELS_PATH = Path(__file__).resolve().parent.parent / "data" / "misconception_labels.json"
+TAG_SOURCES = ("execution", "reviewed")
+
+
+def tag_source() -> str:
+    """MISCONCEPTION_TAGS: 'execution' (default) tags by behaviour wherever no
+    teacher label exists; 'reviewed' (for a study) keeps only confirmed labels."""
+    from ..config import settings
+    s = (settings.misconception_tags or "execution").strip().lower()
+    return s if s in TAG_SOURCES else "execution"
+
+
+def norm_code(code: str) -> str:
+    """One spelling per edit: whitespace collapsed, no trailing semicolon."""
+    return re.sub(r"\s+", " ", str(code)).strip().rstrip(";").strip()
+
+
+def label_key(operation: str, line: int | None, code: str) -> tuple[str, int | None, str]:
+    """A line edit is (operation, line, the line as it now reads); an ordering
+    distractor is (operation, None, its text) — it can sit in any slot."""
+    return (operation, line, norm_code(code))
+
+
+def _load_labels(path: Path) -> dict[tuple, frozenset[str]]:
+    if not path.exists():
+        return {}
+    data = json.loads(path.read_text(encoding="utf-8"))
+    out = {}
+    for e in data.get("labels", []):
+        mid = e.get("misconception")
+        out[label_key(e["operation"], e.get("line"), e["code"])] = frozenset([mid] if mid else [])
+    return out
+
+
+_LABELS: dict[tuple, frozenset[str]] = _load_labels(LABELS_PATH)
+
+
+def set_labels(labels: dict[tuple, frozenset[str]] | None = None) -> None:
+    """Replace the label table (tests; None reloads the file) and drop cached tags."""
+    global _LABELS
+    _LABELS = _load_labels(LABELS_PATH) if labels is None else dict(labels)
+    _authored.cache_clear()
+
+
+def label_for(operation: str, line: int | None, code: str) -> frozenset[str] | None:
+    """The teacher's label for this edit ({m} or empty = 'no misconception'), or
+    None when no teacher has looked at it."""
+    return _LABELS.get(label_key(operation, line, code))
+
+
+def _decide(label: frozenset[str] | None, by_execution) -> frozenset[str]:
+    if label is not None:
+        return label
+    return frozenset() if tag_source() == "reviewed" else by_execution()
+
+
 def tag_blank(operation: str, steps: list[str], line: int, answer: str, option: str) -> frozenset[str]:
     """The misconceptions shown by filling `option` into the blank at `answer`'s
     first occurrence in steps[line] (the _BLANKS str.replace contract)."""
     lines = list(steps)
     lines[line] = steps[line].replace(answer, option, 1)
-    return classify_program(operation, lines)
+    return _decide(label_for(operation, line, lines[line]), lambda: classify_program(operation, lines))
 
 
 def tag_line(operation: str, steps: list[str], line: int, code: str) -> frozenset[str]:
     """...by writing `code` as line `line` (a find_bug buggy line or wrong fix)."""
     lines = list(steps)
     lines[line] = code
-    return classify_program(operation, lines)
+    return _decide(label_for(operation, line, code), lambda: classify_program(operation, lines))
 
 
 def tag_distractor(operation: str, steps: list[str], distractor: str) -> frozenset[str]:
     """...by an ordering distractor, wherever it is placed in place of a step."""
-    out: set[str] = set()
-    for i in range(len(steps)):
-        out |= tag_line(operation, steps, i, distractor)
-    return frozenset(out)
+    def by_execution():
+        out: set[str] = set()
+        for i in range(len(steps)):
+            ls = list(steps)
+            ls[i] = distractor
+            out |= classify_program(operation, ls)
+        return frozenset(out)
+    return _decide(label_for(operation, None, distractor), by_execution)
+
+
+def classify_assembly(operation: str, lines: list[str]) -> frozenset[str]:
+    """A whole ordering answer. A pure reordering of the template's steps is
+    judged by execution (order misconceptions are about order: same steps,
+    different sequence). An answer that uses a distractor is judged by that
+    distractor's label when a teacher gave one."""
+    template = {norm_code(s) for s in _template(operation)}
+    extra = [s for s in lines if norm_code(s) not in template]
+    if not extra:
+        return classify_program(operation, lines)
+    labels = [label_for(operation, None, s) for s in extra]
+    if len(extra) == 1 and labels[0] is not None:
+        return labels[0]
+    if tag_source() == "reviewed":
+        return frozenset()
+    return classify_program(operation, lines)
 
 
 def authored_for(operation: str, qtype: str, mid: str, role: str | None = None) -> list["WrongOption"]:
@@ -371,10 +461,14 @@ class WrongOption:
         return "distractor"
 
 
-@lru_cache(maxsize=None)
 def authored_wrong_options(operation: str) -> tuple[WrongOption, ...]:
     """Every wrong thing the authored content can show for one operation, tagged:
     blank distractors, each bug line and its wrong fixes, ordering distractors."""
+    return _authored(operation, tag_source())
+
+
+@lru_cache(maxsize=None)
+def _authored(operation: str, source: str) -> tuple[WrongOption, ...]:
     from .static_questions import TEMPLATES, _BLANKS, _BUGS
     steps = TEMPLATES[operation]["pseudocode"]
     out: list[WrongOption] = []

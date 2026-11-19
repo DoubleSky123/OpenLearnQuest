@@ -44,6 +44,12 @@ class ServedItem(Base):
 
 class MisconceptionEvent(Base):
     __tablename__ = "misconception_events"
+    # one piece of evidence per (student, question, misconception, kind): a pick
+    # counts once per question, 'avoided' is written once when the question is
+    # finished, 'taught' once per Quinn case (question_id = "npc:<case>"). Two
+    # quick wrong picks used to be able to log the same evidence twice.
+    __table_args__ = (UniqueConstraint("user_id", "question_id", "misconception_id", "kind",
+                                       name="uq_misconception_events_once"),)
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)

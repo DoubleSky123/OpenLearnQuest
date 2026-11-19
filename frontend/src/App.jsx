@@ -1,7 +1,7 @@
-import React, { Component, Suspense, lazy, useState, useCallback } from 'react';
+import React, { Component, Suspense, lazy, useState, useCallback, useEffect } from 'react';
 import { useAuth } from './contexts/AuthContext';
 import { useEmotion } from './contexts/EmotionContext';
-import { progressApi, emotionApi, authApi } from './services/api';
+import { progressApi, emotionApi, authApi, studyApi } from './services/api';
 import { EMOTIONS } from './services/adaptiveEngine';
 
 import AuthPage from './components/AuthPage';
@@ -17,7 +17,13 @@ import EmotionCheckIn from './components/EmotionCheckIn';
 import AgenticSession from './components/AgenticSession';
 import TeachSession from './components/TeachSession';
 import AdminDashboard from './components/AdminDashboard';
+import StudyConsent from './components/StudyConsent';
+import StudyTest from './components/StudyTest';
 import { hasWebGL } from './city/webgl';
+
+// Screens where the study step is re-checked (a test may have opened since):
+// home and the menus, never in the middle of a question.
+const STUDY_CHECK_SCREENS = new Set(['menu', 'school', 'path']);
 
 // Home is the student's 3D city (three.js loads only here, after login).
 const CityHome = lazy(() => import('./city/CityHome'));
@@ -48,6 +54,20 @@ export default function App() {
   const [chosenOperation,   setChosenOperation]   = useState(null);
   const [cityOk,            setCityOk]            = useState(hasWebGL);
   const [mistakesBack,      setMistakesBack]      = useState('path');
+
+  // The classroom study (off unless the server enables it): consent or a test
+  // comes before playing. undefined = not checked yet, null = nothing to do.
+  const [studyStep,         setStudyStep]         = useState(undefined);
+  const checkStudy = user && !user.is_admin && STUDY_CHECK_SCREENS.has(screen);
+  useEffect(() => { setStudyStep(undefined); }, [user?.id]);   // another login: never show the last one's step
+  useEffect(() => {
+    if (!checkStudy) return undefined;
+    let alive = true;
+    studyApi.status()
+      .then((r) => { if (alive) setStudyStep(r.step ?? null); })
+      .catch(() => { if (alive) setStudyStep(null); });   // the server still refuses practice if a step is due
+    return () => { alive = false; };
+  }, [checkStudy, screen, user?.id]);
 
   const openMistakes = (from) => { setMistakesBack(from); setScreen('mistake-book'); };
 
@@ -82,6 +102,19 @@ export default function App() {
 
   if (!user) return <AuthPage />;
   if (user.is_admin) return <AdminDashboard onBack={logout} />;
+
+  // ── The study's steps come before anything else ──────────────────────────────
+  if (studyStep === undefined && STUDY_CHECK_SCREENS.has(screen)) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-indigo-900 to-purple-900 flex items-center justify-center">
+        <div className="text-white text-xl">Loading…</div>
+      </div>
+    );
+  }
+  if (studyStep?.step === 'consent')
+    return <StudyConsent consent={studyStep.consent} onDone={setStudyStep} onLogout={logout} />;
+  if (studyStep?.step === 'test')
+    return <StudyTest key={studyStep.kind} kind={studyStep.kind} onDone={setStudyStep} onLogout={logout} />;
 
   // ── Screens ──────────────────────────────────────────────────────────────────
 

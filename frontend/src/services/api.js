@@ -17,7 +17,11 @@ async function request(method, path, body) {
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: "Request failed" }));
-    throw new Error(err.detail || "Request failed");
+    // a 422 carries a list of field errors: show their messages, not "[object Object]"
+    const detail = Array.isArray(err.detail)
+      ? err.detail.map((d) => d?.msg).filter(Boolean).join("; ")
+      : err.detail;
+    throw new Error(detail || "Request failed");
   }
   return res.json();
 }
@@ -126,6 +130,18 @@ export const npcApi = {
   test: (caseId, board) => request("POST", `/api/npc/case/${caseId}/test`, board),
   explain: (caseId, body) => request("POST", `/api/npc/case/${caseId}/explain`, body),
   coach: (caseId) => request("POST", `/api/npc/case/${caseId}/coach`),
+};
+
+// The classroom study (/api/study): consent, then the pre / post / delayed tests.
+// The server judges every answer; the client never learns which option is right.
+export const studyApi = {
+  status: () => request("GET", "/api/study/status"),
+  consent: (agreed, background = {}) => request("POST", "/api/study/consent", { agreed, background }),
+  startTest: (kind) => request("POST", `/api/study/test/${kind}/start`),
+  answer: (kind, itemId, optionId, timeMs) =>
+    request("POST", `/api/study/test/${kind}/answer`, { item_id: itemId, option_id: optionId, time_ms: timeMs }),
+  submit: (kind) => request("POST", `/api/study/test/${kind}/submit`),
+  summary: () => request("GET", "/api/study/admin/summary"),   // admins: counts only
 };
 
 // Admin

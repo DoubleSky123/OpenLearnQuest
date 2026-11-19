@@ -18,7 +18,7 @@ cd backend
 d:/openLearnquest/venv/Scripts/python.exe ../.claude/skills/tutor-sim/tutor_sim.py [--scenario NAME] [--show-context]
 ```
 
-- Full run = 13 scenarios ≈ 13–17 Haiku calls (~50s). `--scenario NAME` runs one.
+- Full run = 16 scenarios ≈ 16–20 Haiku calls (~60s). `--scenario NAME` runs one. The three `misconception_*` scenarios check the tutor channel of a misconception study: aim at the belief, never name it, never leak the blank; read `misconception_evidence` next to `misconception_control` (same student, no evidence).
 - Scenarios carry a `phase` (`solving` / `reviewing`). `reviewing` means the analysis card is up and the answer is already on screen, so the tutor is EXPECTED to explain the solution — do not add `no_leak` to a reviewing scenario.
 - `--show-context` prints the built first-turn context block **without any API call** — use this (free) to eyeball `[TUTOR CONTEXT]` / `[STUDENT HISTORY]` changes after editing `build_context_block()`.
 - `--auto-student N [--persona "..."]` — watch a full N-turn conversation unfold: Haiku role-plays the student, the transcript prints turn by turn (≈2 calls/turn). No pass/fail checks — this is for reading how the tutor actually behaves across a whole dialogue (verdict tone, when the video appears, whether it stays anchored on the error).

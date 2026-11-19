@@ -66,7 +66,9 @@ def main() -> int:
         items = [i for i in served if (i.user_id, i.question_id) in worked]
         events = q(MisconceptionEvent).order_by(MisconceptionEvent.at).all()
         states = q(MisconceptionState).all()
-        arm_of = {i.user_id: i.arm for i in served if i.arm}
+        # the arm when the PICKED item was served: per student between subjects,
+        # per unit in a crossover study (served_items.arm is stored per item)
+        arm_at = {(i.user_id, i.question_id): i.arm for i in served if i.arm}
 
         _rule("1. Coverage")
         offered = sum(1 for i in items if any(
@@ -88,17 +90,17 @@ def main() -> int:
                 print(f"  {mid:24} suspected={c['suspected']:<3} active={c['active']:<3} resolved={c['resolved']}")
 
         _rule("3. Recurrence: P(picked | picked at the previous opportunity)")
-        seq = defaultdict(list)                      # (user, m) -> kinds in order
+        seq = defaultdict(list)                      # (user, m) -> events in order
         for e in events:
             if e.kind in ("picked", "avoided"):
-                seq[(e.user_id, e.misconception_id)].append(e.kind)
+                seq[(e.user_id, e.misconception_id)].append(e)
         rec = defaultdict(lambda: [0, 0])            # arm -> [again, after_pick]
-        for (user, _), kinds in seq.items():
-            for prev, nxt in zip(kinds, kinds[1:]):
-                if prev == "picked":
-                    r = rec[arm_of.get(user, "-")]
+        for (user, _), evs in seq.items():
+            for prev, nxt in zip(evs, evs[1:]):
+                if prev.kind == "picked":
+                    r = rec[arm_at.get((user, prev.question_id), "-")]
                     r[1] += 1
-                    r[0] += nxt == "picked"
+                    r[0] += nxt.kind == "picked"
         if not rec:
             print("(no repeated opportunities yet)")
         for a, (again, n) in sorted(rec.items()):

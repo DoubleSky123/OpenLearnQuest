@@ -1,12 +1,18 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import String, Integer, DateTime, ForeignKey, Boolean
+from sqlalchemy import String, Integer, DateTime, ForeignKey, Boolean, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .base import Base
 
 
 class QuestionAttempt(Base):
     __tablename__ = "question_attempts"
+    # one attempt per (session, question): /session/record and the /session/next
+    # resend can race; the loser gets IntegrityError and returns the winner's row
+    # (game_master._record_attempt), so mastery is applied once
+    __table_args__ = (
+        UniqueConstraint("session_id", "question_id", name="uq_question_attempts_session_question"),
+    )
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     session_id: Mapped[str] = mapped_column(String, ForeignKey("game_sessions.id"), nullable=False)

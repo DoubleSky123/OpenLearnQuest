@@ -154,21 +154,35 @@ def _board_mistakes(db: Session, user_id: str, question_id: str | None, title: s
 def _honoured_phase(db: Session, user_id: str, body: "TutorRequest") -> str:
     """"reviewing" lets the tutor explain the answer outright, so it is honoured
     only once this question's attempt is recorded (the analysis card appears after
-    /session/record). Anything else is "solving"."""
+    /session/record) BY THE GAME MASTER for this operation: those rows always carry
+    the server-derived question_type. The legacy /progress attempts route writes
+    rows with any question id and no type, so it can't unlock it. Anything else
+    is "solving"."""
     if body.phase != "reviewing" or not body.session_id or not body.question_id:
         return "solving"
     done = (db.query(QuestionAttempt.id)
             .join(GameSession, QuestionAttempt.session_id == GameSession.id)
             .filter(GameSession.user_id == user_id, QuestionAttempt.session_id == body.session_id,
-                    QuestionAttempt.question_id == str(body.question_id))
+                    QuestionAttempt.question_id == str(body.question_id),
+                    QuestionAttempt.question_type.isnot(None),
+                    QuestionAttempt.operation == body.operation)
             .first())
     return "reviewing" if done else "solving"
 
 
+def _answered(db: Session, user_id: str, question_id: str | None) -> bool:
+    return question_id is not None and (
+        db.query(QuestionAttempt.id)
+        .join(GameSession, QuestionAttempt.session_id == GameSession.id)
+        .filter(GameSession.user_id == user_id, QuestionAttempt.question_id == str(question_id))
+        .first() is not None)
+
+
 def _final_hint(db: Session, user_id: str, body: "TutorRequest") -> bool:
     """The client claims the final hint; the server checks the mistakes behind it
-    (never trust client-computed counts — a claim above what was posted is capped)."""
-    if not body.final_hint:
+    (never trust client-computed counts — a claim above what was posted is capped).
+    A question already answered can't lend its mistakes to a new one."""
+    if not body.final_hint or _answered(db, user_id, body.question_id):
         return False
     errors = min(body.error_count, _board_mistakes(db, user_id, body.question_id, body.question_title))
     return tutor_agent.final_hint_allowed(body.phase, body.final_hint, errors)
@@ -198,9 +212,31 @@ def _fetch_history(db: Session, user_id: str, question_title: str, operation: st
     episodic = tutor_memory.episodic_block(db, user_id, operation)
     if episodic:
         parts.append(episodic)
-    if misconception_model.targeting(user_id):
-        parts.append(misconception_model.tutor_block(db, user_id, operation))
     return "\n\n".join(p for p in parts if p)
+
+
+def _misconception_context(db: Session, user_id: str, body: "TutorRequest") -> tuple[str, dict | None]:
+    """[MISCONCEPTION EVIDENCE] for this turn, rebuilt every turn (a pick made
+    mid-chat reaches the tutor on the next message). Only students in the tutor
+    channel get it in the prompt; every recorded turn stores what was — or for a
+    control student, WOULD have been — given (tutor_turns.misconception_context)."""
+    if not misconception_model.recording():
+        return "", None
+    try:
+        items = misconception_model.tutor_evidence(db, user_id, body.question_id, body.operation)
+    except Exception:   # noqa: BLE001 — evidence is an aid, never worth failing the turn
+        db.rollback()
+        logger.exception("misconception evidence failed (question %s)", body.question_id)
+        items = []
+    # the arm can depend on the unit (crossover study): the operation the SERVER
+    # served under this question id, not the one the client names
+    item = misconception_model.served(db, user_id, body.question_id) if body.question_id else None
+    operation = item.operation if item is not None else body.operation
+    sent = misconception_model.targeting(user_id, "tutor", db=db, operation=operation)
+    record = {"arm": misconception_model.arm(user_id, db=db, operation=operation) or misconception_model.mode(),
+              "sent": sent and bool(items),
+              "items": [{k: it.get(k) for k in ("id", "where", "earlier_questions")} for it in items]}
+    return (misconception_model.tutor_note(items) if sent else ""), record
 
 
 def _auto_diagnosis(body: "TutorRequest") -> dict | None:
@@ -288,6 +324,7 @@ def tutor_chat(
         raise HTTPException(status_code=429, detail=RATE_NOTICE)
 
     student_history = _fetch_history(db, current_user.id, body.question_title, body.operation)
+    mc_note, mc_record = _misconception_context(db, current_user.id, body)
     history = tutor_memory.model_view(db, conv)
     if not history and body.session_id is None and body.messages:
         # sessionless legacy caller — honour client-held history. With a session_id
@@ -296,7 +333,8 @@ def tutor_chat(
         history = [m.model_dump() for m in body.messages]
     diagnosis = _auto_diagnosis(body)
     turn = tutor_telemetry.start_turn(
-        db, current_user.id, conv, {**_turn_fields(body, final_hint), "diagnosis": diagnosis},
+        db, current_user.id, conv,
+        {**_turn_fields(body, final_hint), "diagnosis": diagnosis, "misconception_context": mc_record},
     )
     tutor_memory.append_message(db, conv, "user", body.user_message)
     t0 = time.monotonic()
@@ -315,6 +353,7 @@ def tutor_chat(
             board_note=body.board_note,
             phase=body.phase,
             final_hint=final_hint,
+            misconception_note=mc_note,
         )
     except Exception:
         logger.exception("tutor chat failed (conversation %s)", conv.id)
@@ -398,6 +437,7 @@ def tutor_chat_stream(
         return StreamingResponse(notice(), media_type="text/event-stream")
 
     student_history = _fetch_history(db, current_user.id, body.question_title, body.operation)
+    mc_note, mc_record = _misconception_context(db, current_user.id, body)
     history = tutor_memory.model_view(db, conv)
     if not history and body.session_id is None and body.messages:
         # sessionless legacy caller — honour client-held history. With a session_id
@@ -406,7 +446,8 @@ def tutor_chat_stream(
         history = [m.model_dump() for m in body.messages]
     diagnosis = _auto_diagnosis(body)
     turn = tutor_telemetry.start_turn(
-        db, current_user.id, conv, {**_turn_fields(body, final_hint), "diagnosis": diagnosis},
+        db, current_user.id, conv,
+        {**_turn_fields(body, final_hint), "diagnosis": diagnosis, "misconception_context": mc_record},
     )
     tutor_memory.append_message(db, conv, "user", body.user_message)
 
@@ -416,7 +457,7 @@ def tutor_chat_stream(
             body.your_answer, body.correct_answer,
             body.error_count, history, body.user_message,
             diagnosis, student_history, body.question_type,
-            body.board_note, body.phase, final_hint,
+            body.board_note, body.phase, final_hint, mc_note,
         )
         system = tutor_agent.system_prompt_for(body.phase, final_hint)
         t0 = time.monotonic()

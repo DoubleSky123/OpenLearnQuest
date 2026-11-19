@@ -34,6 +34,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
@@ -121,10 +122,11 @@ def level_state(mastery_map: dict, operation: str) -> tuple[int, int]:
 
 def update_mastery(
     db: Session, user_id: str, module_id: str, operation: str, passed: bool, error_count: int = 0,
-    question_type: str | None = None, mastery_map: dict | None = None,
+    question_type: str | None = None, mastery_map: dict | None = None, commit: bool = True,
 ) -> None:
     """mastery_map: the caller's map, if it was built since the last mastery
-    change (_record_attempt has one) — saves rebuilding it."""
+    change (_record_attempt has one) — saves rebuilding it. commit=False: the
+    caller commits (_record_attempt writes the attempt and its mastery together)."""
     # ── Operation-level mastery ───────────────────────────────────────────
     if mastery_map is None:
         mastery_map = get_mastery_map(db, user_id, module_id)
@@ -201,7 +203,8 @@ def update_mastery(
             cm.mastery = max(0.0, cm.mastery - cm.mastery * 0.15 * weight)
         cm.last_updated = datetime.utcnow()
 
-    db.commit()
+    if commit:
+        db.commit()
 
 
 def mastery_summary(mastery_map: dict, module_id: str) -> dict:
@@ -391,7 +394,8 @@ def _close_intervention_loop(
 ) -> None:
     """Closed-loop intervention telemetry: interventions logged since the last
     recorded attempt belong to this question — write the question's outcome
-    back onto them so their effectiveness becomes measurable."""
+    back onto them so their effectiveness becomes measurable. The caller
+    commits (it is part of _record_attempt's transaction)."""
     pending = (
         db.query(EmotionLog)
         .filter(
@@ -409,8 +413,6 @@ def _close_intervention_loop(
             "passed": passed,
             "error_count": error_count,
         }
-    if pending:
-        db.commit()
 
 
 def record_result(
@@ -450,7 +452,7 @@ def record_result(
         # "what your choice did" — only for students who get remediation
         "misconception_feedback": _after_record(
             "misconception feedback", lambda: misconception_model.feedback_for(db, user_id, question_id), [])
-                                  if misconception_model.targeting(user_id) else [],
+                                  if misconception_model.targeting(user_id, "feedback", db=db, operation=operation) else [],
     }
 
 
@@ -477,11 +479,17 @@ def _record_attempt(
     targeted item under that id; it counts as practice for mastery.
     Idempotent per (session, question): /session/next re-sends a result whose
     /session/record landed but whose reply was lost — recording it twice would
-    apply mastery twice (one clean answer counting as two)."""
-    existing = (db.query(QuestionAttempt)
-                .filter(QuestionAttempt.session_id == session_id, QuestionAttempt.question_id == question_id)
-                .first())
+    apply mastery twice (one clean answer counting as two). The attempt, its
+    intervention outcome and its mastery update are ONE transaction: a failure
+    leaves nothing behind, so the resend records it in full. Two requests racing
+    past the check below meet at uq_question_attempts_session_question; the
+    loser rolls back and returns the winner's row."""
+    existing = _attempt_of(db, session_id, question_id)
     if existing is not None:
+        # the misconception outcome is written after the commit; if that write was
+        # lost, the resend repairs it (idempotent per question)
+        misconception_model.record_outcome(db, user_id, question_id, passed=existing.passed,
+                                           error_count=existing.error_count)
         return existing
     mastery_map = get_mastery_map(db, user_id, module_id)
     item = misconception_model.served(db, user_id, question_id) if misconception_model.recording() else None
@@ -513,16 +521,35 @@ def _record_attempt(
         purpose=purpose,
         target_misconception=target,
     )
-    db.add(attempt)
-    db.commit()
-    _close_intervention_loop(db, session_id, question_id, operation, passed, error_count)
-    if operation not in curriculum.available_ops(mastery_map):
-        # the server never serves a locked unit's op: a claim for one is recorded, not credited
-        logger.warning("attempt on %s (locked unit) not applied to mastery for %s", operation, user_id)
-    elif purpose != "review":
-        update_mastery(db, user_id, module_id, operation, passed, error_count, played, mastery_map=mastery_map)
+    try:
+        db.add(attempt)
+        db.flush()        # a concurrent resend for this question fails here (unique index)
+        _close_intervention_loop(db, session_id, question_id, operation, passed, error_count)
+        if operation not in curriculum.available_ops(mastery_map):
+            # the server never serves a locked unit's op: a claim for one is recorded, not credited
+            logger.warning("attempt on %s (locked unit) not applied to mastery for %s", operation, user_id)
+        elif purpose != "review":
+            update_mastery(db, user_id, module_id, operation, passed, error_count, played,
+                           mastery_map=mastery_map, commit=False)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        existing = _attempt_of(db, session_id, question_id)
+        if existing is None:      # a different constraint: not a resend, let the route report it
+            raise
+        logger.info("attempt %s/%s already recorded by a concurrent request", session_id, question_id)
+        return existing
+    except Exception:
+        db.rollback()
+        raise
     misconception_model.record_outcome(db, user_id, question_id, passed=passed, error_count=error_count)
     return attempt
+
+
+def _attempt_of(db: Session, session_id: str, question_id: str) -> QuestionAttempt | None:
+    return (db.query(QuestionAttempt)
+            .filter(QuestionAttempt.session_id == session_id, QuestionAttempt.question_id == question_id)
+            .first())
 
 
 def _peer_stats(db: Session, operation: str, attempt_id: str, time_ms: int) -> dict | None:
@@ -747,7 +774,7 @@ def plan_next(db: Session, user_id: str, module_id: str, pinned_operation: str |
     if misconception_model.recording():
         rem = _remediation(db, user_id, unit, mastery_map, history, seen)
         if rem:
-            if misconception_model.targeting(user_id):
+            if misconception_model.targeting(user_id, "remediation", db=db, operation=rem[0]):
                 return Plan(rem[0], "remediate", target_misconception=rem[1])
             shadow = {"operation": rem[0], "misconception": rem[1]}
 
@@ -961,7 +988,7 @@ def _targeted_question(operation: str, emotion: str, mastery_map: dict, intra_di
             logger.warning("targeted static build failed for %s/%s: %s", operation, target, e)
             q = None
     if (q is None or q.get("target_misconception") != target) and db is not None \
-            and qtype in question_pool.POOLED_TYPES:
+            and qtype in question_pool.POOLED_TYPES and not settings.authored_only:
         q = question_pool.serve(db, user_id, operation, qtype, intra_difficulty,
                                 exclude_qid=exclude_qid, misconception=target)
     if q is None or q.get("target_misconception") != target:
@@ -988,6 +1015,7 @@ def _generate_untracked(
     Pooled AI types are served from question_pool first (class-shared, excluding
     questions this student attempted); an empty pool falls back to live
     generation. generate_question handles retries and static fallback internally.
+    QUESTION_SOURCE=authored skips both: authored content only (a study).
     """
     op_m          = mastery_map.get(operation, {})
     # The question TYPE follows the student's chosen active level (<= the earned ceiling),
@@ -998,7 +1026,8 @@ def _generate_untracked(
     purpose       = plan.purpose if plan else "practice"
 
     qtype = _TYPE_BY_LEVEL.get(active_level, "fill_blank")
-    if db is not None and user_id is not None and qtype in question_pool.POOLED_TYPES:
+    if db is not None and user_id is not None and qtype in question_pool.POOLED_TYPES \
+            and not settings.authored_only:
         q = question_pool.serve(db, user_id, operation, qtype, intra_difficulty, exclude_qid=exclude_qid)
         if q is not None:
             q["intra_difficulty"] = intra_difficulty
@@ -1010,7 +1039,8 @@ def _generate_untracked(
         # attempts count drives deterministic variant rotation (blank sets / static
         # bugs), offset per student so set order is counterbalanced across a class
         q = generate_question(operation, emotion, active_level, intra_difficulty,
-                              variant_seed=op_m.get("attempts", 0) + _variant_offset(user_id))
+                              variant_seed=op_m.get("attempts", 0) + _variant_offset(user_id),
+                              static_only=settings.authored_only)
         if q.get("question_type") == "ordering" and q.get("pseudocode") and any(
             str(step).lower().startswith("step") or str(step).strip() == ""
             for step in q["pseudocode"]

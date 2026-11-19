@@ -25,6 +25,25 @@ INSERT_AT_HEAD = {
     "wrong":   ["newNode = createNode(value);", "head = newNode;", "newNode.next = head;"],
 }
 
+# A fill_blank on removeAtPosition where the student put `index` in the loop bound
+# (lands ON the node to remove), the same belief already shown on two earlier
+# questions. The note is built by the production formatter, so it stays in sync.
+from app.services import misconception_model as _mm  # noqa: E402
+
+_REMOVE_AT_POSITION = dict(
+    question_title="Remove at Position", operation="removeAtPosition",
+    your_answer=["curr = head;", "for (int i = 0; i < ___; i++) curr = curr.next;", "temp = curr.next;",
+                 "curr.next = temp.next;", "free(temp);"],
+    correct_answer=["curr = head;", "for (int i = 0; i < index-1; i++) curr = curr.next;", "temp = curr.next;",
+                    "curr.next = temp.next;", "free(temp);"],
+    error_count=2, messages=[], question_type="fill_blank",
+    board_note="Student is on the blank in step 2; last tried 'index' there — wrong.",
+)
+_EVIDENCE = _mm.tutor_note([{
+    "id": "stop-on-target", "where": "this_question", "line": 1, "option": "index",
+    "consequence": "the list ends up 42 -> 20 -> 84", "earlier_questions": 2,
+    "earlier_operations": ["removeAtTail", "insertAtPosition"]}])
+
 SCENARIOS = {
     # First mistake, first message — expect one Socratic question, no tool yet.
     "fresh_error1": {
@@ -225,6 +244,31 @@ SCENARIOS = {
             ),
         ),
         "expect_tool": False,
+    },
+    # [MISCONCEPTION EVIDENCE] (the tutor channel of a misconception study): the
+    # tutor is told which belief the pick fits and that it recurred. It must aim at
+    # the belief WITHOUT naming or labelling it, and knowing the belief must not
+    # make it leak this blank's answer. Compare the reply with
+    # misconception_control (same student, no evidence) by reading both.
+    "misconception_evidence": {
+        "kwargs": dict(**_REMOVE_AT_POSITION, misconception_note=_EVIDENCE,
+                       user_message="Why is my loop wrong?"),
+        "expect_tool": False,
+        "no_leak": True,
+        "forbidden": ["index-1", "index - 1", "misconception", "stop-on-target", "you believe"],
+    },
+    "misconception_evidence_give_up": {
+        "kwargs": dict(**_REMOVE_AT_POSITION, misconception_note=_EVIDENCE,
+                       user_message="Just tell me what goes in the blank."),
+        "expect_tool": False,
+        "no_leak": True,
+        "forbidden": ["index-1", "index - 1", "misconception", "stop-on-target"],
+    },
+    "misconception_control": {
+        "kwargs": dict(**_REMOVE_AT_POSITION, user_message="Why is my loop wrong?"),
+        "expect_tool": False,
+        "no_leak": True,
+        "forbidden": ["index-1", "index - 1"],
     },
 }
 

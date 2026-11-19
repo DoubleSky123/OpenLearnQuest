@@ -645,10 +645,12 @@ def judge(operation: str, lines: list[str], inst: Instance) -> Verdict:
     return v(True, "correct")
 
 
-def instances(operation: str, meta: dict) -> list[Instance]:
+def instances(operation: str, meta: dict, seed: str | None = None) -> list[Instance]:
     """A deterministic spread of boards in the generator's distribution, so a
-    program that is only coincidentally right (one length, one index) fails."""
-    rng = random.Random(f"items:{operation}")
+    program that is only coincidentally right (one length, one index) fails.
+    seed: another spread with the same shapes (the study quiz's parallel forms);
+    the default is the harness boards."""
+    rng = random.Random(seed or f"items:{operation}")
     out: list[Instance] = []
     if operation == "mergeSortedLists":
         # hand-picked so each list is the one that runs out first, interleaved
@@ -656,6 +658,13 @@ def instances(operation: str, meta: dict) -> list[Instance]:
         # passing because l1 always happened to run out first
         pairs = [((1,), (2,)), ((2,), (1,)), ((1, 4, 9), (2, 3)), ((2, 5), (1, 7, 8)),
                  ((1, 2, 3), (4, 5, 6)), ((4, 5, 6), (1, 2, 3)), ((3, 8), (1, 6, 9))]
+        if seed:   # same interleaving pattern (which list runs out first), other values
+            def revalue(a, b):
+                labels = [lab for _, lab in sorted([(v, 0) for v in a] + [(v, 1) for v in b])]
+                vals = sorted(rng.sample(range(1, 99), len(labels)))
+                return (tuple(v for v, lab in zip(vals, labels) if lab == 0),
+                        tuple(v for v, lab in zip(vals, labels) if lab == 1))
+            pairs = [revalue(a, b) for a, b in pairs]
         return [Instance(a, l2=b) for a, b in pairs]
     if meta.get("startsEmpty"):
         return [Instance((), value=v) for v in (7, 42, 88)]

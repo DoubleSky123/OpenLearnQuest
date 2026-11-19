@@ -52,6 +52,8 @@ For every existing misconception that applies to the new op (stop-on-target, for
 
 Teach Quinn (`backend/app/services/npc_agent.py`): add the op to `_LENGTHS` (the list lengths a student may build: the operation's precondition, not minNodes — `KeyError` otherwise) and to its kind in `_OP_KINDS`; if it takes something other than a value/index/second list/cycle, extend `board_spec`/`parse_board` and the `TestBuilder` in `TeachSession.jsx`. `pytest tests/test_npc.py` checks the template is right on every buildable board, the hidden tests are buildable, and every mutant can be shown. A new catalog entry: read its correction against every other bug and add a `_FAMILIES` row when one would also explain the other.
 
+Classroom study tests (`backend/app/services/quiz_bank.py`): add the op's task sentence to `PROMPTS` (student-facing, `{value}`/`{index}` from the board, e.g. "Remove the node at index {index}."), then from `backend/` run `venv/Scripts/python.exe build_quiz_bank.py` — it builds the op's items from its catalog mutants and checks each one by running it (`test_the_shipped_bank_matches_a_fresh_build` fails until you do). Never rebuild during a running study.
+
 ### 1e'. `backend/app/services/curriculum.py` — `UNITS`
 
 Put `<op>` in the unit whose IDEA it practises (`ops`), and decide its place in `groups`: its own group (a primary that climbs the full ladder) or a variant in the group of an op with the same idea (it joins once that primary is mastered and starts at the unit's `transfer_start`). Every op in a unit is required: the unit is mastered only when all of them are. A genuinely new idea is a new unit — write its `big_idea` and `watch_for` as a teacher would. `test_every_operation_is_taught_exactly_once` fails until it is placed.

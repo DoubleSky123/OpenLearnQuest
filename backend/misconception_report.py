@@ -54,10 +54,14 @@ def main() -> int:
     def pct(a, b):
         return f"{a}/{b} ({100 * a // b if b else 0}%)"
 
-    print(f"\nwrong options tagged: {pct(tagged, total)}")
+    print(f"\nwrong options tagged: {pct(tagged, total)}  (tags from: {mc.tag_source()})")
     for t in TYPES:
         n, k = by_type[t]
         print(f"  {t:10} {pct(k, n)}")
+    from misconception_labels_sheet import edit_of
+    edits = {edit_of(w) for op in ops for w in mc.authored_wrong_options(op) if w.role != "bug"}
+    print(f"student-pickable edits a teacher has labelled: {pct(sum(mc.label_for(*e) is not None for e in edits), len(edits))}"
+          "  (misconception_labels_sheet.py)")
 
     print("\nmisconceptions: authored items that can target each one")
     for m in mc.CATALOG.values():
